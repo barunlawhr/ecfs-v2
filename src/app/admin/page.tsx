@@ -81,7 +81,7 @@ export default function AdminPage() {
 
         const [prRes, assignRes] = await Promise.all([
           supabase.from('practice_records').select('score, created_at'),
-          supabase.from('assignments').select('id', { count: 'exact', head: true }),
+          supabase.from('case_assignments').select('id', { count: 'exact', head: true }),
         ])
 
         const records = prRes.data || []
@@ -403,7 +403,7 @@ export default function AdminPage() {
       setAssignLoading(true)
       const [caseRes, assignRes] = await Promise.all([
         supabase.from('sample_cases').select('*').order('created_at', { ascending: false }),
-        supabase.from('assignments').select('*,sample_cases(*)').order('assigned_at', { ascending: false }),
+        supabase.from('case_assignments').select('*,sample_cases(*)').order('assigned_at', { ascending: false }),
       ])
       setCases(caseRes.data || [])
       setCurrentAssignments(assignRes.data || [])
@@ -436,7 +436,7 @@ export default function AdminPage() {
         assigned_at: new Date().toISOString(),
         status: 'pending',
       }))
-      const { error } = await supabase.from('assignments').insert(rows)
+      const { error } = await supabase.from('case_assignments').insert(rows)
       setAssigning(false)
       if (error) { alert('배정 실패: ' + error.message); return }
       showToast(`${selectedStudents.size}명에게 배정 완료!`)
