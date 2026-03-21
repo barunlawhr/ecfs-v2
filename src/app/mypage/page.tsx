@@ -90,12 +90,9 @@ export default function MyPage() {
   async function fetchAssignments() {
     if (!user) return
     setAssignmentsLoading(true)
-    const { data } = await supabase
-      .from('sample_cases')
-      .select('*')
-      .contains('assigned_students', [user.id])
-      .order('created_at', { ascending: false })
-    const transformed: Assignment[] = (data || []).map(sc => ({
+    const res = await fetch(`/api/assignments?student_id=${user.id}`)
+    const data: SampleCase[] = await res.json()
+    const transformed: Assignment[] = (Array.isArray(data) ? data : []).map(sc => ({
       id: String(sc.id),
       case_id: String(sc.id),
       student_id: user.id,

@@ -401,11 +401,15 @@ export default function AdminPage() {
 
     const fetchData = useCallback(async () => {
       setAssignLoading(true)
-      const { data: casesData } = await supabase.from('sample_cases').select('*').order('created_at', { ascending: false })
-      const allCases = casesData || []
+      const [caseRes, assignedRes] = await Promise.all([
+        supabase.from('sample_cases').select('*').order('created_at', { ascending: false }),
+        fetch('/api/assignments').then(r => r.json()),
+      ])
+      const allCases = caseRes.data || []
       setCases(allCases)
+      const assignedCases: SampleCase[] = Array.isArray(assignedRes) ? assignedRes : []
       const syntheticAssignments: (Assignment & { sample_cases?: SampleCase })[] = []
-      allCases.forEach(sc => {
+      assignedCases.forEach(sc => {
         ;(sc.assigned_students || []).forEach((sid: string) => {
           syntheticAssignments.push({ id: `${sc.id}-${sid}`, case_id: String(sc.id), student_id: sid, assigned_at: sc.created_at, status: 'pending', sample_cases: sc })
         })
@@ -434,12 +438,14 @@ export default function AdminPage() {
       if (!selectedCase) { alert('사건을 선택해주세요.'); return }
       if (selectedStudents.size === 0) { alert('학생을 선택해주세요.'); return }
       setAssigning(true)
-      const sc = cases.find(c => String(c.id) === selectedCase)
-      const current = sc?.assigned_students || []
-      const merged = Array.from(new Set([...current, ...Array.from(selectedStudents)]))
-      const { error } = await supabase.from('sample_cases').update({ assigned_students: merged }).eq('id', Number(selectedCase))
+      const res = await fetch('/api/assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ case_id: Number(selectedCase), student_ids: Array.from(selectedStudents) }),
+      })
+      const result = await res.json()
       setAssigning(false)
-      if (error) { alert('배정 실패: ' + error.message); return }
+      if (!res.ok) { alert('배정 실패: ' + result.error); return }
       showToast(`${selectedStudents.size}명에게 배정 완료!`)
       setSelectedStudents(new Set())
       setSelectedCase('')
