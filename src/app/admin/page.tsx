@@ -474,7 +474,7 @@ export default function AdminPage() {
               {selectedCase && (
                 <div style={{ marginTop: 10, padding: '10px 14px', background: '#f0f6ff', border: '1px solid #c8d8f0', borderRadius: 6, fontSize: 12, color: '#1a3a6b' }}>
                   {(() => {
-                    const sc = cases.find(c => c.id === Number(selectedCase))
+                    const sc = cases.find(c => String(c.id) === selectedCase)
                     return sc ? `${sc.plaintiff} vs ${sc.defendant} | ${sc.court}` : ''
                   })()}
                 </div>
