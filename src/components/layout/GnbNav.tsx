@@ -11,64 +11,80 @@ import LoginModal from '@/components/auth/LoginModal'
 ───────────────────────────────────── */
 type MenuItem = { label: string; href: string }
 type MenuGroup = { title: string; items: MenuItem[] }
-type MegaMenu = { groups: MenuGroup[]; image: string }
+type MegaMenu = { groups: MenuGroup[]; image: string; columns?: MenuGroup[][] }
 
 const MEGA: Record<string, MegaMenu> = {
   '나의전자소송': {
     image: '🧑‍💻',
-    groups: [
-      { title: '나의사건현황', items: [] },
-      { title: '나의사건관리', items: [
-        { label: '진행중사건', href: '/mypage' },
-        { label: '관심사건', href: '/mypage' },
-        { label: '확정된사건', href: '/mypage' },
-        { label: '완료된사건', href: '/mypage' },
-      ]},
-      { title: '사건진행', items: [
-        { label: '재판일정', href: '/mypage' },
-        { label: '대조형 쟁점요약', href: '#' },
-        { label: '사건별게시판', href: '#' },
-        { label: '문서송부서확인', href: '#' },
-        { label: '서증인부(문서송부)', href: '#' },
-        { label: '보정/미보정내역(독촉)', href: '#' },
-        { label: '엑셀 다운로드(독촉)', href: '#' },
-        { label: '증거의견입력', href: '#' },
-      ]},
-      { title: '나의문서함', items: [
-        { label: '작성중서류', href: '/apply' },
-        { label: '제출서류', href: '/mypage' },
-        { label: '미확인송달문서', href: '/mypage' },
-        { label: '전체송달문서', href: '#' },
-        { label: '송달문서 정(등)본발급', href: '#' },
-      ]},
-      { title: '납부/환급관리', items: [
-        { label: '소송비용납부', href: '#' },
-        { label: '상소비용예납', href: '#' },
-        { label: '전자납부내역', href: '#' },
-        { label: '가상계좌내역', href: '#' },
-        { label: '송달료 자동납부내역', href: '#' },
-        { label: '대표청구인 신고', href: '#' },
-        { label: '인지액환급청구', href: '#' },
-        { label: '과오납금반환청구', href: '#' },
-      ]},
-      { title: '기록 열람', items: [
-        { label: '나의사건열람', href: '#' },
-        { label: '형사전자사본화사건열람', href: '#' },
-      ]},
-      { title: '전자소송사건등록', items: [
-        { label: '전자소송사건등록', href: '#' },
-        { label: '형사전자사본화사건등록', href: '#' },
-      ]},
-      { title: '맞춤형문서함', items: [
-        { label: '파산관재인 사건 관리', href: '#' },
-        { label: '제출문서 반려의견', href: '#' },
-        { label: '채권정보조회', href: '#' },
-        { label: '사실조회기관회신', href: '#' },
-        { label: '상담의견교환', href: '#' },
-        { label: '제3채무자', href: '#' },
-        { label: '오픈API 제출내역', href: '#' },
-      ]},
-      { title: '나의정보관리', items: [] },
+    groups: [],
+    columns: [
+      // 열 0
+      [
+        { title: '나의사건현황', items: [] },
+        { title: '나의사건관리', items: [
+          { label: '진행중사건', href: '/mypage' },
+          { label: '관심사건', href: '/mypage' },
+          { label: '확정된사건', href: '/mypage' },
+          { label: '완료된사건', href: '/mypage' },
+        ]},
+        { title: '사건진행', items: [
+          { label: '재판일정', href: '/mypage' },
+          { label: '대조형 쟁점요약', href: '#' },
+          { label: '사건별게시판', href: '#' },
+          { label: '문서송부확인', href: '#' },
+          { label: '서증인부(문서송부)', href: '#' },
+          { label: '보정/미보정내역(독촉)', href: '#' },
+          { label: '증거의견입력', href: '#' },
+        ]},
+      ],
+      // 열 1
+      [
+        { title: '국선전담사건', items: [
+          { label: '처리내역관리', href: '#' },
+          { label: '보고된사건조회', href: '#' },
+        ]},
+        { title: '나의문서함', items: [
+          { label: '작성중서류', href: '/apply' },
+          { label: '제출서류', href: '/mypage' },
+          { label: '미확인송달문서', href: '/mypage' },
+          { label: '전체송달문서', href: '/mypage' },
+          { label: '송달문서 정(등)본발급', href: '#' },
+        ]},
+      ],
+      // 열 2
+      [
+        { title: '납부/환급관리', items: [
+          { label: '소송비용납부', href: '#' },
+          { label: '상소비용예납', href: '#' },
+          { label: '전자납부내역', href: '#' },
+          { label: '가상계좌내역', href: '#' },
+          { label: '송달료 자동납부내역', href: '#' },
+          { label: '대표청구인 신고', href: '#' },
+          { label: '인지액환급청구', href: '#' },
+          { label: '과오납금반환청구', href: '#' },
+        ]},
+        { title: '기록 열람', items: [
+          { label: '나의사건열람', href: '#' },
+          { label: '형사전자사본화사건열람', href: '#' },
+        ]},
+      ],
+      // 열 3
+      [
+        { title: '전자소송사건등록', items: [
+          { label: '전자소송사건등록', href: '#' },
+          { label: '형사전자사본화사건등록', href: '#' },
+        ]},
+        { title: '맞춤형문서함', items: [
+          { label: '파산관재인 사건 관리', href: '#' },
+          { label: '제출문서 반려의견', href: '#' },
+          { label: '채권정보조회', href: '#' },
+          { label: '사실조회기관회신', href: '#' },
+          { label: '상담의견교환', href: '#' },
+          { label: '제3채무자', href: '#' },
+          { label: '오픈API 제출내역', href: '#' },
+        ]},
+        { title: '나의정보관리', items: [] },
+      ],
     ],
   },
 
@@ -297,6 +313,7 @@ export default function GnbNav({ active }: { active?: string }) {
               {user.role === 'admin' && (
                 <Link href="/admin" style={{ padding: '0 10px', borderRight: '1px solid #d8dce4', color: '#555', textDecoration: 'none' }}>관리자</Link>
               )}
+              <Link href="/mypage" style={{ padding: '0 10px', borderRight: '1px solid #d8dce4', color: '#0067c2', fontWeight: 600, textDecoration: 'none', fontSize: 12 }}>나의전자소송</Link>
               <button onClick={logout} style={{ padding: '0 10px', background: 'none', border: 'none', fontSize: 12, color: '#555', cursor: 'pointer', borderRight: '1px solid #d8dce4', fontFamily: 'inherit' }}>로그아웃</button>
             </>
           ) : (
@@ -380,7 +397,7 @@ export default function GnbNav({ active }: { active?: string }) {
 
             {/* 우측 메뉴 그리드 */}
             <div style={{ flex: 1, padding: '24px 28px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0 24px', maxHeight: 480, overflowY: 'auto' }}>
-              {chunkGroups(MEGA[openMenu].groups).map((col, ci) => (
+              {(MEGA[openMenu].columns || chunkGroups(MEGA[openMenu].groups)).map((col, ci) => (
                 <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   {col.map((group, gi) => (
                     <div key={gi}>

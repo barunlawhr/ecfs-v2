@@ -25,6 +25,9 @@ type ActivePage =
   | 'pay'
   | 'myinfo-user'
   | 'myinfo-pw'
+  | 'all-delivery'
+  | 'unread-delivery'
+  | 'alert-service'
   | 'generic'
 
 interface Assignment {
@@ -88,9 +91,13 @@ export default function MyPage() {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     '나의사건관리': true,
     '사건진행': false,
+    '국선전담사건': false,
+    '각종신청': false,
     '나의문서함': false,
     '납부환급관리': false,
-    '기득열람': false,
+    '기록열람': false,
+    '전자소송사건등록': false,
+    '맞춤형문서함': false,
     '실습전용': true,
     '나의정보관리': false,
   })
@@ -262,126 +269,134 @@ export default function MyPage() {
   )
 
   // ── STATUS PAGE ──────────────────────────────────────────────
-  const StatusContent = () => (
-    <div>
-      <PageHd title="나의사건현황" actions={<><ActBtn label="📌 나의 메뉴 추가" /><ActBtn label="🖨 출력" /></>} />
+  const StatusContent = () => {
+    const TC = '#0098a3' // teal color
 
-      {/* Counter boxes */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: 16, background: '#fff', borderBottom: '1px solid #eee' }}>
-        <div style={{ border: '1px solid #dde0e8', borderRadius: 6, overflow: 'hidden' }}>
-          <div style={{ background: '#1a3a6b', color: '#fff', padding: '9px 14px', fontSize: 13, fontWeight: 700 }}>나의 사건관리</div>
-          <div style={{ padding: '14px 16px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, textAlign: 'center' }}>
-            {[
-              { n: allCases.length, l: '진행중사건', c: '#006699' },
-              { n: 0, l: '미확인송달', c: '#555' },
-              { n: 0, l: '관심사건', c: '#555' },
-            ].map(({ n, l, c }) => (
-              <div key={l}>
-                <div style={{ fontSize: 26, fontWeight: 700, color: c }}>{assignmentsLoading ? '…' : n}</div>
-                <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{l}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ padding: '0 16px 14px' }}>
-            <button onClick={() => navTo('assigned-cases')} style={{ width: '100%', padding: '6px', fontSize: 12, border: '1px solid #006699', color: '#006699', background: '#f0f7ff', borderRadius: 3, cursor: 'pointer', fontFamily: 'inherit' }}>
-              배정된 사건 보기
-            </button>
-          </div>
+    const WBox = ({ title, onPlus, children }: { title: string; onPlus?: () => void; children: React.ReactNode }) => (
+      <div style={{ border: '1px solid #d0d8e8', borderRadius: 6, background: '#fff', overflow: 'hidden' }}>
+        <div style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e8edf0' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#222', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ color: TC, fontSize: 16, lineHeight: 1 }}>○</span> {title}
+          </span>
+          <button onClick={onPlus} style={{ width: 22, height: 22, border: '1px solid #c8cdd6', background: '#f5f6fa', borderRadius: 3, cursor: 'pointer', fontSize: 15, lineHeight: '20px', color: '#555', fontFamily: 'inherit', padding: 0 }}>+</button>
         </div>
-
-        <div style={{ border: '1px solid #dde0e8', borderRadius: 6, overflow: 'hidden' }}>
-          <div style={{ background: '#1a3a6b', color: '#fff', padding: '9px 14px', fontSize: 13, fontWeight: 700 }}>나의 문서함</div>
-          <div style={{ padding: '14px 16px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, textAlign: 'center' }}>
-            {[
-              { n: 0, l: '임시저장', c: '#555' },
-              { n: practiceRecords.length, l: '제출서류', c: '#555' },
-              { n: 0, l: '확정된사건', c: '#555' },
-            ].map(({ n, l, c }) => (
-              <div key={l}>
-                <div style={{ fontSize: 26, fontWeight: 700, color: c }}>{n}</div>
-                <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{l}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ padding: '0 16px 14px' }}>
-            <button onClick={() => navTo('submitted-docs')} style={{ width: '100%', padding: '6px', fontSize: 12, border: '1px solid #ccc', color: '#555', background: '#fafafa', borderRadius: 3, cursor: 'pointer', fontFamily: 'inherit' }}>
-              문서함 바로가기
-            </button>
-          </div>
-        </div>
+        {children}
       </div>
+    )
 
-      {/* Quick bar */}
-      <div style={{ display: 'flex', background: '#005f87', borderRadius: 0, overflow: 'hidden' }}>
-        {['각종신청', '재판일정', '납부/환급'].map((item, i) => (
-          <div key={item} style={{ flex: 1, padding: '9px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', borderLeft: i > 0 ? '1px solid rgba(255,255,255,.25)' : 'none' }}
-            onClick={() => i === 1 ? navTo('schedule') : navTo('pay')}>
-            {item}
-          </div>
-        ))}
-      </div>
+    return (
+      <div>
+        <PageHd title="나의사건현황" actions={<><ActBtn label="📌 나의 메뉴 추가" /><ActBtn label="🖨 출력" /></>} />
 
-      {/* Widget grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: 16, background: '#f5f6fa' }}>
-        {/* 재판일정 */}
-        <div style={{ border: '1px solid #dde0e8', borderRadius: 6, overflow: 'hidden', background: '#fff' }}>
-          <div style={{ background: '#1a3a6b', color: '#fff', padding: '8px 14px', fontSize: 13, fontWeight: 700 }}>📅 재판일정</div>
-          <div style={{ padding: 12 }}>
-            {SCHEDULE_ITEMS.map((s, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '7px 0', borderBottom: i < SCHEDULE_ITEMS.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
-                <span style={{ fontSize: 11, background: '#e8f0fc', color: '#0067c2', padding: '2px 7px', borderRadius: 3, whiteSpace: 'nowrap', fontWeight: 600 }}>{s.date}</span>
-                <div>
-                  <div style={{ fontSize: 11, color: '#333' }}>{s.caseNo}</div>
-                  <div style={{ fontSize: 11, color: '#0067c2' }}>{s.event}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* 상단 카드 2개 */}
+        <div style={{ display: 'grid', gridTemplateColumns: '5fr 7fr', gap: 12, padding: 16, background: '#fff', borderBottom: '1px solid #eee' }}>
 
-        {/* 미확인 송달문서 */}
-        <div style={{ border: '1px solid #dde0e8', borderRadius: 6, overflow: 'hidden', background: '#fff' }}>
-          <div style={{ background: '#1a3a6b', color: '#fff', padding: '8px 14px', fontSize: 13, fontWeight: 700 }}>📬 미확인 송달문서</div>
-          <div style={{ padding: 20, textAlign: 'center', color: '#999', fontSize: 13 }}>미확인 송달문서가 없습니다.</div>
-        </div>
-
-        {/* 작성중 서류 */}
-        <div style={{ border: '1px solid #dde0e8', borderRadius: 6, overflow: 'hidden', background: '#fff' }}>
-          <div style={{ background: '#1a3a6b', color: '#fff', padding: '8px 14px', fontSize: 13, fontWeight: 700 }}>📝 작성중 서류</div>
-          <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div onClick={() => router.push('/apply')} style={{ padding: '10px', border: '2px dashed #006699', borderRadius: 5, textAlign: 'center', color: '#006699', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-              새 소장 작성하기 +
+          {/* 나의 사건관리 */}
+          <div style={{ border: '1px solid #d0d8e8', borderRadius: 6, background: '#fff', padding: '14px 16px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#222', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ color: TC, fontSize: 16, lineHeight: 1 }}>○</span> 나의 사건관리
             </div>
-            <div onClick={() => router.push('/answer')} style={{ padding: '10px', border: '2px dashed #16a34a', borderRadius: 5, textAlign: 'center', color: '#16a34a', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-              새 답변서 작성하기 +
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ flex: 1, display: 'flex' }}>
+                {[
+                  { n: allCases.length, l: '진행중사건' },
+                  { n: 0, l: '미확인송달' },
+                  { n: 0, l: '관심사건' },
+                ].map(({ n, l }) => (
+                  <div key={l} style={{ flex: 1, textAlign: 'center' }}>
+                    <div style={{ fontSize: 30, fontWeight: 700, color: '#222', lineHeight: 1.1 }}>{allCasesLoading ? '…' : n}</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>{l}</div>
+                  </div>
+                ))}
+              </div>
+              {/* 원형 아이콘 */}
+              <div style={{ width: 62, height: 62, borderRadius: '50%', border: '2px dashed #c8cdd6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0, color: '#8899bb' }}>📋</div>
+            </div>
+            <div style={{ marginTop: 14, textAlign: 'center' }}>
+              <button onClick={() => router.push('/apply')} style={{ padding: '7px 32px', background: TC, color: '#fff', border: 'none', borderRadius: 4, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                사건등록
+              </button>
+            </div>
+          </div>
+
+          {/* 나의 문서함 */}
+          <div style={{ border: '1px solid #d0d8e8', borderRadius: 6, background: '#fff', padding: '14px 16px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#222', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ color: TC, fontSize: 16, lineHeight: 1 }}>○</span> 나의 문서함
+            </div>
+            <div style={{ display: 'flex' }}>
+              {[
+                { n: 0, l: '임시저장' },
+                { n: 0, l: '전자서명' },
+                { n: practiceRecords.length, l: '제출대기' },
+              ].map(({ n, l }, i) => (
+                <div key={l} style={{ flex: 1, textAlign: 'center', borderLeft: i > 0 ? '1px solid #eee' : 'none' }}>
+                  <div style={{ fontSize: 30, fontWeight: 700, color: '#222', lineHeight: 1.1 }}>{n}</div>
+                  <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>{l}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* 배정된 실습사건 */}
-        <div style={{ border: '1px solid #dde0e8', borderRadius: 6, overflow: 'hidden', background: '#fff' }}>
-          <div style={{ background: 'linear-gradient(90deg,#7c5800,#b8922a)', color: '#ffe082', padding: '8px 14px', fontSize: 13, fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>📋 배정된 실습사건</span>
-            <span onClick={() => navTo('assigned-cases')} style={{ fontSize: 11, cursor: 'pointer', opacity: 0.85 }}>전체보기 →</span>
-          </div>
-          <div style={{ padding: 12 }}>
-            {assignmentsLoading ? (
-              <div style={{ textAlign: 'center', color: '#999', fontSize: 13, padding: 8 }}>로딩 중...</div>
-            ) : assignments.length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#999', fontSize: 13, padding: 8 }}>배정된 사건이 없습니다.</div>
-            ) : (
-              assignments.slice(0, 2).map(a => (
-                <div key={a.id} onClick={() => navTo('assigned-cases')} style={{ padding: '7px 0', borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1a3a6b' }}>{a.sample_cases?.title || '사건명 없음'}</div>
-                  <div style={{ fontSize: 11, color: '#666' }}>{a.sample_cases?.court} | {a.assigned_at?.slice(0, 10)}</div>
+        {/* Quick bar */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', margin: '0', background: TC }}>
+          {[
+            { label: '각종신청', action: () => navTo('alert-service') },
+            { label: '재판일정', action: () => navTo('schedule') },
+          ].map(({ label, action }, i) => (
+            <div
+              key={label}
+              onClick={action}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 18px', cursor: 'pointer', borderLeft: i > 0 ? '1px solid rgba(255,255,255,.3)' : 'none' }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: 'rgba(255,255,255,.7)', fontSize: 16, lineHeight: 1 }}>○</span> {label}
+              </span>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,.85)', whiteSpace: 'nowrap' }}>상세보기 &gt;</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Widget grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: 16, background: '#f5f6fa' }}>
+
+          {/* 제증명 발급내역 */}
+          <WBox title="제증명 발급내역" onPlus={() => navTo('generic', '제증명발급신청')}>
+            <div style={{ padding: '8px 14px' }}>
+              {[
+                { caseNo: '2026가볼10218', type: '접수증명', date: '2026.02.05', extra: '' },
+                { caseNo: '2024가다55226', type: '송달및확정증명', date: '2026.02.05', extra: '출력' },
+              ].map(({ caseNo, type, date, extra }, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: i === 0 ? '1px solid #f0f0f0' : 'none', fontSize: 12 }}>
+                  <span style={{ color: '#0057a8', textDecoration: 'underline', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: 11 }}>· {caseNo}</span>
+                  <span style={{ color: '#555', flex: 1 }}>{type}</span>
+                  <span style={{ color: '#888', whiteSpace: 'nowrap' }}>{date}</span>
+                  {extra && <span style={{ color: '#0067c2', cursor: 'pointer' }}>{extra}</span>}
                 </div>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          </WBox>
+
+          {/* 납부/환급관리 */}
+          <WBox title="납부/환급관리" onPlus={() => navTo('pay')}>
+            <div style={{ padding: '40px 16px', textAlign: 'center', color: '#bbb', fontSize: 12 }}>조회된 결과가 없습니다.</div>
+          </WBox>
+
+          {/* 사건별 게시판 */}
+          <WBox title="사건별 게시판" onPlus={() => navTo('generic', '사건별게시판')}>
+            <div style={{ padding: '40px 16px', textAlign: 'center', color: '#bbb', fontSize: 12 }}>게시된 내용이 없습니다.</div>
+          </WBox>
+
+          {/* 대조형 쟁점요약 */}
+          <WBox title="대조형 쟁점요약" onPlus={() => navTo('generic', '대조형쟁점요약')}>
+            <div style={{ padding: '40px 16px', textAlign: 'center', color: '#bbb', fontSize: 12 }}>조회된 결과가 없습니다.</div>
+          </WBox>
+
         </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   // ── ASSIGNED CASES ───────────────────────────────────────────
   const AssignedCasesContent = () => (
@@ -940,6 +955,445 @@ export default function MyPage() {
     </div>
   )
 
+  // ── 전체송달문서 / 미확인송달문서 공용 상수 ─────────────────────
+  const MOCK_DELIVERY_DOCS = [
+    { court:'서울중앙지방법원', dept:'민사3단독', caseNo:'2026가단11234', docName:'소장부본', sentAt:'2026.01.15', recvAt:'2026.01.15', canIssue:true,  rows:['조회','제출'] },
+    { court:'수원지방법원',     dept:'민사2단독', caseNo:'2026가단22345', docName:'답변서부본', sentAt:'2026.02.10', recvAt:'2026.02.11(자동확인)', canIssue:false, rows:['조회'] },
+    { court:'인천지방법원',     dept:'민사5단독', caseNo:'2025가단33456', docName:'보정명령등본', sentAt:'2026.02.20', recvAt:'2026.02.20', canIssue:true,  rows:['조회','제출'] },
+    { court:'서울동부지방법원', dept:'민사1단독', caseNo:'2026가단44567', docName:'준비서면부본', sentAt:'2026.03.01', recvAt:'2026.03.05(자동확인)', canIssue:false, rows:['조회'] },
+  ]
+
+  // ── 전체송달문서 ─────────────────────────────────────────────
+  const AllDeliveryContent = () => {
+    const LAWSUIT_TYPES = ['전체','민사','형사','가사','행정','특허','회생파산']
+    const COURTS_SEL = ['전체','서울중앙지방법원','서울동부지방법원','서울서부지방법원','서울남부지방법원','수원지방법원','인천지방법원','의정부지방법원','대전지방법원','대구지방법원','부산지방법원','광주지방법원']
+    const [searchMode, setSearchMode] = useState<'date'|'caseNo'>('date')
+    const tdS: React.CSSProperties = { padding:'7px 10px', fontSize:12, borderBottom:'1px solid #eee', verticalAlign:'middle', textAlign:'center' }
+    return (
+      <div>
+        <PageHd title="전체송달문서" actions={<><ActBtn label="📌 나의 메뉴 추가" /><ActBtn label="🖨 출력" /></>} />
+        {/* 필터 */}
+        <div style={{ background:'#fff', borderBottom:'1px solid #eee', padding:'12px 14px', display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#555', minWidth:40 }}>소송유형</span>
+            <select style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+              {LAWSUIT_TYPES.map(t=><option key={t}>{t}</option>)}
+            </select>
+            <select style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+              {['전체','민사본안','민사신청','기타'].map(t=><option key={t}>{t}</option>)}
+            </select>
+            <span style={{ fontSize:12, fontWeight:600, color:'#555', minWidth:20, marginLeft:8 }}>법원</span>
+            <select style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+              {COURTS_SEL.map(c=><option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+            <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, cursor:'pointer' }}>
+              <input type="radio" name="dlMode" checked={searchMode==='date'} onChange={()=>setSearchMode('date')} style={{ accentColor:'#003366' }} />발송일자
+            </label>
+            <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, cursor:'pointer' }}>
+              <input type="radio" name="dlMode" checked={searchMode==='caseNo'} onChange={()=>setSearchMode('caseNo')} style={{ accentColor:'#003366' }} />사건번호
+            </label>
+            {searchMode==='date' ? (
+              <>
+                <input type="date" defaultValue="2026-02-01" style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 6px', fontSize:12, fontFamily:'inherit' }} />
+                <span style={{ fontSize:12 }}>~</span>
+                <input type="date" defaultValue="2026-03-21" style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 6px', fontSize:12, fontFamily:'inherit' }} />
+                {['오늘','3일','1주일','1개월'].map(l=>(
+                  <button key={l} style={{ height:26, padding:'0 9px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>{l}</button>
+                ))}
+              </>
+            ) : (
+              <>
+                <select style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 4px', fontFamily:'inherit' }}>
+                  {['2026','2025','2024'].map(y=><option key={y}>{y}</option>)}
+                </select>
+                <select style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 4px', fontFamily:'inherit' }}>
+                  {['가단','가합','나','가소','가불'].map(t=><option key={t}>{t}</option>)}
+                </select>
+                <input type="text" style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 6px', fontSize:12, fontFamily:'inherit', width:100 }} placeholder="사건번호" />
+              </>
+            )}
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#555' }}>정렬순서</span>
+            {[['발송일자↓','발송일자↑'],['법원↑','법원↓'],['사건번호↓','사건번호↑']].map((opts,i)=>(
+              <select key={i} defaultValue={opts[0]} style={{ height:26, border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, padding:'0 4px', fontFamily:'inherit' }}>
+                {opts.map(o=><option key={o}>{o}</option>)}
+              </select>
+            ))}
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, cursor:'pointer' }}>
+              <input type="checkbox" style={{ accentColor:'#003366' }} />결과내재검색
+            </label>
+            <input type="text" style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 8px', fontSize:12, fontFamily:'inherit', width:220 }} placeholder="" />
+          </div>
+          <div style={{ textAlign:'center' }}>
+            <button style={{ height:32, padding:'0 40px', background:'#003366', color:'#fff', border:'none', borderRadius:3, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>조 회</button>
+          </div>
+        </div>
+        {/* 안내 */}
+        <div style={{ background:'#fffbe6', border:'1px solid #ffe082', borderBottom:'none', padding:'8px 14px', fontSize:11, color:'#7a6000', lineHeight:1.8 }}>
+          ※ '발급/조회' 버튼을 이용하여 발급하여야 '열람'이라는 문구가 기재되지 않은 등본을 출력할 수 있고, 그렇지 않은 경우에는 '열람'이라는 문구가 포함되어 출력되는 점에 유의하시기 바랍니다.
+        </div>
+        {/* 테이블 헤더 도구 */}
+        <div style={{ background:'#fff', borderTop:'1px solid #dde0e8', borderBottom:'1px solid #dde0e8', padding:'6px 14px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <select style={{ height:26, border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, padding:'0 4px', fontFamily:'inherit' }}>
+            {['전체','미확인','확인'].map(t=><option key={t}>{t}</option>)}
+          </select>
+          <div style={{ display:'flex', gap:6 }}>
+            <button style={{ height:26, padding:'0 12px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>일괄확인 ›</button>
+            <button style={{ height:26, padding:'0 12px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>📗 엑셀로 저장</button>
+          </div>
+        </div>
+        {/* 테이블 */}
+        <div style={{ background:'#fff', overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <thead>
+              <tr style={{ background:'#f0f3f8', borderBottom:'2px solid #b8c8e0' }}>
+                <th style={{ padding:'7px 8px', width:28 }}><input type="checkbox" /></th>
+                {['법원','재판부','사건번호','송달문서','발송일자','수산일자','문서발급','송달내역','관련서류'].map(h=>(
+                  <th key={h} style={{ padding:'7px 8px', fontWeight:600, fontSize:11, color:'#333', textAlign:'center', whiteSpace:'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {MOCK_DELIVERY_DOCS.map((doc, i) => (
+                <tr key={i} style={{ background:i%2===0?'#fff':'#fafbfe' }}>
+                  <td style={{ ...tdS }}><input type="checkbox" /></td>
+                  <td style={{ ...tdS }}>{doc.court.replace('지방법원','지법').replace('고등법원','고법')}</td>
+                  <td style={{ ...tdS }}>{doc.dept}</td>
+                  <td style={{ ...tdS }}>
+                    <span style={{ color:'#0057a8', textDecoration:'underline', cursor:'pointer', fontWeight:600 }}>{doc.caseNo}</span>
+                  </td>
+                  <td style={{ ...tdS, textAlign:'left' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                      <span style={{ color:'#555', fontSize:10 }}>ℹ️</span>
+                      <span style={{ color:'#0057a8', textDecoration:'underline', cursor:'pointer' }}>{doc.docName}</span>
+                    </div>
+                  </td>
+                  <td style={{ ...tdS }}>{doc.sentAt}</td>
+                  <td style={{ ...tdS }}>{doc.recvAt}</td>
+                  <td style={{ ...tdS }}>
+                    {doc.canIssue && <button onClick={()=>alert('실습 모드 — 문서 발급 기능')} style={{ height:22, padding:'0 8px', background:'#fff', border:'1px solid #8899bb', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit', color:'#003366' }}>발급/조회</button>}
+                  </td>
+                  <td style={{ ...tdS }}>
+                    <button onClick={()=>alert('실습 모드 — 송달내역 조회')} style={{ height:22, padding:'0 8px', background:'#fff', border:'1px solid #8899bb', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit', color:'#003366' }}>조회</button>
+                  </td>
+                  <td style={{ ...tdS }}>
+                    {doc.rows.includes('제출') && <button onClick={()=>alert('실습 모드 — 관련서류 제출')} style={{ height:22, padding:'0 8px', background:'#fff', border:'1px solid #8899bb', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit', color:'#003366' }}>제출</button>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {/* 페이지네이션 */}
+        <div style={{ background:'#fff', borderTop:'1px solid #e8edf0', padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <span style={{ fontSize:12, color:'#555' }}>총 <strong>{MOCK_DELIVERY_DOCS.length}</strong>건</span>
+          <div style={{ display:'flex', gap:4 }}>
+            {['«','‹','1','›','»'].map(b=>(
+              <button key={b} style={{ width:26, height:26, border:`1px solid ${b==='1'?'#003366':'#ccc'}`, background:b==='1'?'#003366':'#fff', color:b==='1'?'#fff':'#555', borderRadius:3, cursor:'pointer', fontSize:12, fontWeight:b==='1'?700:400 }}>{b}</button>
+            ))}
+          </div>
+          <select defaultValue="10" style={{ height:26, border:'1px solid #ccc', borderRadius:3, fontSize:11, padding:'0 4px', fontFamily:'inherit' }}>
+            {['10','20','30'].map(n=><option key={n}>{n}개씩 보기</option>)}
+          </select>
+        </div>
+        {/* 참고 */}
+        <div style={{ background:'#f8f9fc', border:'1px solid #dde0e8', borderTop:'none', padding:'14px 18px', display:'flex', gap:12, alignItems:'flex-start' }}>
+          <div style={{ fontSize:24, marginTop:2 }}>📬</div>
+          <div>
+            <div style={{ fontSize:12, fontWeight:700, color:'#003366', marginBottom:6 }}>참고하세요</div>
+            <ul style={{ margin:0, paddingLeft:16, fontSize:11, color:'#555', lineHeight:1.9 }}>
+              <li>송달문서를 반드시 확인해 주세요. 송달문서에 대한 불복문서를 제출하고자 하는 경우 제출기간 도과에 따른 불이익이 발생하지 않도록 주의하시기 바랍니다.</li>
+              <li>송달문서를 확인해 주세요. 제출기한이 있는 송달문서의 경우 기한 내에 해당 서류가 법원에 접수될 수 있도록 유의하시기 바랍니다.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── 미확인송달문서 ────────────────────────────────────────────
+  const UnreadDeliveryContent = () => {
+    const LAWSUIT_TYPES = ['전체','민사','형사','가사','행정','특허','회생파산']
+    const COURTS_SEL = ['전체','서울중앙지방법원','서울동부지방법원','서울서부지방법원','서울남부지방법원','수원지방법원','인천지방법원','의정부지방법원','대전지방법원','대구지방법원','부산지방법원','광주지방법원']
+    const tdS: React.CSSProperties = { padding:'7px 10px', fontSize:12, borderBottom:'1px solid #eee', verticalAlign:'middle', textAlign:'center' }
+    return (
+      <div>
+        <PageHd title="미확인송달문서" actions={<><ActBtn label="📌 나의 메뉴 추가" /><ActBtn label="🖨 출력" /></>} />
+        {/* 필터 */}
+        <div style={{ background:'#fff', borderBottom:'1px solid #eee', padding:'12px 14px', display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#555', minWidth:40 }}>소송유형</span>
+            <select style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+              {LAWSUIT_TYPES.map(t=><option key={t}>{t}</option>)}
+            </select>
+            <select style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+              {['전체','민사본안','민사신청','기타'].map(t=><option key={t}>{t}</option>)}
+            </select>
+            <span style={{ fontSize:12, fontWeight:600, color:'#555', minWidth:20, marginLeft:8 }}>법원</span>
+            <select style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+              {COURTS_SEL.map(c=><option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, cursor:'pointer' }}>
+              <input type="checkbox" style={{ accentColor:'#003366' }} />사건번호
+            </label>
+            <select style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 4px', fontFamily:'inherit' }}>
+              {['2026','2025','2024'].map(y=><option key={y}>{y}</option>)}
+            </select>
+            <select style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 4px', fontFamily:'inherit' }}>
+              {['가단','가합','나','가소','가불'].map(t=><option key={t}>{t}</option>)}
+            </select>
+            <input type="text" style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 6px', fontSize:12, fontFamily:'inherit', width:100 }} placeholder="사건번호" />
+            <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, cursor:'pointer', marginLeft:8 }}>
+              <input type="checkbox" style={{ accentColor:'#003366' }} />사건구분 가나다순 정렬
+            </label>
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#555' }}>정렬순서</span>
+            {[['발송일자↓','발송일자↑'],['법원↑','법원↓'],['사건번호↓','사건번호↑']].map((opts,i)=>(
+              <select key={i} defaultValue={opts[0]} style={{ height:26, border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, padding:'0 4px', fontFamily:'inherit' }}>
+                {opts.map(o=><option key={o}>{o}</option>)}
+              </select>
+            ))}
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, cursor:'pointer' }}>
+              <input type="checkbox" style={{ accentColor:'#003366' }} />결과내재검색
+            </label>
+            <input type="text" style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 8px', fontSize:12, fontFamily:'inherit', width:220 }} placeholder="" />
+          </div>
+          <div style={{ textAlign:'center' }}>
+            <button style={{ height:32, padding:'0 40px', background:'#003366', color:'#fff', border:'none', borderRadius:3, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>조 회</button>
+          </div>
+        </div>
+        {/* 안내 */}
+        <div style={{ background:'#fffbe6', border:'1px solid #ffe082', borderBottom:'none', padding:'8px 14px', fontSize:11, color:'#7a6000', lineHeight:1.8 }}>
+          ※ '발급/조회' 버튼을 이용하여 발급하여야 '열람'이라는 문구가 기재되지 않은 등본을 출력할 수 있고, 그렇지 않은 경우에는 '열람'이라는 문구가 포함되어 출력되는 점에 유의하시기 바랍니다.
+        </div>
+        {/* 테이블 헤더 도구 */}
+        <div style={{ background:'#fff', borderTop:'1px solid #dde0e8', borderBottom:'1px solid #dde0e8', padding:'6px 14px', display:'flex', justifyContent:'flex-end', gap:6 }}>
+          <button style={{ height:26, padding:'0 12px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>일괄확인 ›</button>
+          <button style={{ height:26, padding:'0 12px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>📗 엑셀로 저장</button>
+        </div>
+        {/* 테이블 */}
+        <div style={{ background:'#fff', overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <thead>
+              <tr style={{ background:'#f0f3f8', borderBottom:'2px solid #b8c8e0' }}>
+                <th style={{ padding:'7px 8px', width:28 }}><input type="checkbox" /></th>
+                {['법원','재판부','사건번호','송달문서','발송일자','문서발급','송달내역','관련서류'].map(h=>(
+                  <th key={h} style={{ padding:'7px 8px', fontWeight:600, fontSize:11, color:'#333', textAlign:'center', whiteSpace:'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colSpan={9} style={{ ...tdS, padding:'48px', color:'#aaa', fontSize:13 }}>
+                  미확인 송달문서가 없습니다.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        {/* 페이지네이션 */}
+        <div style={{ background:'#fff', borderTop:'1px solid #e8edf0', padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <span style={{ fontSize:12, color:'#555' }}>총 <strong>0</strong>건</span>
+          <div style={{ display:'flex', gap:4 }}>
+            {['«','‹','›','»'].map(b=>(
+              <button key={b} style={{ width:26, height:26, border:'1px solid #ccc', background:'#fff', color:'#999', borderRadius:3, cursor:'pointer', fontSize:12 }}>{b}</button>
+            ))}
+          </div>
+          <select defaultValue="10" style={{ height:26, border:'1px solid #ccc', borderRadius:3, fontSize:11, padding:'0 4px', fontFamily:'inherit' }}>
+            {['10','20','30'].map(n=><option key={n}>{n}개씩 보기</option>)}
+          </select>
+        </div>
+        {/* 참고 */}
+        <div style={{ background:'#f8f9fc', border:'1px solid #dde0e8', borderTop:'none', padding:'14px 18px', display:'flex', gap:12, alignItems:'flex-start' }}>
+          <div style={{ fontSize:24, marginTop:2 }}>📬</div>
+          <div>
+            <div style={{ fontSize:12, fontWeight:700, color:'#003366', marginBottom:6 }}>참고하세요</div>
+            <ul style={{ margin:0, paddingLeft:16, fontSize:11, color:'#555', lineHeight:1.9 }}>
+              <li>송달문서를 반드시 확인해 주세요. 송달문서에 대한 불복문서를 제출하고자 하는 경우 제출기간 도과에 따른 불이익이 발생하지 않도록 주의하시기 바랍니다.</li>
+              <li>송달문서를 확인해 주세요. 제출기한이 있는 송달문서의 경우 기한 내에 해당 서류가 법원에 접수될 수 있도록 유의하시기 바랍니다.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── 알림서비스신청 ────────────────────────────────────────────
+  const AlertServiceContent = () => {
+    const [caseYear, setCaseYear] = useState('2026')
+    const [caseType, setCaseType] = useState('가단')
+    const [caseNum, setCaseNum] = useState('')
+    const [court, setCourt] = useState('전체')
+    const [searched, setSearched] = useState(false)
+    const [selectedRow, setSelectedRow] = useState<number | null>(null)
+    const [alertKakao, setAlertKakao] = useState(true)
+    const [alertSms, setAlertSms] = useState(false)
+    const [alertEmail, setAlertEmail] = useState(false)
+
+    const MOCK_ALERT_CASES = [
+      { no: 1, court: '서울중앙지방법원', dept: '민사3단독', caseNo: '2026가단11234', plaintiff: '홍길동', defendant: '이순신', status: '신청가능', alertOn: false },
+      { no: 2, court: '수원지방법원', dept: '민사2단독', caseNo: '2026가단22345', plaintiff: '홍길동', defendant: '김철수', status: '신청가능', alertOn: true },
+    ]
+
+    const COURTS_SEL = ['전체','서울중앙지방법원','서울동부지방법원','서울서부지방법원','서울남부지방법원','수원지방법원','인천지방법원','의정부지방법원','대전지방법원','대구지방법원','부산지방법원','광주지방법원']
+    const thS: React.CSSProperties = { padding:'7px 10px', fontSize:11, fontWeight:600, color:'#333', textAlign:'center', whiteSpace:'nowrap', background:'#f0f3f8', borderBottom:'2px solid #b8c8e0' }
+    const tdS: React.CSSProperties = { padding:'7px 10px', fontSize:12, borderBottom:'1px solid #eee', verticalAlign:'middle', textAlign:'center' }
+
+    return (
+      <div>
+        <PageHd title="알림서비스신청" actions={<><ActBtn label="📌 나의 메뉴 추가" /><ActBtn label="🖨 출력" /></>} />
+
+        {/* 안내문 */}
+        <div style={{ background:'#e8f4fb', border:'1px solid #c8ddf5', borderBottom:'none', padding:'8px 14px', fontSize:11, color:'#1a4a6b', lineHeight:1.8 }}>
+          ※ 알림서비스를 신청하면 재판기일, 송달문서, 납부 등 사건 진행상황을 알림톡·문자·전자우편으로 받을 수 있습니다.
+        </div>
+
+        {/* 조회 필터 */}
+        <div style={{ background:'#fff', borderBottom:'1px solid #eee', padding:'12px 14px', display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#555', minWidth:40 }}>법원</span>
+            <select value={court} onChange={e=>setCourt(e.target.value)} style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+              {COURTS_SEL.map(c=><option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#555', minWidth:40 }}>사건번호</span>
+            <select value={caseYear} onChange={e=>setCaseYear(e.target.value)} style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 4px', fontFamily:'inherit' }}>
+              {['2026','2025','2024'].map(y=><option key={y}>{y}</option>)}
+            </select>
+            <select value={caseType} onChange={e=>setCaseType(e.target.value)} style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 4px', fontFamily:'inherit' }}>
+              {['가단','가합','나','가소','가불'].map(t=><option key={t}>{t}</option>)}
+            </select>
+            <input type="text" value={caseNum} onChange={e=>setCaseNum(e.target.value)} style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 8px', fontSize:12, fontFamily:'inherit', width:100 }} placeholder="번호 입력" />
+          </div>
+          <div style={{ textAlign:'center' }}>
+            <button onClick={()=>setSearched(true)} style={{ height:32, padding:'0 40px', background:'#003366', color:'#fff', border:'none', borderRadius:3, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>조 회</button>
+          </div>
+        </div>
+
+        {/* 사건 목록 테이블 */}
+        <div style={{ background:'#fff', overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <thead>
+              <tr>
+                <th style={thS}>선택</th>
+                <th style={thS}>번호</th>
+                <th style={thS}>법원</th>
+                <th style={thS}>재판부</th>
+                <th style={thS}>사건번호</th>
+                <th style={thS}>원고</th>
+                <th style={thS}>피고</th>
+                <th style={thS}>알림상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              {MOCK_ALERT_CASES.map((c, i) => (
+                <tr key={c.no} style={{ background: selectedRow === i ? '#e8f0fc' : i%2===0 ? '#fff' : '#fafbfe' }}>
+                  <td style={tdS}><input type="radio" name="alertCase" checked={selectedRow === i} onChange={()=>setSelectedRow(i)} /></td>
+                  <td style={tdS}>{c.no}</td>
+                  <td style={tdS}>{c.court.replace('지방법원','지법')}</td>
+                  <td style={tdS}>{c.dept}</td>
+                  <td style={tdS}><span style={{ color:'#0057a8', textDecoration:'underline', cursor:'pointer', fontWeight:600 }}>{c.caseNo}</span></td>
+                  <td style={tdS}>{c.plaintiff}</td>
+                  <td style={tdS}>{c.defendant}</td>
+                  <td style={tdS}>
+                    <span style={{ display:'inline-block', padding:'2px 8px', borderRadius:10, fontSize:11, fontWeight:700, background: c.alertOn ? '#d1fae5' : '#f3f4f6', color: c.alertOn ? '#065f46' : '#555' }}>
+                      {c.alertOn ? '신청중' : '미신청'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 신청 폼 */}
+        <div style={{ background:'#f7f8fc', border:'1px solid #dde0e8', borderTop:'none', padding:'16px 18px' }}>
+          <div style={{ fontSize:13, fontWeight:700, color:'#003366', marginBottom:12, borderBottom:'1px solid #dde0e8', paddingBottom:8 }}>알림 수단 선택</div>
+
+          {/* 신청대상자 */}
+          <div style={{ display:'flex', gap:12, alignItems:'center', marginBottom:12 }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#555', minWidth:80 }}>신청대상자</span>
+            <span style={{ fontSize:12 }}>본인 (당사자/대리인)</span>
+          </div>
+
+          {/* 알림톡/문자 */}
+          <div style={{ background:'#fff', border:'1px solid #e0e6ee', borderRadius:4, padding:'12px 14px', marginBottom:10 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'#1a3a6b', marginBottom:8 }}>📱 알림톡 / 문자메시지</div>
+            <div style={{ display:'flex', gap:16, alignItems:'center', marginBottom:8 }}>
+              <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, cursor:'pointer' }}>
+                <input type="checkbox" checked={alertKakao} onChange={e=>setAlertKakao(e.target.checked)} style={{ accentColor:'#003366' }} />
+                알림톡 수신 (카카오 알림톡)
+              </label>
+              <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, cursor:'pointer' }}>
+                <input type="checkbox" checked={alertSms} onChange={e=>setAlertSms(e.target.checked)} style={{ accentColor:'#003366' }} />
+                문자메시지 수신 (SMS)
+              </label>
+            </div>
+            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+              <span style={{ fontSize:12, color:'#555' }}>수신번호</span>
+              <input type="text" defaultValue="010-0000-0000" style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 8px', fontSize:12, fontFamily:'inherit', width:140 }} placeholder="휴대폰 번호" />
+              <span style={{ fontSize:11, color:'#888' }}>(가상 연습용 번호)</span>
+            </div>
+          </div>
+
+          {/* 전자우편 */}
+          <div style={{ background:'#fff', border:'1px solid #e0e6ee', borderRadius:4, padding:'12px 14px', marginBottom:14 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'#1a3a6b', marginBottom:8 }}>📧 전자우편</div>
+            <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, cursor:'pointer', marginBottom:8 }}>
+              <input type="checkbox" checked={alertEmail} onChange={e=>setAlertEmail(e.target.checked)} style={{ accentColor:'#003366' }} />
+              이메일 수신
+            </label>
+            {alertEmail && (
+              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                <span style={{ fontSize:12, color:'#555' }}>이메일</span>
+                <input type="email" defaultValue="practice@example.edu" style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 8px', fontSize:12, fontFamily:'inherit', width:200 }} placeholder="이메일 주소" />
+                <span style={{ fontSize:11, color:'#888' }}>(가상 연습용)</span>
+              </div>
+            )}
+          </div>
+
+          <div style={{ display:'flex', justifyContent:'center', gap:8 }}>
+            <button
+              onClick={() => {
+                if (selectedRow === null) { alert('사건을 선택하세요.'); return }
+                alert('알림서비스 신청이 완료되었습니다. (실습 모드)')
+              }}
+              style={{ height:36, padding:'0 32px', background:'#003366', color:'#fff', border:'none', borderRadius:3, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}
+            >신청하기</button>
+            <button
+              onClick={() => alert('알림서비스가 해지되었습니다. (실습 모드)')}
+              style={{ height:36, padding:'0 32px', background:'#fff', color:'#555', border:'1px solid #c8cdd6', borderRadius:3, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}
+            >해지하기</button>
+          </div>
+        </div>
+
+        {/* 참고 */}
+        <div style={{ background:'#f8f9fc', border:'1px solid #dde0e8', borderTop:'none', padding:'14px 18px', display:'flex', gap:12, alignItems:'flex-start' }}>
+          <div style={{ fontSize:24, marginTop:2 }}>🔔</div>
+          <div>
+            <div style={{ fontSize:12, fontWeight:700, color:'#003366', marginBottom:6 }}>참고하세요</div>
+            <ul style={{ margin:0, paddingLeft:16, fontSize:11, color:'#555', lineHeight:1.9 }}>
+              <li>알림서비스를 신청하면 재판기일, 결정·명령 등 사건 진행 내용을 알림톡·문자·전자우편으로 받을 수 있습니다.</li>
+              <li>알림 수신을 위해 정확한 휴대폰 번호와 이메일을 입력하시기 바랍니다.</li>
+              <li>본 페이지는 실습용 모의 페이지로, 실제 알림은 발송되지 않습니다.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   function renderContent() {
     switch (activePage) {
       case 'status': return <StatusContent />
@@ -949,6 +1403,9 @@ export default function MyPage() {
       case 'submitted-docs': return <SubmittedDocsContent />
       case 'schedule': return <ScheduleContent />
       case 'pay': return <PayContent />
+      case 'all-delivery': return <AllDeliveryContent />
+      case 'unread-delivery': return <UnreadDeliveryContent />
+      case 'alert-service': return <AlertServiceContent />
       case 'myinfo-user': return <MyInfoContent type="user" />
       case 'myinfo-pw': return <MyInfoContent type="pw" />
       default: return <GenericContent title={genericTitle || activePage} />
@@ -991,14 +1448,30 @@ export default function MyPage() {
           {openGroups['사건진행'] && (
             <>
               <SbItem label="재판일정" page="schedule" />
-              <SbItem label="대조형 행정요약" page="generic" title="대조형 행정요약" />
-              <SbItem label="사건별계시판" page="generic" title="사건별계시판" />
+              <SbItem label="대조형 쟁점요약" page="generic" title="대조형 쟁점요약" />
+              <SbItem label="사건별게시판" page="generic" title="사건별게시판" />
               <SbItem label="문서송부확인" page="generic" title="문서송부확인" />
               <SbItem label="서증인부(문서송부)" page="generic" title="서증인부(문서송부)" />
               <SbItem label="보정/미보정내역(독촉)" page="generic" title="보정/미보정내역(독촉)" />
               <SbItem label="증거의견입력" page="generic" title="증거의견입력" />
-              <SbItem label="각종신청" page="generic" title="각종신청" />
-              <SbItem label="전자결제" page="generic" title="전자결제" />
+            </>
+          )}
+
+          <GrpHd label="국선전담사건" gKey="국선전담사건" />
+          {openGroups['국선전담사건'] && (
+            <>
+              <SbItem label="처리내역관리" page="generic" title="처리내역관리" />
+              <SbItem label="보고된사건조회" page="generic" title="보고된사건조회" />
+            </>
+          )}
+
+          <GrpHd label="각종신청" gKey="각종신청" />
+          {openGroups['각종신청'] && (
+            <>
+              <SbItem label="알림서비스신청" page="alert-service" />
+              <SbItem label="판결문전자송달신청" page="generic" title="판결문전자송달신청" />
+              <SbItem label="송달료 자동납부신청" page="generic" title="송달료 자동납부신청" />
+              <SbItem label="제증명발급신청" page="generic" title="제증명발급신청" />
             </>
           )}
 
@@ -1007,8 +1480,8 @@ export default function MyPage() {
             <>
               <SbItem label="작성중서류" page="generic" title="작성중서류" />
               <SbItem label="제출서류" page="submitted-docs" />
-              <SbItem label="미확인송달문서" page="generic" title="미확인송달문서" />
-              <SbItem label="전체송달문서" page="generic" title="전체송달문서" />
+              <SbItem label="미확인송달문서" page="unread-delivery" />
+              <SbItem label="전체송달문서" page="all-delivery" />
               <SbItem label="송달문서 정(등)본발급" page="generic" title="송달문서 정(등)본발급" />
             </>
           )}
@@ -1027,11 +1500,31 @@ export default function MyPage() {
             </>
           )}
 
-          <GrpHd label="기득 열람" gKey="기득열람" />
-          {openGroups['기득열람'] && (
+          <GrpHd label="기록 열람" gKey="기록열람" />
+          {openGroups['기록열람'] && (
             <>
-              <SbItem label="열람신청" page="generic" title="열람신청" />
-              <SbItem label="열람내역" page="generic" title="열람내역" />
+              <SbItem label="나의사건열람" page="generic" title="나의사건열람" />
+              <SbItem label="형사전자사본화사건열람" page="generic" title="형사전자사본화사건열람" />
+            </>
+          )}
+
+          <GrpHd label="전자소송사건등록" gKey="전자소송사건등록" />
+          {openGroups['전자소송사건등록'] && (
+            <>
+              <SbItem label="전자소송사건등록" page="generic" title="전자소송사건등록" />
+              <SbItem label="형사전자사본화사건등록" page="generic" title="형사전자사본화사건등록" />
+            </>
+          )}
+
+          <GrpHd label="맞춤형문서함" gKey="맞춤형문서함" />
+          {openGroups['맞춤형문서함'] && (
+            <>
+              <SbItem label="파산관재인 사건 관리" page="generic" title="파산관재인 사건 관리" />
+              <SbItem label="제출문서 반려의견" page="generic" title="제출문서 반려의견" />
+              <SbItem label="채권정보조회" page="generic" title="채권정보조회" />
+              <SbItem label="사실조회기관회신" page="generic" title="사실조회기관회신" />
+              <SbItem label="상담의견교환" page="generic" title="상담의견교환" />
+              <SbItem label="제3채무자" page="generic" title="제3채무자" />
             </>
           )}
 
