@@ -45,7 +45,7 @@ function getAllAccounts(): AccountRow[] {
   return Object.values(merged)
 }
 
-type Panel = 'dashboard' | 'accounts' | 'cases' | 'assign' | 'records' | 'settings'
+type Panel = 'dashboard' | 'accounts' | 'cases' | 'assign' | 'records' | 'ecfs-reg' | 'settings'
 
 const PANEL_ITEMS: { key: Panel; icon: string; label: string }[] = [
   { key: 'dashboard', icon: '📊', label: '대시보드' },
@@ -53,6 +53,7 @@ const PANEL_ITEMS: { key: Panel; icon: string; label: string }[] = [
   { key: 'cases', icon: '📋', label: '사건 관리' },
   { key: 'assign', icon: '🎯', label: '학생 배정' },
   { key: 'records', icon: '📈', label: '실습 현황' },
+  { key: 'ecfs-reg', icon: '📝', label: '전자소송등록 현황' },
   { key: 'settings', icon: '⚙', label: '설정' },
 ]
 
@@ -993,6 +994,154 @@ export default function AdminPage() {
   }
 
   // ─────────────────────────────────────────────
+  // EcfsReg Panel
+  // ─────────────────────────────────────────────
+  function EcfsRegPanel() {
+    interface EcfsRecord {
+      id: string
+      registeredAt: string
+      userId: string
+      userName: string
+      sosongType: string
+      court: string
+      caseNo: string
+      relationType: string
+      tab: string
+      certNo: string
+      partyName: string
+      caseInfo: { court: string; plaintiff: string; defendant: string; caseName: string } | null
+    }
+
+    const [records, setRecords] = useState<EcfsRecord[]>([])
+    const [search, setSearch] = useState('')
+    const [deleteModal, setDeleteModal] = useState<string | 'all' | null>(null)
+
+    function load() {
+      try {
+        const data = JSON.parse(localStorage.getItem('ecfs_registrations') || '[]')
+        setRecords(Array.isArray(data) ? data : [])
+      } catch { setRecords([]) }
+    }
+
+    useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    const filtered = records.filter(r =>
+      r.userName.includes(search) || r.userId.includes(search) ||
+      r.caseNo.includes(search) || r.court.includes(search)
+    )
+
+    function deleteOne(id: string) {
+      const updated = records.filter(r => r.id !== id)
+      localStorage.setItem('ecfs_registrations', JSON.stringify(updated))
+      setRecords(updated)
+      setDeleteModal(null)
+      showToast('등록 내역이 삭제되었습니다.')
+    }
+
+    function deleteAll() {
+      localStorage.setItem('ecfs_registrations', '[]')
+      setRecords([])
+      setDeleteModal(null)
+      showToast('전체 등록 내역이 초기화되었습니다.')
+    }
+
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', margin: 0 }}>📝 전자소송등록 현황</h2>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 13, color: '#888' }}>총 {filtered.length}건</span>
+            <button
+              onClick={() => records.length > 0 && setDeleteModal('all')}
+              disabled={records.length === 0}
+              style={{ padding: '6px 14px', background: records.length > 0 ? '#fee2e2' : '#f5f5f5', color: records.length > 0 ? '#dc2626' : '#bbb', border: `1px solid ${records.length > 0 ? '#fca5a5' : '#e5e7eb'}`, borderRadius: 5, fontSize: 12, fontWeight: 700, cursor: records.length > 0 ? 'pointer' : 'not-allowed' }}
+            >
+              🗑 전체 초기화
+            </button>
+          </div>
+        </div>
+
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="이름·아이디·사건번호·법원 검색..."
+          style={{ width: '100%', padding: '8px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', marginBottom: 14 }}
+        />
+
+        {filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 48, color: '#999', border: '1px dashed #d0d8e8', borderRadius: 8, fontSize: 14 }}>
+            {records.length === 0 ? '등록된 전자소송사건이 없습니다.' : '검색 결과가 없습니다.'}
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: '#1a3a6b', color: '#fff' }}>
+                  {['등록일시', '사용자', '소송유형', '법원', '사건번호', '관계인유형', '구분', '당사자/인증번호', '조회된 사건정보', '삭제'].map(h => (
+                    <th key={h} style={{ padding: '9px 10px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((r, i) => (
+                  <tr key={r.id} style={{ background: i % 2 === 0 ? '#fff' : '#f8f9fb', borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '8px 10px', whiteSpace: 'nowrap', color: '#666', fontSize: 12 }}>{r.registeredAt.slice(0, 16).replace('T', ' ')}</td>
+                    <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontWeight: 700, color: '#1a3a6b' }}>{r.userName}</span>
+                      <span style={{ fontSize: 11, color: '#888', marginLeft: 4 }}>({r.userId})</span>
+                    </td>
+                    <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                      <span style={{ background: '#dbeafe', color: '#1d4ed8', padding: '2px 7px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>{r.sosongType}</span>
+                    </td>
+                    <td style={{ padding: '8px 10px', whiteSpace: 'nowrap', color: '#555' }}>{r.court}</td>
+                    <td style={{ padding: '8px 10px', whiteSpace: 'nowrap', fontFamily: 'monospace', color: '#0067c2', fontWeight: 600 }}>{r.caseNo}</td>
+                    <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>{r.relationType}</td>
+                    <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                      <span style={{ background: r.tab === 'cert' ? '#dcfce7' : '#fef3c7', color: r.tab === 'cert' ? '#16a34a' : '#d97706', padding: '2px 7px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>
+                        {r.tab === 'cert' ? '인증번호 있음' : '인증번호 없음'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px 10px', color: '#555' }}>{r.tab === 'cert' ? (r.certNo || '–') : (r.partyName || '–')}</td>
+                    <td style={{ padding: '8px 10px', fontSize: 12 }}>
+                      {r.caseInfo ? (
+                        <div style={{ color: '#16a34a' }}>
+                          <div style={{ fontWeight: 600 }}>{r.caseInfo.caseName}</div>
+                          <div style={{ fontSize: 11, color: '#555' }}>{r.caseInfo.plaintiff} vs {r.caseInfo.defendant}</div>
+                        </div>
+                      ) : (
+                        <span style={{ color: '#bbb', fontSize: 11 }}>조회 없음</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '8px 10px' }}>
+                      <button onClick={() => setDeleteModal(r.id)} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>삭제</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {deleteModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: '#fff', borderRadius: 10, width: 360, boxShadow: '0 8px 32px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+              <div style={{ background: '#dc2626', color: '#fff', padding: '14px 20px', fontWeight: 700, fontSize: 15 }}>⚠️ 삭제 확인</div>
+              <div style={{ padding: '24px 20px', fontSize: 14, color: '#333', lineHeight: 1.7 }}>
+                {deleteModal === 'all' ? '전체 등록 내역을 초기화하시겠습니까?' : '해당 등록 내역을 삭제하시겠습니까?'}
+                <br /><span style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>⚠️ 이 작업은 되돌릴 수 없습니다.</span>
+              </div>
+              <div style={{ display: 'flex', gap: 10, padding: '0 20px 20px' }}>
+                <button onClick={() => setDeleteModal(null)} style={{ flex: 1, padding: '10px', border: '1px solid #ccc', background: '#f5f5f5', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>취소</button>
+                <button onClick={() => deleteModal === 'all' ? deleteAll() : deleteOne(deleteModal)} style={{ flex: 1, padding: '10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>삭제</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ─────────────────────────────────────────────
   // Settings Panel
   // ─────────────────────────────────────────────
   function SettingsPanel() {
@@ -1313,6 +1462,7 @@ export default function AdminPage() {
       case 'cases': return <CasesPanel />
       case 'assign': return <AssignPanel />
       case 'records': return <RecordsPanel />
+      case 'ecfs-reg': return <EcfsRegPanel />
       case 'settings': return <SettingsPanel />
       default: return <DashboardPanel />
     }

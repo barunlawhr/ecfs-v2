@@ -1602,6 +1602,24 @@ export default function MyPage() {
     const handleRegister = () => {
       if (!agreed) { alert('동의 체크박스를 선택해주세요.'); return }
       if (!caseNum.trim()) { alert('사건번호를 입력하세요.'); return }
+      const record = {
+        id: String(Date.now()),
+        registeredAt: new Date().toISOString(),
+        userId: user?.id || user?.login_id || '알 수 없음',
+        userName: user?.name || '알 수 없음',
+        sosongType,
+        court: selCourt,
+        caseNo: `${caseYear}${caseGubun}${caseNum.trim()}`,
+        relationType,
+        tab,
+        certNo: tab === 'cert' ? certNo : '',
+        partyName: tab === 'nocert' ? partyName : '',
+        caseInfo: foundCase,
+      }
+      try {
+        const prev = JSON.parse(localStorage.getItem('ecfs_registrations') || '[]')
+        localStorage.setItem('ecfs_registrations', JSON.stringify([record, ...prev]))
+      } catch { /* ignore */ }
       alert('전자소송 사건등록이 완료되었습니다. (실습 모드)')
     }
 
