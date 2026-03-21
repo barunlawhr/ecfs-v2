@@ -982,13 +982,312 @@ export default function AdminPage() {
   // Settings Panel
   // ─────────────────────────────────────────────
   function SettingsPanel() {
+    // ── 1. 시스템 설정
+    const [siteName, setSiteName] = useState('')
+    const [mockBarText, setMockBarText] = useState('')
+    // ── 2. 실습 설정
+    const [aiFeedback, setAiFeedback] = useState(true)
+    const [scoreReveal, setScoreReveal] = useState('immediate')
+    const [submitLimit, setSubmitLimit] = useState('unlimited')
+    // ── 3. 채점 기준
+    const [weights, setWeights] = useState({ parties: 20, purpose: 30, reason: 30, evidence: 20 })
+    // ── 4. 공지사항
+    const [notices, setNotices] = useState<{ id: string; text: string; date: string }[]>([])
+    const [newNotice, setNewNotice] = useState('')
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editText, setEditText] = useState('')
+    // ── 5. 데이터 관리
+    const [dataDeleteModal, setDataDeleteModal] = useState<{ type: 'all' | 'student'; sid?: string } | null>(null)
+    const [selectedStudent, setSelectedStudent] = useState('')
+    const [csvLoading, setCsvLoading] = useState(false)
+
+    useEffect(() => {
+      setSiteName(localStorage.getItem('site_name') || '')
+      setMockBarText(localStorage.getItem('mock_bar_text') || '')
+      setAiFeedback(localStorage.getItem('ai_feedback_enabled') !== 'false')
+      setScoreReveal(localStorage.getItem('score_reveal') || 'immediate')
+      setSubmitLimit(localStorage.getItem('submit_limit') || 'unlimited')
+      try {
+        const w = JSON.parse(localStorage.getItem('scoring_weights') || 'null')
+        if (w && typeof w === 'object') setWeights(w)
+      } catch { /* ignore */ }
+      try {
+        const n = JSON.parse(localStorage.getItem('notices') || 'null')
+        if (Array.isArray(n)) setNotices(n)
+      } catch { /* ignore */ }
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    const weightsTotal = weights.parties + weights.purpose + weights.reason + weights.evidence
+
+    function changeWeight(key: 'parties' | 'purpose' | 'reason' | 'evidence', val: number) {
+      setWeights(prev => ({ ...prev, [key]: val }))
+    }
+
+    function saveSection1() {
+      localStorage.setItem('site_name', siteName)
+      localStorage.setItem('mock_bar_text', mockBarText)
+      window.dispatchEvent(new CustomEvent('site-settings-updated'))
+      showToast('시스템 설정이 저장되었습니다.')
+    }
+
+    function saveSection2() {
+      localStorage.setItem('ai_feedback_enabled', String(aiFeedback))
+      localStorage.setItem('score_reveal', scoreReveal)
+      localStorage.setItem('submit_limit', submitLimit)
+      showToast('실습 설정이 저장되었습니다.')
+    }
+
+    function saveSection3() {
+      if (weightsTotal !== 100) { alert(`합계가 ${weightsTotal}점입니다. 100점이 되도록 조정해주세요.`); return }
+      localStorage.setItem('scoring_weights', JSON.stringify(weights))
+      showToast('채점 기준이 저장되었습니다.')
+    }
+
+    function persistNotices(updated: typeof notices) {
+      localStorage.setItem('notices', JSON.stringify(updated))
+      setNotices(updated)
+    }
+
+    function addNotice() {
+      if (!newNotice.trim()) return
+      persistNotices([{ id: String(Date.now()), text: newNotice.trim(), date: new Date().toISOString().slice(0, 10) }, ...notices])
+      setNewNotice('')
+      showToast('공지사항이 추가되었습니다.')
+    }
+
+    function deleteNotice(id: string) {
+      persistNotices(notices.filter(n => n.id !== id))
+      showToast('공지사항이 삭제되었습니다.')
+    }
+
+    function saveEditNotice() {
+      if (!editText.trim() || !editingId) return
+      persistNotices(notices.map(n => n.id === editingId ? { ...n, text: editText.trim() } : n))
+      setEditingId(null)
+      setEditText('')
+      showToast('공지사항이 수정되었습니다.')
+    }
+
+    async function execDeleteRecords() {
+      if (!dataDeleteModal) return
+      let error
+      if (dataDeleteModal.type === 'all') {
+        ({ error } = await supabase.from('practice_records').delete().gte('id', 0))
+      } else {
+        ({ error } = await supabase.from('practice_records').delete().eq('student_id', dataDeleteModal.sid!))
+      }
+      if (error) { alert('삭제 실패: ' + error.message); return }
+      const msg = dataDeleteModal.type === 'all' ? '전체 실습기록이 초기화되었습니다.' : '해당 학생의 기록이 삭제되었습니다.'
+      setDataDeleteModal(null)
+      setSelectedStudent('')
+      showToast(msg)
+    }
+
+    async function exportCSV() {
+      setCsvLoading(true)
+      const { data, error } = await supabase.from('practice_records').select('*').order('created_at', { ascending: false })
+      setCsvLoading(false)
+      if (error || !data) { alert('내보내기 실패: ' + (error?.message || '')); return }
+      const headers = ['id', 'student_id', 'score', 'case_type', 'court', 'plaintiff', 'defendant', 'feedback', 'created_at']
+      const rows = data.map(r => headers.map(h => {
+        const v = (r as Record<string, unknown>)[h] ?? ''
+        return `"${String(v).replace(/"/g, '""')}"`
+      }).join(','))
+      const csv = [headers.join(','), ...rows].join('\n')
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `practice_records_${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      showToast('CSV 내보내기 완료.')
+    }
+
+    const sec: React.CSSProperties = { background: '#fff', border: '1px solid #d0d8e8', borderRadius: 10, padding: '24px', marginBottom: 20 }
+    const secTitle: React.CSSProperties = { fontSize: 15, fontWeight: 700, color: '#1a3a6b', marginBottom: 18, paddingBottom: 12, borderBottom: '1px solid #e8edf5', display: 'flex', alignItems: 'center', gap: 8 }
+    const lbl: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#555', display: 'block', marginBottom: 4 }
+    const inp: React.CSSProperties = { width: '100%', padding: '8px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }
+    const saveBtn: React.CSSProperties = { marginTop: 18, padding: '8px 28px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer' }
+
     return (
       <div>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', marginBottom: 20 }}>⚙ 설정</h2>
-        <div style={{ background: '#f8f9fb', border: '1px solid #d0d8e8', borderRadius: 8, padding: '24px', color: '#555', fontSize: 14, lineHeight: 1.8 }}>
-          <p>🔧 시스템 설정 기능은 준비 중입니다.</p>
-          <p>현재 모든 계정은 하드코딩된 계정을 사용하며, 데이터베이스 연동은 Supabase를 통해 이루어집니다.</p>
+
+        {/* ── 1. 시스템 설정 */}
+        <div style={sec}>
+          <div style={secTitle}>🖥 시스템 설정</div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={lbl}>실습 사이트 이름</label>
+            <input value={siteName} onChange={e => setSiteName(e.target.value)} placeholder="전자소송 실습 시스템" style={inp} />
+          </div>
+          <div>
+            <label style={lbl}>실습 안내 바 문구</label>
+            <input value={mockBarText} onChange={e => setMockBarText(e.target.value)} placeholder="기본 안내 문구를 사용하려면 비워두세요" style={inp} />
+            <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>비워두면 기본 문구가 표시됩니다.</div>
+          </div>
+          <button onClick={saveSection1} style={saveBtn}>저장</button>
         </div>
+
+        {/* ── 2. 실습 설정 */}
+        <div style={sec}>
+          <div style={secTitle}>🎓 실습 설정</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>AI 피드백</span>
+            <button
+              onClick={() => setAiFeedback(v => !v)}
+              style={{ position: 'relative', width: 48, height: 26, borderRadius: 13, border: 'none', background: aiFeedback ? '#0067c2' : '#d1d5db', cursor: 'pointer', transition: 'background .2s', flexShrink: 0 }}
+            >
+              <span style={{ position: 'absolute', top: 3, left: aiFeedback ? 25 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', display: 'block' }} />
+            </button>
+            <span style={{ fontSize: 12, color: aiFeedback ? '#0067c2' : '#999', fontWeight: 700 }}>{aiFeedback ? 'ON' : 'OFF'}</span>
+          </div>
+          <div style={{ marginBottom: 18 }}>
+            <label style={lbl}>점수 공개 시점</label>
+            <div style={{ display: 'flex', gap: 24 }}>
+              {[{ val: 'immediate', label: '제출 즉시' }, { val: 'after_review', label: '선생님 확인 후' }].map(o => (
+                <label key={o.val} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+                  <input type="radio" checked={scoreReveal === o.val} onChange={() => setScoreReveal(o.val)} />
+                  {o.label}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label style={lbl}>소장 제출 제한</label>
+            <div style={{ display: 'flex', gap: 24 }}>
+              {[{ val: 'unlimited', label: '무제한' }, { val: '1', label: '1회' }, { val: '3', label: '3회' }].map(o => (
+                <label key={o.val} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+                  <input type="radio" checked={submitLimit === o.val} onChange={() => setSubmitLimit(o.val)} />
+                  {o.label}
+                </label>
+              ))}
+            </div>
+          </div>
+          <button onClick={saveSection2} style={saveBtn}>저장</button>
+        </div>
+
+        {/* ── 3. 채점 기준 */}
+        <div style={sec}>
+          <div style={secTitle}>
+            📊 채점 기준
+            <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 700, color: weightsTotal === 100 ? '#16a34a' : '#dc2626' }}>
+              합계: {weightsTotal}점
+            </span>
+          </div>
+          {([
+            { key: 'parties', label: '당사자정보' },
+            { key: 'purpose', label: '청구취지' },
+            { key: 'reason', label: '청구원인' },
+            { key: 'evidence', label: '입증서류' },
+          ] as const).map(({ key, label }) => (
+            <div key={key} style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                <label style={{ ...lbl, marginBottom: 0 }}>{label}</label>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#1a3a6b', minWidth: 36, textAlign: 'right' }}>{weights[key]}점</span>
+              </div>
+              <input type="range" min={0} max={100} value={weights[key]} onChange={e => changeWeight(key, Number(e.target.value))} style={{ width: '100%', accentColor: '#1a3a6b' }} />
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button onClick={saveSection3} style={{ ...saveBtn, marginTop: 0, opacity: weightsTotal !== 100 ? 0.5 : 1 }}>저장</button>
+            <button onClick={() => setWeights({ parties: 25, purpose: 25, reason: 25, evidence: 25 })} style={{ marginTop: 0, padding: '8px 14px', background: '#f0f4fc', color: '#1a3a6b', border: '1px solid #c8d8f0', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>균등 분배 (25점)</button>
+          </div>
+        </div>
+
+        {/* ── 4. 공지사항 관리 */}
+        <div style={sec}>
+          <div style={secTitle}>📢 공지사항 관리</div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            <input value={newNotice} onChange={e => setNewNotice(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNotice()} placeholder="새 공지사항 내용 입력..." style={{ ...inp, flex: 1 }} />
+            <button onClick={addNotice} style={{ padding: '8px 18px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>+ 추가</button>
+          </div>
+          {notices.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px', color: '#999', border: '1px dashed #d0d8e8', borderRadius: 6, fontSize: 13 }}>등록된 공지사항이 없습니다.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {notices.map(n => (
+                <div key={n.id} style={{ border: '1px solid #e8edf5', borderRadius: 6, padding: '10px 14px', background: '#fafbfe' }}>
+                  {editingId === n.id ? (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input value={editText} onChange={e => setEditText(e.target.value)} style={{ ...inp, flex: 1 }} autoFocus />
+                      <button onClick={saveEditNotice} style={{ padding: '6px 14px', background: '#0067c2', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>저장</button>
+                      <button onClick={() => setEditingId(null)} style={{ padding: '6px 12px', background: '#f5f5f5', border: '1px solid #ccc', borderRadius: 5, fontSize: 12, cursor: 'pointer' }}>취소</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ flex: 1, fontSize: 13, color: '#333' }}>{n.text}</span>
+                      <span style={{ fontSize: 11, color: '#aaa', whiteSpace: 'nowrap' }}>{n.date}</span>
+                      <button onClick={() => { setEditingId(n.id); setEditText(n.text) }} style={{ padding: '4px 10px', background: '#f0f4fc', border: '1px solid #c8d8f0', borderRadius: 4, fontSize: 11, cursor: 'pointer', color: '#1a3a6b' }}>수정</button>
+                      <button onClick={() => deleteNotice(n.id)} style={{ padding: '4px 10px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 4, fontSize: 11, cursor: 'pointer', color: '#dc2626' }}>삭제</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── 5. 데이터 관리 */}
+        <div style={sec}>
+          <div style={secTitle}>🗄 데이터 관리</div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
+            <button
+              onClick={() => setDataDeleteModal({ type: 'all' })}
+              style={{ padding: '9px 18px', background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+            >
+              🗑 전체 실습기록 초기화
+            </button>
+            <button
+              onClick={exportCSV}
+              disabled={csvLoading}
+              style={{ padding: '9px 18px', background: '#dcfce7', color: '#16a34a', border: '1px solid #86efac', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: csvLoading ? 'not-allowed' : 'pointer', opacity: csvLoading ? 0.6 : 1 }}
+            >
+              {csvLoading ? '내보내는 중...' : '⬇ CSV 내보내기'}
+            </button>
+          </div>
+
+          <div>
+            <label style={lbl}>학생별 기록 초기화</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <select value={selectedStudent} onChange={e => setSelectedStudent(e.target.value)} style={{ ...inp, flex: 1 }}>
+                <option value="">-- 학생 선택 --</option>
+                {STUDENT_IDS.map(id => {
+                  const acc = HARDCODED_ACCOUNTS[id]
+                  return <option key={id} value={id}>{acc?.name} ({id})</option>
+                })}
+              </select>
+              <button
+                onClick={() => { if (selectedStudent) setDataDeleteModal({ type: 'student', sid: selectedStudent }) }}
+                disabled={!selectedStudent}
+                style={{ padding: '8px 18px', background: selectedStudent ? '#dc2626' : '#e5e7eb', color: selectedStudent ? '#fff' : '#999', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: selectedStudent ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}
+              >
+                기록 삭제
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 데이터 삭제 확인 모달 */}
+        {dataDeleteModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: '#fff', borderRadius: 10, width: 380, boxShadow: '0 8px 32px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+              <div style={{ background: '#dc2626', color: '#fff', padding: '14px 20px', fontWeight: 700, fontSize: 15 }}>⚠️ 실습기록 삭제</div>
+              <div style={{ padding: '24px 20px', fontSize: 14, color: '#333', lineHeight: 1.8 }}>
+                {dataDeleteModal.type === 'all'
+                  ? '전체 실습기록을 초기화하시겠습니까?'
+                  : `'${HARDCODED_ACCOUNTS[dataDeleteModal.sid!]?.name || dataDeleteModal.sid}' 학생의 실습기록을 삭제하시겠습니까?`}
+                <br />
+                <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>⚠️ 이 작업은 되돌릴 수 없습니다.</span>
+              </div>
+              <div style={{ display: 'flex', gap: 10, padding: '0 20px 20px' }}>
+                <button onClick={() => setDataDeleteModal(null)} style={{ flex: 1, padding: '10px', border: '1px solid #ccc', background: '#f5f5f5', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>취소</button>
+                <button onClick={execDeleteRecords} style={{ flex: 1, padding: '10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>삭제</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
