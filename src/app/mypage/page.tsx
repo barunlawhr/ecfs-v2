@@ -90,20 +90,14 @@ export default function MyPage() {
   async function fetchAssignments() {
     if (!user) return
     setAssignmentsLoading(true)
-    const { data } = await supabase
-      .from('sample_cases')
-      .select('*')
-      .contains('assigned_students', [user.id])
-      .order('created_at', { ascending: false })
-    const transformed: Assignment[] = (data || []).map(sc => ({
-      id: String(sc.id),
-      case_id: String(sc.id),
-      student_id: user.id,
-      assigned_at: sc.created_at,
-      status: 'pending',
-      sample_cases: sc,
-    }))
-    setAssignments(transformed)
+    const SURL = 'https://knpvayujykoqjncctxrr.supabase.co'
+    const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHZheXVqeWtvcWpuY2N0eHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NzA3NDUsImV4cCI6MjA4OTE0Njc0NX0.rXlo5IsOW6FS5N1X3vgqNM1RvzB84TYPqVhnYyc6FSg'
+    const res = await fetch(
+      `${SURL}/rest/v1/case_assignments?select=*,sample_cases(*)&student_id=eq.${user.id}&order=assigned_at.desc`,
+      { headers: { apikey: SKEY, Authorization: `Bearer ${SKEY}` } }
+    )
+    const data = await res.json()
+    setAssignments(Array.isArray(data) ? data : [])
     setAssignmentsLoading(false)
   }
 
