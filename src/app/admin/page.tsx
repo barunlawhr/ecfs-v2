@@ -455,15 +455,31 @@ export default function AdminPage() {
       else setSelectedStudents(new Set(STUDENT_IDS))
     }
 
+    async function deleteAssignment(id: string) {
+      await fetch(`${SB_URL}/rest/v1/assignments?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+      })
+      fetchData()
+    }
+
     async function handleAssign() {
       if (!selectedCase) { alert('사건을 선택해주세요.'); return }
       if (selectedStudents.size === 0) { alert('학생을 선택해주세요.'); return }
       setAssigning(true)
       try {
+        let skipped = 0
         for (const uid of Array.from(selectedStudents)) {
+          const isDup = currentAssignments.some(a =>
+            ((a as Assignment & { user_id?: string }).user_id || a.student_id) === uid &&
+            String(a.case_id) === selectedCase
+          )
+          if (isDup) { skipped++; continue }
           await assignCase(uid, Number(selectedCase), dueDate)
         }
-        showToast(`${selectedStudents.size}명에게 배정 완료!`)
+        const assigned = selectedStudents.size - skipped
+        if (assigned > 0) showToast(`${assigned}명에게 배정 완료!${skipped > 0 ? ` (${skipped}명 중복 제외)` : ''}`)
+        else alert(`모두 이미 배정된 사건입니다.`)
         setSelectedStudents(new Set())
         setSelectedCase('')
         setDueDate('')
@@ -572,8 +588,13 @@ export default function AdminPage() {
                   </div>
                   <div style={{ padding: '8px 14px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {asgns.map(a => (
-                      <span key={a.id} style={{ fontSize: 12, background: '#e8f0fc', color: '#1a3a6b', padding: '3px 10px', borderRadius: 20 }}>
+                      <span key={a.id} style={{ fontSize: 12, background: '#e8f0fc', color: '#1a3a6b', padding: '3px 10px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 6 }}>
                         {(a.sample_cases as SampleCase | undefined)?.title || a.case_id}
+                        <button
+                          onClick={() => deleteAssignment(a.id)}
+                          style={{ background: 'none', border: 'none', color: '#e53e3e', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }}
+                          title="배정 삭제"
+                        >×</button>
                       </span>
                     ))}
                   </div>
