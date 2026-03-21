@@ -469,15 +469,12 @@ export default function AdminPage() {
     const [cases, setCases] = useState<SampleCase[]>([])
     const [casesLoading, setCasesLoading] = useState(true)
     const [showModal, setShowModal] = useState(false)
+    const [editId, setEditId] = useState<string | null>(null)
     const [saving, setSaving] = useState(false)
     const [deleteModal, setDeleteModal] = useState<{ id: string; title: string } | null>(null)
     const [deleting, setDeleting] = useState(false)
-    const [form, setForm] = useState({
-      title: '', case_type: '대여금', court: '서울중앙지방법원',
-      plaintiff: '', defendant: '', claim_amount: '',
-      background: '', key_facts: '', evidence_hint: '',
-      claim_purpose: '', claim_reason: '', difficulty: '보통',
-    })
+    const BLANK_FORM = { title: '', case_type: '대여금', court: '서울중앙지방법원', plaintiff: '', defendant: '', claim_amount: '', background: '', key_facts: '', evidence_hint: '', claim_purpose: '', claim_reason: '', difficulty: '보통' }
+    const [form, setForm] = useState(BLANK_FORM)
 
     const fetchCases = useCallback(async () => {
       setCasesLoading(true)
@@ -488,33 +485,42 @@ export default function AdminPage() {
 
     useEffect(() => { fetchCases() }, [fetchCases])
 
+    function openAdd() { setForm(BLANK_FORM); setEditId(null); setShowModal(true) }
+    function openEdit(c: SampleCase) {
+      setForm({
+        title: c.title, case_type: c.case_type, court: c.court,
+        plaintiff: c.plaintiff, defendant: c.defendant,
+        claim_amount: c.claim_amount ? String(c.claim_amount) : '',
+        background: c.background || '', key_facts: c.key_facts || '',
+        evidence_hint: c.evidence_hint || '', claim_purpose: c.claim_purpose || '',
+        claim_reason: c.claim_reason || '', difficulty: c.difficulty || '보통',
+      })
+      setEditId(c.id)
+      setShowModal(true)
+    }
+
     async function handleSave() {
       if (!form.title || !form.plaintiff || !form.defendant) {
         alert('제목, 원고, 피고는 필수입니다.')
         return
       }
       setSaving(true)
-      const { error } = await supabase.from('sample_cases').insert({
-        title: form.title,
-        case_type: form.case_type,
-        court: form.court,
-        plaintiff: form.plaintiff,
-        defendant: form.defendant,
+      const payload = {
+        title: form.title, case_type: form.case_type, court: form.court,
+        plaintiff: form.plaintiff, defendant: form.defendant,
         claim_amount: form.claim_amount ? Number(form.claim_amount) : null,
-        background: form.background || null,
-        key_facts: form.key_facts || null,
-        evidence_hint: form.evidence_hint || null,
-        claim_purpose: form.claim_purpose || null,
-        claim_reason: form.claim_reason || null,
-        difficulty: form.difficulty,
-        is_active: true,
-      })
+        background: form.background || null, key_facts: form.key_facts || null,
+        evidence_hint: form.evidence_hint || null, claim_purpose: form.claim_purpose || null,
+        claim_reason: form.claim_reason || null, difficulty: form.difficulty,
+      }
+      const { error } = editId
+        ? await supabase.from('sample_cases').update(payload).eq('id', editId)
+        : await supabase.from('sample_cases').insert({ ...payload, is_active: true })
       setSaving(false)
       if (error) { alert('저장 실패: ' + error.message); return }
-      setShowModal(false)
-      setForm({ title: '', case_type: '대여금', court: '서울중앙지방법원', plaintiff: '', defendant: '', claim_amount: '', background: '', key_facts: '', evidence_hint: '', claim_purpose: '', claim_reason: '', difficulty: '보통' })
+      setShowModal(false); setEditId(null); setForm(BLANK_FORM)
       fetchCases()
-      showToast('사건이 추가되었습니다.')
+      showToast(editId ? '사건이 수정되었습니다.' : '사건이 추가되었습니다.')
     }
 
     async function handleDelete() {
@@ -533,7 +539,7 @@ export default function AdminPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', margin: 0 }}>📋 사건 관리</h2>
           <button
-            onClick={() => setShowModal(true)}
+            onClick={openAdd}
             style={{ padding: '8px 18px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
           >
             + 새 사건 추가
@@ -547,14 +553,14 @@ export default function AdminPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#1a3a6b', color: '#fff' }}>
-                  {['제목', '유형', '법원', '원고', '피고', '난이도', '생성일', '삭제'].map(h => (
+                  {['제목', '유형', '법원', '원고', '피고', '난이도', '생성일', '수정', '삭제'].map(h => (
                     <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {cases.length === 0 ? (
-                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: 30, color: '#999' }}>등록된 사건이 없습니다.</td></tr>
+                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: 30, color: '#999' }}>등록된 사건이 없습니다.</td></tr>
                 ) : cases.map((c, i) => (
                   <tr key={c.id} style={{ background: i % 2 === 0 ? '#fff' : '#f8f9fb', borderBottom: '1px solid #eee' }}>
                     <td style={{ padding: '9px 12px', fontWeight: 600, color: '#1a3a6b', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</td>
@@ -568,6 +574,9 @@ export default function AdminPage() {
                       </span>
                     </td>
                     <td style={{ padding: '9px 12px', color: '#888', whiteSpace: 'nowrap' }}>{c.created_at?.slice(0, 10)}</td>
+                    <td style={{ padding: '9px 12px' }}>
+                      <button onClick={() => openEdit(c)} style={{ background: '#0067c2', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>수정</button>
+                    </td>
                     <td style={{ padding: '9px 12px' }}>
                       <button onClick={() => setDeleteModal({ id: c.id, title: c.title })} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>삭제</button>
                     </td>
@@ -583,8 +592,8 @@ export default function AdminPage() {
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ background: '#fff', borderRadius: 12, width: 560, maxHeight: '90vh', overflow: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,.25)' }}>
               <div style={{ background: '#1a3a6b', color: '#fff', padding: '14px 20px', borderRadius: '12px 12px 0 0', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 700, fontSize: 15 }}>새 사건 추가</span>
-                <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer' }}>×</button>
+                <span style={{ fontWeight: 700, fontSize: 15 }}>{editId ? '사건 수정' : '새 사건 추가'}</span>
+                <button onClick={() => { setShowModal(false); setEditId(null); setForm(BLANK_FORM) }} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer' }}>×</button>
               </div>
               <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {[
@@ -659,9 +668,9 @@ export default function AdminPage() {
                   />
                 </div>
                 <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                  <button onClick={() => setShowModal(false)} style={{ flex: 1, padding: '10px', border: '1px solid #ccc', background: '#f5f5f5', borderRadius: 6, fontSize: 13, cursor: 'pointer' }}>취소</button>
+                  <button onClick={() => { setShowModal(false); setEditId(null); setForm(BLANK_FORM) }} style={{ flex: 1, padding: '10px', border: '1px solid #ccc', background: '#f5f5f5', borderRadius: 6, fontSize: 13, cursor: 'pointer' }}>취소</button>
                   <button onClick={handleSave} disabled={saving} style={{ flex: 2, padding: '10px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
-                    {saving ? '저장 중...' : '저장하기'}
+                    {saving ? '저장 중...' : editId ? '수정하기' : '저장하기'}
                   </button>
                 </div>
               </div>
