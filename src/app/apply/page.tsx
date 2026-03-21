@@ -63,6 +63,14 @@ export default function ApplyPage() {
   const [submitted, setSubmitted] = useState(false);
   const [submittedId, setSubmittedId] = useState<string | null>(null);
   const [sogaDisp, setSogaDisp] = useState('( 0 원 )');
+  const [pageStep, setPageStep] = useState<'form' | 'payment'>('form');
+  const [payAgreed, setPayAgreed] = useState(false);
+  const [showBankPay, setShowBankPay] = useState(false);
+  const [payCompleted, setPayCompleted] = useState(false);
+  const [refundBank, setRefundBank] = useState('');
+  const [refundAcct, setRefundAcct] = useState('');
+  const [refundName, setRefundName] = useState('');
+  const [payParty, setPayParty] = useState('');
   const causeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -101,6 +109,17 @@ export default function ApplyPage() {
 
   const toggle = useCallback((k: keyof typeof open) => setOpen(p => ({ ...p, [k]: !p[k] })), []);
   const upd = (patch: Partial<ComplaintFormData>) => setData(p => ({ ...p, ...patch }));
+
+  function calcStampDuty(sogaStr: string): number {
+    const n = parseInt(sogaStr || '0', 10);
+    if (!n) return 0;
+    let d = 0;
+    if (n <= 10_000_000) d = n * 50 / 10000;
+    else if (n <= 100_000_000) d = 50_000 + (n - 10_000_000) * 45 / 10000;
+    else if (n <= 1_000_000_000) d = 455_000 + (n - 100_000_000) * 40 / 10000;
+    else d = 3_655_000 + (n - 1_000_000_000) * 35 / 10000;
+    return Math.max(1000, Math.ceil(d / 1000) * 1000);
+  }
 
   function fmtSoga(v: string) {
     const n = v.replace(/[^0-9]/g, '');
@@ -220,6 +239,241 @@ export default function ApplyPage() {
 
   const wonCount = data.parties.filter(p => p.role === '원고').length;
   const defCount = data.parties.filter(p => p.role === '피고').length;
+
+  // ── Payment screen ────────────────────────────────────────────
+  if (pageStep === 'payment') {
+    const stampDuty = calcStampDuty(data.soga);
+    const souralRyo = 82500;
+    const totalPayment = stampDuty + souralRyo;
+    const BANKS = ['국민은행','신한은행','우리은행','하나은행','기업은행','농협은행','카카오뱅크','토스뱅크'];
+    const thS: React.CSSProperties = { background:'#f5f7fb', width:140, padding:'11px 14px', fontSize:12, fontWeight:600, color:'#333', textAlign:'left', verticalAlign:'middle', borderRight:'1px solid #e0e6ee', whiteSpace:'nowrap' };
+    const tdSt: React.CSSProperties = { padding:'9px 14px', verticalAlign:'middle', fontSize:13 };
+    const SectionHd = ({ label }: { label: string }) => (
+      <div style={{ background:'#edf1f8', borderBottom:'1px solid #ccd4e0', padding:'11px 16px', display:'flex', alignItems:'center', gap:8, borderLeft:'3px solid #006699' }}>
+        <div style={{ width:8, height:8, borderRadius:'50%', background:'#006699', flexShrink:0 }} />
+        <span style={{ fontSize:13, fontWeight:700, color:'#003366' }}>{label}</span>
+      </div>
+    );
+    return (
+      <div style={{ margin:0, padding:0, fontFamily:"'Malgun Gothic','맑은 고딕',sans-serif", minHeight:'100vh', display:'flex', flexDirection:'column', background:'#f2f4f7', fontSize:13 }}>
+        <MockBar /><GnbNav active="서류제출" />
+        {/* Subtab */}
+        <div style={{ background:'#fff', borderBottom:'1px solid #dde0e8', display:'flex', padding:'0 20px', overflowX:'auto', height:38 }}>
+          {subtabs.map((t, i) => (
+            <button key={i} onClick={() => setActiveSubtab(i)} style={{ padding:'0 14px', height:38, border:'none', borderBottom:activeSubtab===i?'2px solid #003366':'2px solid transparent', background:'transparent', color:activeSubtab===i?'#003366':'#555', fontWeight:activeSubtab===i?700:400, fontSize:12, cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit' }}>{t}</button>
+          ))}
+        </div>
+        {/* Breadcrumb */}
+        <div style={{ background:'#fff', borderBottom:'1px solid #eee', padding:'7px 20px', display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#888' }}>
+          <button onClick={() => router.push('/')} style={{ background:'none', border:'none', color:'#888', cursor:'pointer', fontSize:11, padding:0 }}>🏠</button>
+          <span style={{ color:'#ccc' }}>›</span><span>서류제출</span>
+          <span style={{ color:'#ccc' }}>›</span><span>민사서류 작성</span>
+          <span style={{ color:'#ccc' }}>›</span><span style={{ color:'#444', fontWeight:600 }}>소장</span>
+        </div>
+        {/* Stepbar — 수납/제출(index 4) active */}
+        <div style={{ background:'#f8f9fc', borderBottom:'1px solid #dde0e8', padding:'12px 20px', display:'flex', justifyContent:'center' }}>
+          <div style={{ display:'flex', alignItems:'center' }}>
+            {['서류선택','소장작성','당사자정보','첨부서류','수납/제출'].map((lbl, i) => (
+              <div key={i} style={{ display:'flex', alignItems:'center' }}>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
+                  <div style={{ width:28, height:28, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, background:i<4?'#006699':'#fff', color:i<4?'#fff':'#006699', border:i===4?'2px solid #006699':'2px solid transparent', boxShadow:i===4?'0 0 0 3px rgba(0,102,153,.12)':'none' }}>
+                    {i < 4 ? '✓' : i+1}
+                  </div>
+                  <div style={{ fontSize:10, marginTop:4, color:'#006699', fontWeight:i===4?700:400, whiteSpace:'nowrap' }}>{lbl}</div>
+                </div>
+                {i < 4 && <div style={{ width:60, height:2, background:'#006699', marginBottom:22, flexShrink:0 }} />}
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Content */}
+        <div style={{ flex:1 }}>
+          <div style={{ maxWidth:980, margin:'0 auto', padding:'16px 12px 80px' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+              <div style={{ width:12, height:12, borderRadius:'50%', background:'#006699' }} />
+              <span style={{ fontSize:16, fontWeight:700, color:'#003366' }}>소송비용납부</span>
+            </div>
+
+            {/* 수납정보 */}
+            <div style={{ background:'#fff', border:'1px solid #d0d8e4', marginBottom:8, borderRadius:3, boxShadow:'0 1px 3px rgba(0,0,0,.04)' }}>
+              <SectionHd label="① 수납정보" />
+              <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                <tbody>
+                  {[
+                    { label:'납부구분', value:'소장 - 소송비용납부' },
+                    { label:'사건명', value:`${data.caseCategory||data.caseName||'민사'} / ${data.court||'법원미선택'}` },
+                    { label:'인지액', value:`${stampDuty.toLocaleString('ko-KR')}원` },
+                    { label:'송달료', value:`${souralRyo.toLocaleString('ko-KR')}원 (15회분 × 5,500원)` },
+                    { label:'법원보관금', value:'0원' },
+                  ].map(({ label, value }) => (
+                    <tr key={label} style={{ borderBottom:'1px solid #eaecf4' }}>
+                      <th style={thS}>{label}</th>
+                      <td style={tdSt}>{value}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <th style={{ ...thS, background:'#e8f0fb', fontWeight:700 }}>납부합계</th>
+                    <td style={{ ...tdSt, fontWeight:700, color:'#003366', fontSize:15 }}>{totalPayment.toLocaleString('ko-KR')}원</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* 환급계좌 */}
+            <div style={{ background:'#fff', border:'1px solid #d0d8e4', marginBottom:8, borderRadius:3, boxShadow:'0 1px 3px rgba(0,0,0,.04)' }}>
+              <SectionHd label="② 환급계좌 입력" />
+              <div style={{ padding:'10px 16px 14px' }}>
+                <div style={{ fontSize:11, color:'#666', marginBottom:10, lineHeight:1.7 }}>※ 소송비용이 환급될 경우 지급할 계좌를 입력하세요. (선택사항)</div>
+                <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                  <tbody>
+                    <tr style={{ borderBottom:'1px solid #eaecf4' }}>
+                      <th style={thS}>은행명</th>
+                      <td style={tdSt}>
+                        <select value={refundBank} onChange={e=>setRefundBank(e.target.value)} style={{ ...SEL, width:160 }}>
+                          <option value="">선택</option>
+                          {BANKS.map(b=><option key={b}>{b}</option>)}
+                        </select>
+                      </td>
+                    </tr>
+                    <tr style={{ borderBottom:'1px solid #eaecf4' }}>
+                      <th style={thS}>계좌번호</th>
+                      <td style={tdSt}><input value={refundAcct} onChange={e=>setRefundAcct(e.target.value)} style={{ ...INP, width:220 }} placeholder="숫자만 입력" /></td>
+                    </tr>
+                    <tr>
+                      <th style={thS}>예금주</th>
+                      <td style={tdSt}><input value={refundName} onChange={e=>setRefundName(e.target.value)} style={{ ...INP, width:160 }} placeholder="예금주명" /></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 납부당사자 선택 */}
+            <div style={{ background:'#fff', border:'1px solid #d0d8e4', marginBottom:8, borderRadius:3, boxShadow:'0 1px 3px rgba(0,0,0,.04)' }}>
+              <SectionHd label="③ 납부당사자 선택" />
+              <div style={{ padding:'10px 16px 14px' }}>
+                <div style={{ fontSize:12, color:'#666', marginBottom:8 }}>납부인을 선택하세요.</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {data.parties.map(p => (
+                    <label key={p.id} style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', padding:'9px 14px', border:`1px solid ${payParty===p.id?'#006699':'#dde0e8'}`, borderRadius:3, background:payParty===p.id?'#f0f7ff':'#fff', width:'fit-content' }}>
+                      <input type="radio" name="payParty" checked={payParty===p.id} onChange={()=>setPayParty(p.id)} style={{ accentColor:'#006699', cursor:'pointer' }} />
+                      <span style={{ fontSize:13, fontWeight:payParty===p.id?700:400 }}>
+                        <span style={{ display:'inline-block', padding:'1px 8px', borderRadius:20, fontSize:11, fontWeight:700, background:p.role==='원고'?'#dbeafe':'#fce7f3', color:p.role==='원고'?'#1e40af':'#9d174d', marginRight:6 }}>{p.role}</span>
+                        {p.name}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 납부수단 선택 */}
+            <div style={{ background:'#fff', border:'1px solid #d0d8e4', marginBottom:8, borderRadius:3, boxShadow:'0 1px 3px rgba(0,0,0,.04)' }}>
+              <SectionHd label="④ 납부수단 선택" />
+              <div style={{ padding:'10px 16px 14px' }}>
+                <label style={{ display:'flex', alignItems:'center', gap:12, cursor:'pointer', padding:'12px 16px', border:'2px solid #006699', borderRadius:4, background:'#f0f7ff', width:'fit-content' }}>
+                  <input type="radio" defaultChecked style={{ accentColor:'#006699', cursor:'pointer', width:16, height:16 }} />
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#003366' }}>🏦 BankPay (가상계좌)</div>
+                    <div style={{ fontSize:11, color:'#666', marginTop:2 }}>안전한 인터넷뱅킹 납부 서비스</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* 이용약관 동의 */}
+            <div style={{ background:'#fff', border:'1px solid #d0d8e4', marginBottom:8, borderRadius:3, boxShadow:'0 1px 3px rgba(0,0,0,.04)' }}>
+              <SectionHd label="⑤ 이용약관 동의" />
+              <div style={{ padding:'10px 16px 14px' }}>
+                <div style={{ background:'#f8f8f8', border:'1px solid #dde0e8', borderRadius:3, padding:'10px 12px', height:80, overflowY:'auto', fontSize:11, color:'#555', lineHeight:1.8, marginBottom:10 }}>
+                  전자소송 시스템을 통한 소송비용 납부 시, 납부한 금액은 전자소송 절차에 따라 처리됩니다. 납부 후 취소는 재판부 허가를 요합니다. 본 실습 페이지는 실제 법원 납부 시스템과 연동되지 않으며 모의 실습 목적으로만 사용됩니다. 실제 법원 비용 납부는 반드시 법원 공식 전자소송 시스템(ecfs.scourt.go.kr)을 이용하시기 바랍니다.
+                </div>
+                <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
+                  <input type="checkbox" checked={payAgreed} onChange={e=>setPayAgreed(e.target.checked)} style={{ accentColor:'#006699', width:16, height:16, cursor:'pointer' }} />
+                  <span style={{ fontSize:13, fontWeight:600 }}>위 약관에 동의합니다.</span>
+                </label>
+              </div>
+            </div>
+
+            {/* 유의사항 */}
+            <div style={{ border:'1px solid #d8dce8', background:'#f7f8fb', borderRadius:3, padding:'10px 14px', marginBottom:12 }}>
+              <ul style={{ listStyle:'none', padding:0, margin:0 }}>
+                {['인지액은 민사소송 등 인지법에 따라 소가를 기준으로 산정됩니다.','송달료는 당사자 수 × 15회분 × 5,500원으로 계산됩니다.','납부 후 영수증은 나의전자소송 > 납부/환급관리에서 확인하실 수 있습니다.'].map((t,i)=>(
+                  <li key={i} style={{ fontSize:11, color:'#555', lineHeight:1.7, paddingLeft:10, position:'relative' }}>
+                    <span style={{ position:'absolute', left:0 }}>•</span>{t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {submitError && (
+              <div style={{ background:'#fef2f2', border:'1px solid #fecaca', borderRadius:4, padding:'12px 16px', color:'#dc2626', fontSize:13, marginBottom:12 }}>⚠️ {submitError}</div>
+            )}
+
+            {/* 납부 완료 후 전자제출 */}
+            {payCompleted ? (
+              <div>
+                <div style={{ background:'#f0fdf4', border:'1px solid #86efac', borderRadius:6, padding:'16px 20px', marginBottom:14, display:'flex', alignItems:'center', gap:12 }}>
+                  <span style={{ fontSize:28 }}>✅</span>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:700, color:'#166534' }}>소송비용 납부가 완료되었습니다!</div>
+                    <div style={{ fontSize:12, color:'#555', marginTop:2 }}>납부금액: {totalPayment.toLocaleString('ko-KR')}원</div>
+                  </div>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <button onClick={()=>setPageStep('form')} style={{ height:38, padding:'0 20px', background:'#fff', color:'#555', border:'1px solid #c8cdd6', borderRadius:3, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>← 이전</button>
+                  <button onClick={handleSubmit} disabled={submitting} style={{ height:38, padding:'0 28px', background:submitting?'#7ab0c8':'#003366', color:'#fff', border:'none', borderRadius:3, fontSize:14, fontWeight:700, cursor:submitting?'not-allowed':'pointer', fontFamily:'inherit' }}>
+                    {submitting ? '⏳ 제출 중...' : '📨 전자제출하기 →'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <button onClick={()=>setPageStep('form')} style={{ height:38, padding:'0 20px', background:'#fff', color:'#555', border:'1px solid #c8cdd6', borderRadius:3, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>← 이전 (소장수정)</button>
+                <button onClick={()=>{ if(!payAgreed){alert('이용약관에 동의해주세요.');return;} setShowBankPay(true); }} style={{ height:38, padding:'0 28px', background:'#006699', color:'#fff', border:'none', borderRadius:3, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>🏦 소송비용 납부하기 →</button>
+              </div>
+            )}
+
+            {/* BankPay 모의 모달 */}
+            {showBankPay && (
+              <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.6)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <div style={{ background:'#fff', borderRadius:8, width:420, boxShadow:'0 8px 32px rgba(0,0,0,.3)', overflow:'hidden' }}>
+                  <div style={{ background:'linear-gradient(90deg,#003366,#006699)', color:'#fff', padding:'14px 18px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <div>
+                      <div style={{ fontWeight:700, fontSize:15 }}>🏦 BankPay</div>
+                      <div style={{ fontSize:11, opacity:0.8, marginTop:2 }}>가상계좌 납부 서비스</div>
+                    </div>
+                    <button onClick={()=>setShowBankPay(false)} style={{ background:'none', border:'none', color:'#fff', fontSize:20, cursor:'pointer', lineHeight:1 }}>✕</button>
+                  </div>
+                  <div style={{ padding:'20px' }}>
+                    <div style={{ background:'#f0f7ff', border:'1px solid #c5d8f6', borderRadius:4, padding:'12px 16px', marginBottom:14, textAlign:'center' }}>
+                      <div style={{ fontSize:11, color:'#888', marginBottom:4 }}>납부금액</div>
+                      <div style={{ fontSize:26, fontWeight:700, color:'#003366' }}>{totalPayment.toLocaleString('ko-KR')}원</div>
+                    </div>
+                    <div style={{ fontSize:12, color:'#444', lineHeight:1.9, marginBottom:12, background:'#f8f9fc', border:'1px solid #e0e6ee', borderRadius:3, padding:'10px 12px' }}>
+                      <div style={{ fontWeight:700, marginBottom:4, color:'#003366' }}>가상계좌 납부 안내</div>
+                      은행: 국민은행<br/>
+                      계좌번호: 123456-78-901234<br/>
+                      입금기한: {new Date(Date.now()+3*24*60*60*1000).toLocaleDateString('ko-KR')}까지<br/>
+                      <span style={{ color:'#dc2626', fontWeight:600 }}>반드시 위 계좌로 정확한 금액을 입금하세요.</span>
+                    </div>
+                    <div style={{ display:'flex', gap:6, marginBottom:12 }}>
+                      {['일반결제','간편결제'].map((t,i)=>(
+                        <button key={t} style={{ flex:1, height:34, border:`1px solid ${i===0?'#003366':'#ccc'}`, borderRadius:3, fontSize:12, fontWeight:i===0?700:400, background:i===0?'#003366':'#fff', color:i===0?'#fff':'#555', cursor:'pointer', fontFamily:'inherit' }}>{t}</button>
+                      ))}
+                    </div>
+                    <div style={{ fontSize:11, color:'#888', marginBottom:10, textAlign:'center' }}>⚠️ 본 결제창은 실습 전용 모의 화면입니다. 실제 납부 처리 없음.</div>
+                    <button onClick={()=>{setShowBankPay(false);setPayCompleted(true);window.scrollTo(0,0);}} style={{ width:'100%', height:42, background:'#006699', color:'#fff', border:'none', borderRadius:4, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>납부하기 (모의 처리)</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div style={{ margin: 0, padding: 0, fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif", minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f2f4f7', fontSize: 13 }}>
@@ -631,11 +885,17 @@ export default function ApplyPage() {
           {/* Bottom buttons */}
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
-              onClick={handleSubmit}
-              disabled={submitting}
-              style={{ height: 38, padding: '0 28px', background: submitting ? '#7ab0c8' : '#003366', color: '#fff', border: 'none', borderRadius: 3, fontSize: 14, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}
+              onClick={() => {
+                if (!data.court) { alert('법원을 선택해주세요.'); return; }
+                if (data.parties.length < 2) { alert('원고와 피고를 각 1명 이상 등록해주세요.'); return; }
+                if (!data.claimPurpose.trim()) { alert('청구취지를 입력해주세요.'); return; }
+                if (!data.claimCause.trim()) { alert('청구원인을 입력해주세요.'); return; }
+                setPageStep('payment');
+                window.scrollTo(0, 0);
+              }}
+              style={{ height: 38, padding: '0 28px', background: '#003366', color: '#fff', border: 'none', borderRadius: 3, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}
             >
-              {submitting ? '⏳ 제출 중...' : '✏️ 최종 등록 →'}
+              ✏️ 소송비용납부 →
             </button>
           </div>
         </div>

@@ -991,6 +991,12 @@ export default function MyPage() {
           {openGroups['사건진행'] && (
             <>
               <SbItem label="재판일정" page="schedule" />
+              <SbItem label="대조형 행정요약" page="generic" title="대조형 행정요약" />
+              <SbItem label="사건별계시판" page="generic" title="사건별계시판" />
+              <SbItem label="문서송부확인" page="generic" title="문서송부확인" />
+              <SbItem label="서증인부(문서송부)" page="generic" title="서증인부(문서송부)" />
+              <SbItem label="보정/미보정내역(독촉)" page="generic" title="보정/미보정내역(독촉)" />
+              <SbItem label="증거의견입력" page="generic" title="증거의견입력" />
               <SbItem label="각종신청" page="generic" title="각종신청" />
               <SbItem label="전자결제" page="generic" title="전자결제" />
             </>
@@ -999,18 +1005,25 @@ export default function MyPage() {
           <GrpHd label="나의문서함" gKey="나의문서함" />
           {openGroups['나의문서함'] && (
             <>
-              <SbItem label="미확인송달문서" page="generic" title="미확인송달문서" />
-              <SbItem label="전체송달문서" page="generic" title="전체송달문서" />
               <SbItem label="작성중서류" page="generic" title="작성중서류" />
               <SbItem label="제출서류" page="submitted-docs" />
+              <SbItem label="미확인송달문서" page="generic" title="미확인송달문서" />
+              <SbItem label="전체송달문서" page="generic" title="전체송달문서" />
+              <SbItem label="송달문서 정(등)본발급" page="generic" title="송달문서 정(등)본발급" />
             </>
           )}
 
           <GrpHd label="납부/환급관리" gKey="납부환급관리" />
           {openGroups['납부환급관리'] && (
             <>
-              <SbItem label="납부관리" page="pay" />
-              <SbItem label="환급관리" page="generic" title="환급관리" />
+              <SbItem label="소송비용납부" page="pay" />
+              <SbItem label="상소비용예납" page="generic" title="상소비용예납" />
+              <SbItem label="전자납부내역" page="generic" title="전자납부내역" />
+              <SbItem label="가상계좌내역" page="generic" title="가상계좌내역" />
+              <SbItem label="송달료 자동납부내역" page="generic" title="송달료 자동납부내역" />
+              <SbItem label="대표청구인 신고" page="generic" title="대표청구인 신고" />
+              <SbItem label="인지액환급청구" page="generic" title="인지액환급청구" />
+              <SbItem label="과오납금반환청구" page="generic" title="과오납금반환청구" />
             </>
           )}
 
