@@ -14,12 +14,35 @@ const SB_HDR = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Typ
 
 interface AccountRow {
   login_id: string
+  password?: string
   name: string
   org: string
   role: string
   cohort: string
   bar_num: string
   email: string
+  isHardcoded?: boolean
+}
+
+const ACC_KEY = 'ec_acc'
+
+function getLocalAccounts(): Record<string, AccountRow> {
+  if (typeof window === 'undefined') return {}
+  try { return JSON.parse(localStorage.getItem(ACC_KEY) || '{}') } catch { return {} }
+}
+
+function getAllAccounts(): AccountRow[] {
+  const localAccs = getLocalAccounts()
+  // Build from HARDCODED_ACCOUNTS
+  const merged: Record<string, AccountRow> = {}
+  Object.entries(HARDCODED_ACCOUNTS).forEach(([id, acc]) => {
+    merged[id] = { login_id: id, name: acc.name, org: acc.org, role: acc.role, cohort: '', bar_num: acc.barNum, email: acc.email, isHardcoded: true }
+  })
+  // localStorage overrides (same id wins for local)
+  Object.entries(localAccs).forEach(([id, acc]) => {
+    merged[id] = { ...(acc as AccountRow), login_id: id, isHardcoded: false }
+  })
+  return Object.values(merged)
 }
 
 type Panel = 'dashboard' | 'accounts' | 'cases' | 'assign' | 'records' | 'settings'
@@ -153,7 +176,6 @@ export default function AdminPage() {
   // ─────────────────────────────────────────────
   function AccountsPanel() {
     const [accounts, setAccounts] = useState<AccountRow[]>([])
-    const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [showAddForm, setShowAddForm] = useState(false)
@@ -161,15 +183,11 @@ export default function AdminPage() {
     const [form, setForm] = useState({ login_id: '', password: '', name: '', org: '', cohort: '', email: '', role: 'student', bar_num: '' })
     const fileRef = useRef<HTMLInputElement>(null)
 
-    const fetchAccounts = useCallback(async () => {
-      setLoading(true)
-      const res = await fetch(`${SB_URL}/rest/v1/accounts?select=*&order=cohort.asc,name.asc`, { headers: SB_HDR })
-      const data = await res.json()
-      setAccounts(Array.isArray(data) ? data : [])
-      setLoading(false)
-    }, [])
+    function loadAccounts() {
+      setAccounts(getAllAccounts())
+    }
 
-    useEffect(() => { fetchAccounts() }, [fetchAccounts])
+    useEffect(() => { loadAccounts() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     const filtered = accounts.filter(a =>
       a.login_id.includes(search) || a.name.includes(search) || (a.cohort || '').includes(search) || (a.org || '').includes(search)
@@ -178,7 +196,7 @@ export default function AdminPage() {
     // Group by cohort
     const cohortMap: Record<string, AccountRow[]> = {}
     filtered.forEach(a => {
-      const key = a.cohort || '미분류'
+      const key = a.cohort || (a.isHardcoded ? '기본 계정' : '미분류')
       if (!cohortMap[key]) cohortMap[key] = []
       cohortMap[key].push(a)
     })
@@ -187,41 +205,44 @@ export default function AdminPage() {
       setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
     }
 
-    async function handleAdd() {
+    function handleAdd() {
       if (!form.login_id || !form.password || !form.name) { alert('아이디, 비밀번호, 이름은 필수입니다.'); return }
       setSaving(true)
-      const res = await fetch(`${SB_URL}/rest/v1/accounts`, {
-        method: 'POST',
-        headers: { ...SB_HDR, Prefer: 'return=minimal' },
-        body: JSON.stringify(form),
-      })
-      setSaving(false)
-      if (!res.ok) { const e = await res.json(); alert('추가 실패: ' + JSON.stringify(e)); return }
-      setForm({ login_id: '', password: '', name: '', org: '', cohort: '', email: '', role: 'student', bar_num: '' })
-      setShowAddForm(false)
-      fetchAccounts()
-      showToast('계정이 추가되었습니다.')
-    }
-
-    async function handleDeleteSelected() {
-      if (selectedIds.size === 0) { alert('삭제할 계정을 선택해주세요.'); return }
-      if (!confirm(`선택한 ${selectedIds.size}개 계정을 삭제하시겠습니까?`)) return
-      for (const id of Array.from(selectedIds)) {
-        await fetch(`${SB_URL}/rest/v1/accounts?login_id=eq.${encodeURIComponent(id)}`, {
-          method: 'DELETE', headers: SB_HDR,
-        })
+      try {
+        const localAccs = getLocalAccounts()
+        localAccs[form.login_id] = { ...form }
+        localStorage.setItem(ACC_KEY, JSON.stringify(localAccs))
+        setForm({ login_id: '', password: '', name: '', org: '', cohort: '', email: '', role: 'student', bar_num: '' })
+        setShowAddForm(false)
+        loadAccounts()
+        showToast('계정이 추가되었습니다.')
+      } catch (e) {
+        alert('추가 실패: ' + String(e))
       }
-      setSelectedIds(new Set())
-      fetchAccounts()
-      showToast(`${selectedIds.size}개 계정이 삭제되었습니다.`)
+      setSaving(false)
     }
 
-    async function handleDeleteSingle(id: string) {
+    function handleDeleteSelected() {
+      if (selectedIds.size === 0) { alert('삭제할 계정을 선택해주세요.'); return }
+      const toDelete = Array.from(selectedIds).filter(id => !HARDCODED_ACCOUNTS[id])
+      const hardcodedCount = selectedIds.size - toDelete.length
+      if (toDelete.length === 0) { alert('기본 계정은 삭제할 수 없습니다.'); return }
+      if (!confirm(`선택한 ${toDelete.length}개 계정을 삭제하시겠습니까?${hardcodedCount > 0 ? ` (기본 계정 ${hardcodedCount}개 제외)` : ''}`)) return
+      const localAccs = getLocalAccounts()
+      toDelete.forEach(id => delete localAccs[id])
+      localStorage.setItem(ACC_KEY, JSON.stringify(localAccs))
+      setSelectedIds(new Set())
+      loadAccounts()
+      showToast(`${toDelete.length}개 계정이 삭제되었습니다.`)
+    }
+
+    function handleDeleteSingle(id: string) {
+      if (HARDCODED_ACCOUNTS[id]) { alert('기본 계정은 삭제할 수 없습니다.'); return }
       if (!confirm(`'${id}' 계정을 삭제하시겠습니까?`)) return
-      await fetch(`${SB_URL}/rest/v1/accounts?login_id=eq.${encodeURIComponent(id)}`, {
-        method: 'DELETE', headers: SB_HDR,
-      })
-      fetchAccounts()
+      const localAccs = getLocalAccounts()
+      delete localAccs[id]
+      localStorage.setItem(ACC_KEY, JSON.stringify(localAccs))
+      loadAccounts()
       showToast('계정이 삭제되었습니다.')
     }
 
@@ -236,6 +257,7 @@ export default function AdminPage() {
         const rows: Record<string, string>[] = xlsx.utils.sheet_to_json(ws)
         if (rows.length === 0) { alert('데이터가 없습니다.'); return }
         setSaving(true)
+        const localAccs = getLocalAccounts()
         let ok = 0; let fail = 0
         for (const row of rows) {
           const acc = {
@@ -249,15 +271,12 @@ export default function AdminPage() {
             bar_num: String(row['bar_num'] || row['사원번호'] || ''),
           }
           if (!acc.login_id || !acc.password || !acc.name) { fail++; continue }
-          const res = await fetch(`${SB_URL}/rest/v1/accounts`, {
-            method: 'POST',
-            headers: { ...SB_HDR, Prefer: 'return=minimal' },
-            body: JSON.stringify(acc),
-          })
-          if (res.ok || res.status === 201) ok++; else fail++
+          localAccs[acc.login_id] = acc
+          ok++
         }
+        localStorage.setItem(ACC_KEY, JSON.stringify(localAccs))
         setSaving(false)
-        fetchAccounts()
+        loadAccounts()
         showToast(`${ok}개 계정 등록 완료${fail > 0 ? ` (${fail}개 실패)` : ''}`)
       } catch (err) {
         setSaving(false)
@@ -334,9 +353,7 @@ export default function AdminPage() {
         )}
 
         {/* Account list grouped by cohort */}
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#0067c2' }}>로딩 중...</div>
-        ) : Object.keys(cohortMap).length === 0 ? (
+        {Object.keys(cohortMap).length === 0 ? (
           <div style={{ textAlign: 'center', padding: 40, color: '#999', border: '1px solid #eee', borderRadius: 8 }}>
             등록된 계정이 없습니다.
           </div>
@@ -382,10 +399,14 @@ export default function AdminPage() {
                         <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: acc.role === 'admin' ? '#fee2e2' : '#dbeafe', color: acc.role === 'admin' ? '#dc2626' : '#1d4ed8' }}>
                           {acc.role === 'admin' ? '관리자' : '학생'}
                         </span>
+                        {acc.isHardcoded && <span style={{ fontSize: 10, color: '#aaa', marginLeft: 5 }}>기본</span>}
                       </td>
                       <td style={{ padding: '7px 12px', color: '#555' }}>{acc.email || '-'}</td>
                       <td style={{ padding: '7px 12px' }}>
-                        <button onClick={() => handleDeleteSingle(acc.login_id)} style={{ background: 'none', border: '1px solid #dc2626', color: '#dc2626', borderRadius: 4, padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>삭제</button>
+                        {acc.isHardcoded
+                          ? <span style={{ fontSize: 11, color: '#aaa' }}>삭제불가</span>
+                          : <button onClick={() => handleDeleteSingle(acc.login_id)} style={{ background: 'none', border: '1px solid #dc2626', color: '#dc2626', borderRadius: 4, padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>삭제</button>
+                        }
                       </td>
                     </tr>
                   ))}
@@ -394,36 +415,6 @@ export default function AdminPage() {
             </div>
           ))
         )}
-
-        {/* Also show hardcoded accounts as reference */}
-        <details style={{ marginTop: 20 }}>
-          <summary style={{ cursor: 'pointer', fontSize: 13, color: '#888', padding: '8px 0' }}>기본 계정 (하드코딩) 보기</summary>
-          <div style={{ overflowX: 'auto', marginTop: 8 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead>
-                <tr style={{ background: '#f0f2f7' }}>
-                  {['아이디', '이름', '소속', '역할'].map(h => (
-                    <th key={h} style={{ padding: '7px 12px', textAlign: 'left', fontWeight: 600, color: '#555', borderBottom: '1px solid #eee' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(HARDCODED_ACCOUNTS).map(([id, acc], i) => (
-                  <tr key={id} style={{ background: i % 2 === 0 ? '#fff' : '#fafbfc', borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '7px 12px', fontFamily: 'monospace', color: '#0067c2' }}>{id}</td>
-                    <td style={{ padding: '7px 12px' }}>{acc.name}</td>
-                    <td style={{ padding: '7px 12px', color: '#555' }}>{acc.org}</td>
-                    <td style={{ padding: '7px 12px', fontSize: 11 }}>
-                      <span style={{ background: acc.role === 'admin' ? '#fee2e2' : '#dbeafe', color: acc.role === 'admin' ? '#dc2626' : '#1d4ed8', padding: '1px 7px', borderRadius: 20, fontWeight: 700 }}>
-                        {acc.role === 'admin' ? '관리자' : '학생'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </details>
       </div>
     )
   }

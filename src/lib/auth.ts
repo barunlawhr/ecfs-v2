@@ -59,6 +59,28 @@ export async function validateWithSupabase(id: string, pw: string): Promise<User
 }
 
 export function validateCredentials(id: string, pw: string): User | null {
+  // Check localStorage ec_acc first (accounts added via admin panel)
+  if (typeof window !== 'undefined') {
+    try {
+      const localAccs: Record<string, { password?: string; name?: string; org?: string; role?: string; bar_num?: string; email?: string }> =
+        JSON.parse(localStorage.getItem('ec_acc') || '{}')
+      if (localAccs[id]) {
+        const la = localAccs[id]
+        if (la.password !== pw) return null
+        return {
+          id,
+          name: la.name || id,
+          org: la.org || '',
+          role: (la.role as 'student' | 'admin') || 'student',
+          barNum: la.bar_num || '',
+          addr: '',
+          tel: '',
+          email: la.email || '',
+        }
+      }
+    } catch { /* ignore */ }
+  }
+  // Fall back to hardcoded accounts
   const acc = HARDCODED_ACCOUNTS[id]
   if (!acc || acc.pw !== pw) return null
   return {
