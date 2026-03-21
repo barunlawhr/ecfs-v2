@@ -180,13 +180,18 @@ export default function AdminPage() {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [showAddForm, setShowAddForm] = useState(false)
     const [saving, setSaving] = useState(false)
-    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-    const [confirmBulk, setConfirmBulk] = useState(false)
+    const [deleteModal, setDeleteModal] = useState<{ ids: string[]; label: string } | null>(null)
     const [form, setForm] = useState({ login_id: '', password: '', name: '', org: '', email: '', role: 'student' })
     const fileRef = useRef<HTMLInputElement>(null)
 
-    // admin만 삭제 불가 기본 계정
+    // admin만 삭제 불가
     const PROTECTED_IDS = new Set(['admin'])
+    // 삭제된 hardcoded 계정 목록 (ec_del)
+    const DEL_KEY = 'ec_del'
+
+    function getDeletedSet(): Set<string> {
+      try { return new Set(JSON.parse(localStorage.getItem(DEL_KEY) || '[]')) } catch { return new Set() }
+    }
 
     const DEFAULT_IDS = [
       'student01','student02','student03','student04','student05',
@@ -195,12 +200,15 @@ export default function AdminPage() {
 
     function loadRows() {
       const localAccs = getLocalAccounts()
-      // 1) DEFAULT_ACC 먼저 (student01~10은 isHardcoded:false → 삭제 가능)
-      const defaultRows: AccountRow[] = DEFAULT_IDS.map(id => {
-        const a = HARDCODED_ACCOUNTS[id]
-        return { login_id: id, name: a.name, org: a.org, role: a.role, cohort: '', bar_num: a.barNum, email: a.email, isHardcoded: PROTECTED_IDS.has(id) }
-      })
-      // 2) localStorage에만 있는 계정 (DEFAULT 아닌 것)
+      const deleted = getDeletedSet()
+      // 1) DEFAULT_ACC 먼저 — 삭제된 것은 제외
+      const defaultRows: AccountRow[] = DEFAULT_IDS
+        .filter(id => !deleted.has(id))
+        .map(id => {
+          const a = HARDCODED_ACCOUNTS[id]
+          return { login_id: id, name: a.name, org: a.org, role: a.role, cohort: '', bar_num: a.barNum, email: a.email, isHardcoded: PROTECTED_IDS.has(id) }
+        })
+      // 2) localStorage에만 있는 계정
       const extraRows: AccountRow[] = Object.entries(localAccs)
         .filter(([id]) => !HARDCODED_ACCOUNTS[id])
         .map(([id, a]) => ({ ...(a as AccountRow), login_id: id, isHardcoded: false }))
@@ -230,38 +238,34 @@ export default function AdminPage() {
       } catch (e) { alert('추가 실패: ' + String(e)) }
     }
 
+    function execDelete(ids: string[]) {
+      const stored = getLocalAccounts()
+      const deleted = getDeletedSet()
+      ids.forEach(id => {
+        if (HARDCODED_ACCOUNTS[id]) {
+          deleted.add(id) // hardcoded → ec_del에 추가
+        } else {
+          delete stored[id] // local → ec_acc에서 삭제
+        }
+      })
+      localStorage.setItem(ACC_KEY, JSON.stringify(stored))
+      localStorage.setItem(DEL_KEY, JSON.stringify([...deleted]))
+      setSelectedIds(new Set())
+      setDeleteModal(null)
+      loadRows()
+      showToast(`${ids.length}개 계정이 삭제되었습니다.`)
+    }
+
     function handleDeleteSingle(id: string) {
-      if (PROTECTED_IDS.has(id)) { alert('기본 계정은 삭제할 수 없습니다.'); return }
-      if (confirmDeleteId === id) {
-        // second click → actually delete
-        const stored = getLocalAccounts()
-        delete stored[id]
-        localStorage.setItem(ACC_KEY, JSON.stringify(stored))
-        setConfirmDeleteId(null)
-        loadRows()
-        showToast('계정이 삭제되었습니다.')
-      } else {
-        setConfirmDeleteId(id)
-        setConfirmBulk(false)
-      }
+      if (PROTECTED_IDS.has(id)) return
+      const acc = rows.find(r => r.login_id === id)
+      setDeleteModal({ ids: [id], label: `'${acc?.name || id}' 계정을 삭제하시겠습니까?` })
     }
 
     function handleDeleteSelected() {
       const toDelete = Array.from(selectedIds).filter(id => !PROTECTED_IDS.has(id))
-      if (toDelete.length === 0) { alert('기본 계정은 삭제할 수 없습니다.'); return }
-      if (confirmBulk) {
-        // second click → actually delete
-        const stored = getLocalAccounts()
-        toDelete.forEach(id => delete stored[id])
-        localStorage.setItem(ACC_KEY, JSON.stringify(stored))
-        setSelectedIds(new Set())
-        setConfirmBulk(false)
-        loadRows()
-        showToast(`${toDelete.length}개 계정이 삭제되었습니다.`)
-      } else {
-        setConfirmBulk(true)
-        setConfirmDeleteId(null)
-      }
+      if (toDelete.length === 0) { alert('삭제할 계정을 선택해주세요.'); return }
+      setDeleteModal({ ids: toDelete, label: `선택한 ${toDelete.length}개 계정을 삭제하시겠습니까?` })
     }
 
     async function handleSampleDownload() {
@@ -328,15 +332,9 @@ export default function AdminPage() {
           <button onClick={handleSampleDownload} style={{ padding: '7px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
             ⬇ 샘플 양식
           </button>
-            {confirmBulk ? (
-            <button onClick={handleDeleteSelected} style={{ padding: '7px 14px', background: '#7f1d1d', color: '#fff', border: '2px solid #dc2626', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              확인? 정말 삭제
-            </button>
-          ) : (
             <button onClick={handleDeleteSelected} disabled={selectedIds.size === 0} style={{ padding: '7px 14px', background: selectedIds.size > 0 ? '#dc2626' : '#e5e7eb', color: selectedIds.size > 0 ? '#fff' : '#999', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: selectedIds.size > 0 ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}>
-              🗑 선택 삭제 ({selectedIds.size})
-            </button>
-          )}
+            🗑 선택 삭제 ({selectedIds.size})
+          </button>
         </div>
 
         {/* 개별 추가 폼 */}
@@ -420,15 +418,30 @@ export default function AdminPage() {
                 <td style={{ padding: '7px 12px' }}>
                   {acc.isHardcoded
                     ? <span style={{ fontSize: 11, color: '#c0c0c0' }}>–</span>
-                    : confirmDeleteId === acc.login_id
-                      ? <button onClick={() => handleDeleteSingle(acc.login_id)} style={{ background: '#7f1d1d', color: '#fff', border: '2px solid #dc2626', borderRadius: 4, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>확인?</button>
-                      : <button onClick={() => handleDeleteSingle(acc.login_id)} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>삭제</button>
+                    : <button onClick={() => handleDeleteSingle(acc.login_id)} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>삭제</button>
                   }
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+
+        {/* 삭제 확인 모달 */}
+        {deleteModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: '#fff', borderRadius: 10, width: 360, boxShadow: '0 8px 32px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+              <div style={{ background: '#dc2626', color: '#fff', padding: '14px 20px', fontWeight: 700, fontSize: 15 }}>⚠️ 계정 삭제</div>
+              <div style={{ padding: '24px 20px', fontSize: 14, color: '#333', lineHeight: 1.7 }}>
+                {deleteModal.label}<br />
+                <span style={{ fontSize: 12, color: '#888' }}>삭제 후에는 해당 계정으로 로그인할 수 없습니다.</span>
+              </div>
+              <div style={{ display: 'flex', gap: 10, padding: '0 20px 20px' }}>
+                <button onClick={() => setDeleteModal(null)} style={{ flex: 1, padding: '10px', border: '1px solid #ccc', background: '#f5f5f5', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>취소</button>
+                <button onClick={() => execDelete(deleteModal.ids)} style={{ flex: 1, padding: '10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>삭제</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
