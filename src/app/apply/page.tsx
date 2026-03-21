@@ -190,27 +190,53 @@ export default function ApplyPage() {
   useEffect(() => { if (!loading && !user) router.push('/'); }, [user, loading, router]);
 
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem('assigned_case');
-      if (raw) {
-        const parsed: SampleCase = JSON.parse(raw);
-        sessionStorage.removeItem('assigned_case');
-        setAssignedCase(parsed);
-        setData(prev => ({
-          ...prev,
-          court: parsed.court || prev.court,
-          caseCategory: CASE_NAMES.includes(parsed.case_type) ? parsed.case_type : prev.caseCategory,
-          caseName: parsed.case_type || prev.caseName,
-          claimPurpose: parsed.claim_purpose || prev.claimPurpose,
-          claimCause: parsed.claim_reason || prev.claimCause,
-        }));
-        const initial: Party[] = [];
-        if (parsed.plaintiff) initial.push({ id: crypto.randomUUID(), role: '원고', name: parsed.plaintiff, addr: '' });
-        if (parsed.defendant) initial.push({ id: crypto.randomUUID(), role: '피고', name: parsed.defendant, addr: '' });
-        if (initial.length) setData(prev => ({ ...prev, parties: initial }));
-      }
-    } catch { /* ignore */ }
-  }, []);
+    if (!user) return;
+
+    async function loadAssignedCase() {
+      // 1) sessionStorage 우선 (다른 페이지에서 넘어온 경우)
+      try {
+        const raw = sessionStorage.getItem('assigned_case');
+        if (raw) {
+          const parsed: SampleCase = JSON.parse(raw);
+          sessionStorage.removeItem('assigned_case');
+          applyCase(parsed);
+          return;
+        }
+      } catch { /* ignore */ }
+
+      // 2) Supabase assignments 테이블에서 현재 학생의 배정 사건 조회
+      try {
+        const { data: rows } = await supabase
+          .from('assignments')
+          .select('*, sample_cases(*)')
+          .eq('user_id', user!.id)
+          .order('id', { ascending: false })
+          .limit(1);
+
+        const row = rows?.[0];
+        const sc = row?.sample_cases as SampleCase | undefined;
+        if (sc) applyCase(sc);
+      } catch { /* ignore */ }
+    }
+
+    function applyCase(parsed: SampleCase) {
+      setAssignedCase(parsed);
+      setData(prev => ({
+        ...prev,
+        court: parsed.court || prev.court,
+        caseCategory: CASE_NAMES.includes(parsed.case_type) ? parsed.case_type : prev.caseCategory,
+        caseName: parsed.case_type || prev.caseName,
+        claimPurpose: parsed.claim_purpose || prev.claimPurpose,
+        claimCause: parsed.claim_reason || prev.claimCause,
+      }));
+      const initial: Party[] = [];
+      if (parsed.plaintiff) initial.push({ id: crypto.randomUUID(), role: '원고', name: parsed.plaintiff, addr: '' });
+      if (parsed.defendant) initial.push({ id: crypto.randomUUID(), role: '피고', name: parsed.defendant, addr: '' });
+      if (initial.length) setData(prev => ({ ...prev, parties: initial }));
+    }
+
+    loadAssignedCase();
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (causeRef.current) causeRef.current.innerText = data.claimCause || '';
