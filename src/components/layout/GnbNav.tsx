@@ -137,6 +137,63 @@ const MEGA: Record<string, MegaMenu> = {
       { title: '비송,과태료 서류', items: [] },
       { title: '회신서등 제출', items: [] },
     ],
+    columns: [
+      [
+        { title: '서류검색', items: [] },
+        { title: '민사서류', items: [
+          { label: '민사본안', href: '/apply' },
+          { label: '민사신청', href: '/apply' },
+          { label: '지급명령(독촉)신청', href: '/apply' },
+          { label: '전체서류', href: '/apply' },
+        ]},
+      ],
+      [
+        { title: '형사서류', items: [
+          { label: '형사공판', href: '#' },
+          { label: '형사신청', href: '#' },
+          { label: '형사약식', href: '#' },
+          { label: '영장/즉결', href: '#' },
+        ]},
+      ],
+      [
+        { title: '가사서류', items: [
+          { label: '가사소송·비송', href: '#' },
+          { label: '가사조정', href: '#' },
+          { label: '가사신청', href: '#' },
+          { label: '과태료/감치', href: '#' },
+          { label: '가족관계등록비송', href: '#' },
+          { label: '전체서류', href: '#' },
+        ]},
+        { title: '보호서류', items: [
+          { label: '소년보호', href: '#' },
+          { label: '가정아동성보호', href: '#' },
+        ]},
+      ],
+      [
+        { title: '행정서류', items: [] },
+        { title: '특허서류', items: [] },
+        { title: '회생파산서류', items: [
+          { label: '개인회생', href: '#' },
+          { label: '개인파산', href: '#' },
+          { label: '법인회생(간이회생 포함)', href: '#' },
+          { label: '법인파산', href: '#' },
+          { label: '일반회생(간이회생 포함)', href: '#' },
+          { label: '기타사건', href: '#' },
+        ]},
+      ],
+      [
+        { title: '민사집행서류', items: [
+          { label: '부동산 등 집행', href: '#' },
+          { label: '채권압류 등', href: '#' },
+          { label: '채권배당', href: '#' },
+          { label: '재산명시/감치', href: '#' },
+          { label: '재산조회/채무불이행자명부', href: '#' },
+          { label: '그 밖의 집행', href: '#' },
+        ]},
+        { title: '비송,과태료 서류', items: [] },
+        { title: '회신서등 제출', items: [] },
+      ],
+    ],
   },
 
   '각종신청': {
@@ -396,7 +453,7 @@ export default function GnbNav({ active }: { active?: string }) {
             </div>
 
             {/* 우측 메뉴 그리드 */}
-            <div style={{ flex: 1, padding: '24px 28px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0 24px', maxHeight: 480, overflowY: 'auto' }}>
+            <div style={{ flex: 1, padding: '24px 28px', display: 'grid', gridTemplateColumns: `repeat(${(MEGA[openMenu].columns || chunkGroups(MEGA[openMenu].groups)).length}, 1fr)`, gap: '0 24px', maxHeight: 480, overflowY: 'auto' }}>
               {(MEGA[openMenu].columns || chunkGroups(MEGA[openMenu].groups)).map((col, ci) => (
                 <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   {col.map((group, gi) => (

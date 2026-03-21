@@ -1445,6 +1445,164 @@ export default function MyPage() {
     )
   }
 
+  // ── 완료된사건 ───────────────────────────────────────────────
+  const CompletedCasesContent = () => {
+    const [filterType, setFilterType] = useState('전체')
+    const [filterCourt, setFilterCourt] = useState('전체')
+    const [searchMode, setSearchMode] = useState<'date'|'caseNo'>('date')
+    const [currentPage, setCurrentPage] = useState(1)
+    const perPage = 10
+
+    const LAWSUIT_TYPES = ['전체','민사','형사','가사','보호','행정','특허','회생파산','민사(지급명령)','민사집행']
+    const COURTS = ['전체','서울중앙지방법원','서울동부지방법원','서울서부지방법원','서울남부지방법원','서울북부지방법원','수원지방법원','인천지방법원','의정부지방법원','춘천지방법원','대전지방법원','청주지방법원','대구지방법원','부산지방법원','울산지방법원','창원지방법원','광주지방법원','전주지방법원','제주지방법원']
+
+    const MOCK: { court:string; caseNo:string; dept:string; stance:string; recvDate:string; confirmDate:string; plaintiff:string; defendant:string }[] = [
+      { court:'수원지법',        caseNo:'2026가단11111', dept:'민사3단독',    stance:'피고대리인',   recvDate:'2025.07.03', confirmDate:'',          plaintiff:'주식회사 가나다물산',          defendant:'홍길동' },
+      { court:'서울중앙지법',    caseNo:'2025타채55001', dept:'기타집행5게',  stance:'채권자대리인', recvDate:'2025.06.24', confirmDate:'',          plaintiff:'이민준',                      defendant:'주식회사 라마바기술' },
+      { court:'인천지법',        caseNo:'2025가단88002', dept:'민사43단독',   stance:'채권자대리인', recvDate:'2025.05.02', confirmDate:'',          plaintiff:'김정호',                      defendant:'주식회사 사아자컨설팅' },
+      { court:'서울행정법원',    caseNo:'2025구단33003', dept:'행정3단독',    stance:'원고대리인',   recvDate:'2025.03.18', confirmDate:'',          plaintiff:'박성민',                      defendant:'서울특별시 차구청장' },
+      { court:'수원지법 안양지원',caseNo:'2024가단99004', dept:'32단독(가압류)',stance:'채권자대리인', recvDate:'2024.11.29', confirmDate:'',          plaintiff:'주식회사 카타파네트웍스',     defendant:'주식회사 하카도컴퍼니' },
+      { court:'부산지법 서부지원',caseNo:'2024타배55005', dept:'채권배당1게',  stance:'채권자대리인', recvDate:'2024.11.28', confirmDate:'',          plaintiff:'이준혁 외 6명',               defendant:'최민주' },
+      { court:'서울중앙지법',    caseNo:'2023가단66006', dept:'제201민사단독',stance:'피고대리인',   recvDate:'2023.05.02', confirmDate:'',          plaintiff:'주식회사 파하거설',           defendant:'정상우' },
+      { court:'청주지법 충주지원',caseNo:'2023카합20007(본소)',dept:'제1민사부',stance:'피고대리인', recvDate:'2023.04.19', confirmDate:'',          plaintiff:'가나다손보 주식회사 외 2명',  defendant:'' },
+      { court:'화성시법원',      caseNo:'2023가소303008', dept:'소액1단독',   stance:'원고대리인',   recvDate:'2023.02.07', confirmDate:'2024.05.25',plaintiff:'최지수',                      defendant:'김민수 외 1명' },
+      { court:'부산지법 서부지원',caseNo:'2022카정200009', dept:'3(민사)단독', stance:'신청인대리인', recvDate:'2022.01.28', confirmDate:'',          plaintiff:'주식회사 나라',               defendant:'이민섭' },
+      { court:'서울중앙지법',    caseNo:'2022가합11010',  dept:'민사합의22부', stance:'피고대리인',  recvDate:'2022.01.10', confirmDate:'2023.12.15',plaintiff:'홍길동 외 2명',               defendant:'주식회사 다나라건설' },
+    ]
+
+    const filtered = MOCK.filter(c => {
+      if (filterType !== '전체' && filterType !== '민사' && filterType !== '행정') return false
+      if (filterCourt !== '전체' && !c.court.includes(filterCourt.replace('지방법원','지법').replace('법원',''))) return false
+      return true
+    })
+    const total = filtered.length
+    const totalPages = Math.max(1, Math.ceil(total / perPage))
+    const paged = filtered.slice((currentPage-1)*perPage, currentPage*perPage)
+    const tdS: React.CSSProperties = { padding:'7px 8px', fontSize:12, borderBottom:'1px solid #e8edf0', verticalAlign:'middle', textAlign:'center' }
+
+    return (
+      <div style={{ fontFamily:'inherit' }}>
+        <PageHd title="완료된사건" actions={<><ActBtn label="📌 나의 메뉴 추가" /><ActBtn label="🖨 출력" /></>} />
+
+        {/* 필터 */}
+        <div style={{ background:'#fff', borderBottom:'1px solid #dde0e8', padding:'10px 14px', display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, color:'#555', fontWeight:600, minWidth:40 }}>소송유형</span>
+            <select value={filterType} onChange={e=>{setFilterType(e.target.value);setCurrentPage(1)}} style={{ height:30, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+              {LAWSUIT_TYPES.map(t=><option key={t}>{t}</option>)}
+            </select>
+            <select style={{ height:30, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+              {['전체','민사본안','민사신청','기타'].map(t=><option key={t}>{t}</option>)}
+            </select>
+            <span style={{ fontSize:12, color:'#555', fontWeight:600, minWidth:20, marginLeft:8 }}>법원</span>
+            <select value={filterCourt} onChange={e=>{setFilterCourt(e.target.value);setCurrentPage(1)}} style={{ height:30, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+              {COURTS.map(c=><option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <label style={{ fontSize:12, display:'flex', alignItems:'center', gap:4, cursor:'pointer' }}>
+              <input type="radio" name="compMode" checked={searchMode==='date'} onChange={()=>setSearchMode('date')} style={{ accentColor:'#003366' }} />접수일자
+            </label>
+            <label style={{ fontSize:12, display:'flex', alignItems:'center', gap:4, cursor:'pointer' }}>
+              <input type="radio" name="compMode" checked={searchMode==='caseNo'} onChange={()=>setSearchMode('caseNo')} style={{ accentColor:'#003366' }} />사건번호
+            </label>
+            {searchMode==='date' ? (
+              <>
+                <input type="date" style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 6px', fontSize:12, fontFamily:'inherit' }} />
+                <span style={{ fontSize:12 }}>~</span>
+                <input type="date" style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 6px', fontSize:12, fontFamily:'inherit' }} />
+                {['오늘','3일','1주일','1개월','전체'].map(l=>(
+                  <button key={l} style={{ height:26, padding:'0 9px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>{l}</button>
+                ))}
+              </>
+            ) : (
+              <>
+                <select style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 4px', fontFamily:'inherit' }}>
+                  {['2026','2025','2024','2023','2022'].map(y=><option key={y}>{y}</option>)}
+                </select>
+                <select style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 4px', fontFamily:'inherit' }}>
+                  {['가단','가합','나','가소','가불','타채','타배','카합','카정','구단'].map(t=><option key={t}>{t}</option>)}
+                </select>
+                <input type="text" style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 6px', fontSize:12, fontFamily:'inherit', width:100 }} placeholder="사건번호" />
+              </>
+            )}
+          </div>
+          <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, color:'#555', fontWeight:600, minWidth:40 }}>정렬순서</span>
+            {[['접수일↓','접수일↑'],['법원↑','법원↓'],['사건번호↓','사건번호↑']].map((opts,i)=>(
+              <select key={i} defaultValue={opts[0]} style={{ height:26, border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, padding:'0 4px', fontFamily:'inherit' }}>
+                {opts.map(o=><option key={o}>{o}</option>)}
+              </select>
+            ))}
+          </div>
+          <div style={{ textAlign:'center' }}>
+            <button style={{ height:34, padding:'0 48px', background:'#0098a3', color:'#fff', border:'none', borderRadius:3, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>조 회</button>
+          </div>
+        </div>
+
+        {/* 상단 버튼 */}
+        <div style={{ background:'#fff', borderBottom:'1px solid #dde0e8', padding:'6px 14px', display:'flex', justifyContent:'flex-end', gap:6 }}>
+          <button style={{ height:28, padding:'0 10px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', gap:4, fontFamily:'inherit' }}>
+            <span style={{ fontSize:13 }}>📗</span> 엑셀로 저장
+          </button>
+          <ActBtn label="완료사건 지정취소" />
+        </div>
+
+        {/* 테이블 */}
+        <div style={{ background:'#fff', overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <thead>
+              <tr style={{ background:'#f0f3f8', borderBottom:'2px solid #b8c8e0' }}>
+                <th style={{ padding:'8px 8px', width:28 }}><input type="checkbox" /></th>
+                {['법원','사건번호','재판부','사건지위','접수일자','확정일자','원고','피고','바로가기'].map(h=>(
+                  <th key={h} style={{ padding:'8px 8px', fontWeight:600, fontSize:11, color:'#333', whiteSpace:'nowrap', textAlign:'center' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((c, i) => (
+                <tr key={c.caseNo} style={{ background:i%2===0?'#fff':'#fafbfe', borderBottom:'1px solid #e8edf0' }}>
+                  <td style={{...tdS}}><input type="checkbox" /></td>
+                  <td style={{...tdS, whiteSpace:'nowrap'}}>{c.court}</td>
+                  <td style={{...tdS}}>
+                    <span style={{ color:'#0057a8', textDecoration:'underline', cursor:'pointer', fontWeight:600, whiteSpace:'nowrap' }}
+                      onClick={()=>alert('실습 모드 — 사건 상세 조회')}>{c.caseNo}</span>
+                  </td>
+                  <td style={{...tdS, whiteSpace:'nowrap', color:'#555'}}>{c.dept}</td>
+                  <td style={{...tdS, whiteSpace:'nowrap', color:'#555'}}>{c.stance}</td>
+                  <td style={{...tdS, whiteSpace:'nowrap', color:'#555'}}>{c.recvDate}</td>
+                  <td style={{...tdS, whiteSpace:'nowrap', color:'#555'}}>{c.confirmDate || ''}</td>
+                  <td style={{...tdS, maxWidth:90, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{c.plaintiff}</td>
+                  <td style={{...tdS, maxWidth:90, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{c.defendant}</td>
+                  <td style={{...tdS}}>
+                    <button onClick={()=>alert('실습 모드 — 메뉴 선택')} style={{ height:24, padding:'0 8px', background:'#fff', border:'1px solid #8899bb', borderRadius:3, fontSize:11, cursor:'pointer', color:'#003366', fontFamily:'inherit' }}>메뉴선택</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 페이지네이션 */}
+        <div style={{ background:'#fff', borderTop:'1px solid #e8edf0', padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
+          <span style={{ fontSize:12, color:'#555' }}>총 <strong>{total}</strong>건</span>
+          <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+            <button onClick={()=>setCurrentPage(1)} disabled={currentPage===1} style={{ width:26, height:26, border:'1px solid #ccc', background:'#fff', borderRadius:3, cursor:'pointer', fontSize:11 }}>«</button>
+            <button onClick={()=>setCurrentPage(p=>Math.max(1,p-1))} disabled={currentPage===1} style={{ width:26, height:26, border:'1px solid #ccc', background:'#fff', borderRadius:3, cursor:'pointer', fontSize:12 }}>‹</button>
+            {Array.from({length:totalPages},(_,i)=>i+1).map(p=>(
+              <button key={p} onClick={()=>setCurrentPage(p)} style={{ width:26, height:26, border:`1px solid ${p===currentPage?'#003366':'#ccc'}`, background:p===currentPage?'#003366':'#fff', color:p===currentPage?'#fff':'#333', borderRadius:3, cursor:'pointer', fontSize:12, fontWeight:p===currentPage?700:400 }}>{p}</button>
+            ))}
+            <button onClick={()=>setCurrentPage(p=>Math.min(totalPages,p+1))} disabled={currentPage===totalPages} style={{ width:26, height:26, border:'1px solid #ccc', background:'#fff', borderRadius:3, cursor:'pointer', fontSize:12 }}>›</button>
+            <button onClick={()=>setCurrentPage(totalPages)} disabled={currentPage===totalPages} style={{ width:26, height:26, border:'1px solid #ccc', background:'#fff', borderRadius:3, cursor:'pointer', fontSize:11 }}>»</button>
+          </div>
+          <select defaultValue="10" style={{ height:26, border:'1px solid #ccc', borderRadius:3, fontSize:11, padding:'0 4px', fontFamily:'inherit' }}>
+            {['10','20','30'].map(n=><option key={n}>{n}개씩 보기</option>)}
+          </select>
+        </div>
+      </div>
+    )
+  }
+
   // ── 전자문서제출/송달내역 (목록) ─────────────────────────────
   const DocHistoryContent = () => {
     const [filterGubun, setFilterGubun] = useState('전체')
@@ -1717,6 +1875,7 @@ export default function MyPage() {
       case 'doc-history': return <DocHistoryContent />
       case 'delivery-detail': return <DeliveryDetailContent />
       case 'submit-detail': return <SubmitDetailContent />
+      case 'completed-cases': return <CompletedCasesContent />
       case 'myinfo-user': return <MyInfoContent type="user" />
       case 'myinfo-pw': return <MyInfoContent type="pw" />
       default: return <GenericContent title={genericTitle || activePage} />
@@ -1751,7 +1910,7 @@ export default function MyPage() {
               <SbItem label="진행중사건" page="active-cases" />
               <SbItem label="관심사건" page="generic" title="관심사건" />
               <SbItem label="확정된사건" page="generic" title="확정된사건" />
-              <SbItem label="완료된사건" page="generic" title="완료된사건" />
+              <SbItem label="완료된사건" page="completed-cases" title="완료된사건" />
             </>
           )}
 
