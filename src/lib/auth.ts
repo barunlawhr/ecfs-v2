@@ -1,5 +1,8 @@
 import type { User } from '@/types'
 
+const SB_URL = 'https://knpvayujykoqjncctxrr.supabase.co'
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHZheXVqeWtvcWpuY2N0eHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NzA3NDUsImV4cCI6MjA4OTE0Njc0NX0.rXlo5IsOW6FS5N1X3vgqNM1RvzB84TYPqVhnYyc6FSg'
+
 export interface AccountRecord {
   pw: string
   name: string
@@ -23,6 +26,36 @@ export const HARDCODED_ACCOUNTS: Record<string, AccountRecord> = {
   student09: { pw: 'court1234', name: '장바른', org: '정직법률사무소', role: 'student', barNum: '서울21017', addr: '서울 서초구 서초대로 163', tel: '010-2999-3693', email: 'student09@barun.law' },
   student10: { pw: 'court1234', name: '임바른', org: '신뢰법률사무소', role: 'student', barNum: '서울21130', addr: '서울 서초구 서초대로 170', tel: '010-3110-3770', email: 'student10@barun.law' },
   admin: { pw: 'admin1234', name: '관리자', org: '운영팀', role: 'admin', barNum: '', addr: '', tel: '', email: 'admin@ecourt.kr' },
+}
+
+// Checks Supabase accounts table first, falls back to HARDCODED_ACCOUNTS
+export async function validateWithSupabase(id: string, pw: string): Promise<User | null> {
+  try {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/accounts?login_id=eq.${encodeURIComponent(id)}&select=*`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+    )
+    if (res.ok) {
+      const rows = await res.json()
+      if (Array.isArray(rows) && rows.length > 0) {
+        const acc = rows[0]
+        if (acc.password !== pw) return null
+        return {
+          id: acc.login_id,
+          name: acc.name,
+          org: acc.org || '',
+          role: acc.role || 'student',
+          barNum: acc.bar_num || '',
+          addr: '',
+          tel: '',
+          email: acc.email || '',
+        }
+      }
+    }
+  } catch {
+    // fall through to hardcoded
+  }
+  return validateCredentials(id, pw)
 }
 
 export function validateCredentials(id: string, pw: string): User | null {

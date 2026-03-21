@@ -10,11 +10,14 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
   const [id, setId] = useState('')
   const [pw, setPw] = useState('')
   const [err, setErr] = useState('')
+  const [loggingIn, setLoggingIn] = useState(false)
 
-  function handleLogin() {
+  async function handleLogin() {
     setErr('')
     if (!id || !pw) { setErr('아이디와 비밀번호를 입력해주세요.'); return }
-    const user = login(id, pw)
+    setLoggingIn(true)
+    const user = await login(id, pw)
+    setLoggingIn(false)
     if (!user) { setErr('아이디 또는 비밀번호가 올바르지 않습니다.'); return }
     onClose()
     if (user.role === 'admin') router.push('/admin')
@@ -36,15 +39,15 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
           </div>
           <div style={{ marginBottom: 12 }}>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#444', marginBottom: 5 }}>아이디</label>
-            <input className="inp" style={{ width: '100%' }} value={id} onChange={e => setId(e.target.value)} placeholder="아이디 입력" onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+            <input className="inp" style={{ width: '100%' }} value={id} onChange={e => setId(e.target.value)} placeholder="아이디 입력" onKeyDown={e => { if (e.key === 'Enter') handleLogin() }} disabled={loggingIn} />
           </div>
           <div style={{ marginBottom: 8 }}>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#444', marginBottom: 5 }}>비밀번호</label>
-            <input className="inp" type="password" style={{ width: '100%' }} value={pw} onChange={e => setPw(e.target.value)} placeholder="비밀번호 입력" onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+            <input className="inp" type="password" style={{ width: '100%' }} value={pw} onChange={e => setPw(e.target.value)} placeholder="비밀번호 입력" onKeyDown={e => { if (e.key === 'Enter') handleLogin() }} disabled={loggingIn} />
           </div>
           {err && <div style={{ fontSize: 11, color: '#c0392b', marginBottom: 8 }}>{err}</div>}
-          <button onClick={handleLogin} style={{ width: '100%', height: 44, background: '#006699', color: '#fff', border: 'none', borderRadius: 3, fontSize: 14, fontWeight: 700, cursor: 'pointer', marginTop: 8, marginBottom: 8, fontFamily: 'inherit' }}>
-            로그인
+          <button onClick={handleLogin} disabled={loggingIn} style={{ width: '100%', height: 44, background: loggingIn ? '#7ab0c8' : '#006699', color: '#fff', border: 'none', borderRadius: 3, fontSize: 14, fontWeight: 700, cursor: loggingIn ? 'not-allowed' : 'pointer', marginTop: 8, marginBottom: 8, fontFamily: 'inherit' }}>
+            {loggingIn ? '로그인 중...' : '로그인'}
           </button>
           <button onClick={onClose} style={{ width: '100%', height: 36, background: '#fff', color: '#555', border: '1px solid #c8cdd6', borderRadius: 3, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
             취소

@@ -2,19 +2,19 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import type { User } from '@/types'
-import { validateCredentials, saveSession, loadSession, clearSession } from '@/lib/auth'
+import { validateWithSupabase, saveSession, loadSession, clearSession } from '@/lib/auth'
 
 interface AuthContextValue {
   user: User | null
   loading: boolean
-  login: (id: string, pw: string) => User | null
+  login: (id: string, pw: string) => Promise<User | null>
   logout: () => void
 }
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
-  login: () => null,
+  login: async () => null,
   logout: () => {},
 })
 
@@ -27,8 +27,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false)
   }, [])
 
-  function login(id: string, pw: string): User | null {
-    const u = validateCredentials(id, pw)
+  async function login(id: string, pw: string): Promise<User | null> {
+    const u = await validateWithSupabase(id, pw)
     if (u) { saveSession(u); setUser(u) }
     return u
   }

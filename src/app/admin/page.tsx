@@ -1,12 +1,26 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import MockBar from '@/components/layout/MockBar'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { HARDCODED_ACCOUNTS } from '@/lib/auth'
 import type { SampleCase, Assignment, PracticeRecord } from '@/types'
+
+const SB_URL = 'https://knpvayujykoqjncctxrr.supabase.co'
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHZheXVqeWtvcWpuY2N0eHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NzA3NDUsImV4cCI6MjA4OTE0Njc0NX0.rXlo5IsOW6FS5N1X3vgqNM1RvzB84TYPqVhnYyc6FSg'
+const SB_HDR = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' }
+
+interface AccountRow {
+  login_id: string
+  name: string
+  org: string
+  role: string
+  cohort: string
+  bar_num: string
+  email: string
+}
 
 type Panel = 'dashboard' | 'accounts' | 'cases' | 'assign' | 'records' | 'settings'
 
@@ -79,13 +93,9 @@ export default function AdminPage() {
         monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
         monday.setHours(0, 0, 0, 0)
 
-        const SURL = 'https://knpvayujykoqjncctxrr.supabase.co'
-        const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHZheXVqeWtvcWpuY2N0eHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NzA3NDUsImV4cCI6MjA4OTE0Njc0NX0.rXlo5IsOW6FS5N1X3vgqNM1RvzB84TYPqVhnYyc6FSg'
-        const hdrs = { apikey: SKEY, Authorization: `Bearer ${SKEY}` }
-
         const [prRes, assignRes] = await Promise.all([
           supabase.from('practice_records').select('score, created_at'),
-          fetch(`${SURL}/rest/v1/assignments?select=id`, { headers: hdrs }).then(r => r.json()),
+          fetch(`${SB_URL}/rest/v1/assignments?select=id`, { headers: SB_HDR }).then(r => r.json()),
         ])
 
         const records = prRes.data || []
@@ -142,58 +152,278 @@ export default function AdminPage() {
   // Account Management Panel
   // ─────────────────────────────────────────────
   function AccountsPanel() {
+    const [accounts, setAccounts] = useState<AccountRow[]>([])
+    const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
-    const allEntries = Object.entries(HARDCODED_ACCOUNTS)
-    const filtered = allEntries.filter(([id, acc]) =>
-      id.includes(search) || acc.name.includes(search) || acc.org.includes(search)
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+    const [showAddForm, setShowAddForm] = useState(false)
+    const [saving, setSaving] = useState(false)
+    const [form, setForm] = useState({ login_id: '', password: '', name: '', org: '', cohort: '', email: '', role: 'student', bar_num: '' })
+    const fileRef = useRef<HTMLInputElement>(null)
+
+    const fetchAccounts = useCallback(async () => {
+      setLoading(true)
+      const res = await fetch(`${SB_URL}/rest/v1/accounts?select=*&order=cohort.asc,name.asc`, { headers: SB_HDR })
+      const data = await res.json()
+      setAccounts(Array.isArray(data) ? data : [])
+      setLoading(false)
+    }, [])
+
+    useEffect(() => { fetchAccounts() }, [fetchAccounts])
+
+    const filtered = accounts.filter(a =>
+      a.login_id.includes(search) || a.name.includes(search) || (a.cohort || '').includes(search) || (a.org || '').includes(search)
     )
+
+    // Group by cohort
+    const cohortMap: Record<string, AccountRow[]> = {}
+    filtered.forEach(a => {
+      const key = a.cohort || '미분류'
+      if (!cohortMap[key]) cohortMap[key] = []
+      cohortMap[key].push(a)
+    })
+
+    function toggleId(id: string) {
+      setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+    }
+
+    async function handleAdd() {
+      if (!form.login_id || !form.password || !form.name) { alert('아이디, 비밀번호, 이름은 필수입니다.'); return }
+      setSaving(true)
+      const res = await fetch(`${SB_URL}/rest/v1/accounts`, {
+        method: 'POST',
+        headers: { ...SB_HDR, Prefer: 'return=minimal' },
+        body: JSON.stringify(form),
+      })
+      setSaving(false)
+      if (!res.ok) { const e = await res.json(); alert('추가 실패: ' + JSON.stringify(e)); return }
+      setForm({ login_id: '', password: '', name: '', org: '', cohort: '', email: '', role: 'student', bar_num: '' })
+      setShowAddForm(false)
+      fetchAccounts()
+      showToast('계정이 추가되었습니다.')
+    }
+
+    async function handleDeleteSelected() {
+      if (selectedIds.size === 0) { alert('삭제할 계정을 선택해주세요.'); return }
+      if (!confirm(`선택한 ${selectedIds.size}개 계정을 삭제하시겠습니까?`)) return
+      for (const id of Array.from(selectedIds)) {
+        await fetch(`${SB_URL}/rest/v1/accounts?login_id=eq.${encodeURIComponent(id)}`, {
+          method: 'DELETE', headers: SB_HDR,
+        })
+      }
+      setSelectedIds(new Set())
+      fetchAccounts()
+      showToast(`${selectedIds.size}개 계정이 삭제되었습니다.`)
+    }
+
+    async function handleDeleteSingle(id: string) {
+      if (!confirm(`'${id}' 계정을 삭제하시겠습니까?`)) return
+      await fetch(`${SB_URL}/rest/v1/accounts?login_id=eq.${encodeURIComponent(id)}`, {
+        method: 'DELETE', headers: SB_HDR,
+      })
+      fetchAccounts()
+      showToast('계정이 삭제되었습니다.')
+    }
+
+    async function handleExcelImport(e: React.ChangeEvent<HTMLInputElement>) {
+      const file = e.target.files?.[0]
+      if (!file) return
+      try {
+        const xlsx = await import('xlsx')
+        const buf = await file.arrayBuffer()
+        const wb = xlsx.read(buf)
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const rows: Record<string, string>[] = xlsx.utils.sheet_to_json(ws)
+        if (rows.length === 0) { alert('데이터가 없습니다.'); return }
+        setSaving(true)
+        let ok = 0; let fail = 0
+        for (const row of rows) {
+          const acc = {
+            login_id: String(row['login_id'] || row['아이디'] || ''),
+            password: String(row['password'] || row['비밀번호'] || ''),
+            name: String(row['name'] || row['이름'] || ''),
+            org: String(row['org'] || row['소속'] || ''),
+            cohort: String(row['cohort'] || row['기수'] || ''),
+            email: String(row['email'] || row['이메일'] || ''),
+            role: String(row['role'] || row['역할'] || 'student'),
+            bar_num: String(row['bar_num'] || row['사원번호'] || ''),
+          }
+          if (!acc.login_id || !acc.password || !acc.name) { fail++; continue }
+          const res = await fetch(`${SB_URL}/rest/v1/accounts`, {
+            method: 'POST',
+            headers: { ...SB_HDR, Prefer: 'return=minimal' },
+            body: JSON.stringify(acc),
+          })
+          if (res.ok || res.status === 201) ok++; else fail++
+        }
+        setSaving(false)
+        fetchAccounts()
+        showToast(`${ok}개 계정 등록 완료${fail > 0 ? ` (${fail}개 실패)` : ''}`)
+      } catch (err) {
+        setSaving(false)
+        alert('Excel 파싱 오류: ' + String(err))
+      }
+      if (fileRef.current) fileRef.current.value = ''
+    }
+
+    const inp = { padding: '7px 10px', border: '1px solid #d0d8e8', borderRadius: 4, fontSize: 13, boxSizing: 'border-box' as const }
 
     return (
       <div>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', marginBottom: 16 }}>👥 계정 관리</h2>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="이름 또는 아이디로 검색..."
-          style={{ width: '100%', padding: '9px 14px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13, marginBottom: 16, boxSizing: 'border-box' }}
-        />
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: '#1a3a6b', color: '#fff' }}>
-                {['아이디', '이름', '소속', '역할', '이메일', '상태'].map(h => (
-                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(([id, acc], i) => (
-                <tr key={id} style={{ background: i % 2 === 0 ? '#fff' : '#f8f9fb', borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '9px 14px', fontFamily: 'monospace', color: '#0067c2', fontWeight: 600 }}>{id}</td>
-                  <td style={{ padding: '9px 14px', fontWeight: 600 }}>{acc.name}</td>
-                  <td style={{ padding: '9px 14px', color: '#555' }}>{acc.org}</td>
-                  <td style={{ padding: '9px 14px' }}>
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '2px 10px',
-                      borderRadius: 20,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      background: acc.role === 'admin' ? '#fee2e2' : '#dbeafe',
-                      color: acc.role === 'admin' ? '#dc2626' : '#1d4ed8',
-                    }}>
-                      {acc.role === 'admin' ? '관리자' : '학생'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '9px 14px', color: '#555' }}>{acc.email}</td>
-                  <td style={{ padding: '9px 14px' }}>
-                    <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>● 활성</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+        {/* Toolbar */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="이름·아이디·기수 검색..."
+            style={{ ...inp, flex: 1, minWidth: 180 }}
+          />
+          <button onClick={() => setShowAddForm(v => !v)} style={{ padding: '7px 14px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            + 개별 추가
+          </button>
+          <label style={{ padding: '7px 14px', background: '#0067c2', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            📂 Excel 일괄 등록
+            <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleExcelImport} style={{ display: 'none' }} />
+          </label>
+          <button onClick={handleDeleteSelected} disabled={selectedIds.size === 0} style={{ padding: '7px 14px', background: selectedIds.size > 0 ? '#dc2626' : '#e5e7eb', color: selectedIds.size > 0 ? '#fff' : '#999', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: selectedIds.size > 0 ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}>
+            🗑 선택 삭제 ({selectedIds.size})
+          </button>
         </div>
+
+        {/* Excel format hint */}
+        <div style={{ background: '#f0f7ff', border: '1px solid #b3d9f0', borderRadius: 4, padding: '8px 12px', fontSize: 11, color: '#1a4a6b', marginBottom: 12 }}>
+          📋 Excel 열 순서: <strong>login_id · password · name · org · cohort · email · role · bar_num</strong> (또는 한글: 아이디·비밀번호·이름·소속·기수·이메일·역할·사원번호)
+        </div>
+
+        {/* Add form */}
+        {showAddForm && (
+          <div style={{ background: '#f8f9fb', border: '1px solid #d0d8e8', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#1a3a6b', marginBottom: 12 }}>신규 계정 추가</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
+              {[
+                { label: '아이디 *', key: 'login_id' }, { label: '비밀번호 *', key: 'password' },
+                { label: '이름 *', key: 'name' }, { label: '기수', key: 'cohort' },
+                { label: '소속', key: 'org' }, { label: '이메일', key: 'email' }, { label: '사원번호', key: 'bar_num' },
+              ].map(f => (
+                <div key={f.key}>
+                  <label style={{ fontSize: 11, color: '#555', fontWeight: 600, display: 'block', marginBottom: 3 }}>{f.label}</label>
+                  <input
+                    value={(form as Record<string, string>)[f.key]}
+                    onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                    style={{ ...inp, width: '100%' }}
+                  />
+                </div>
+              ))}
+              <div>
+                <label style={{ fontSize: 11, color: '#555', fontWeight: 600, display: 'block', marginBottom: 3 }}>역할</label>
+                <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))} style={{ ...inp, width: '100%' }}>
+                  <option value="student">학생</option>
+                  <option value="admin">관리자</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button onClick={() => setShowAddForm(false)} style={{ padding: '7px 16px', background: '#fff', border: '1px solid #ccc', borderRadius: 4, fontSize: 13, cursor: 'pointer' }}>취소</button>
+              <button onClick={handleAdd} disabled={saving} style={{ padding: '7px 20px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                {saving ? '저장 중...' : '추가하기'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Account list grouped by cohort */}
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 40, color: '#0067c2' }}>로딩 중...</div>
+        ) : Object.keys(cohortMap).length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, color: '#999', border: '1px solid #eee', borderRadius: 8 }}>
+            등록된 계정이 없습니다.
+          </div>
+        ) : (
+          Object.entries(cohortMap).sort().map(([cohort, rows]) => (
+            <div key={cohort} style={{ marginBottom: 20 }}>
+              <div style={{ background: '#1a3a6b', color: '#fff', padding: '8px 14px', borderRadius: '6px 6px 0 0', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                🎓 {cohort}
+                <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>({rows.length}명)</span>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 'auto', cursor: 'pointer', fontWeight: 400, fontSize: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={rows.every(r => selectedIds.has(r.login_id))}
+                    onChange={e => {
+                      setSelectedIds(prev => {
+                        const n = new Set(prev)
+                        rows.forEach(r => e.target.checked ? n.add(r.login_id) : n.delete(r.login_id))
+                        return n
+                      })
+                    }}
+                  />
+                  기수 전체 선택
+                </label>
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, border: '1px solid #d0d8e8', borderTop: 'none' }}>
+                <thead>
+                  <tr style={{ background: '#f5f7fb' }}>
+                    {['', '아이디', '이름', '소속', '역할', '이메일', '삭제'].map((h, i) => (
+                      <th key={i} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#333', fontSize: 12, borderBottom: '1px solid #d0d8e8', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((acc, i) => (
+                    <tr key={acc.login_id} style={{ background: i % 2 === 0 ? '#fff' : '#fafbfc', borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '7px 12px', width: 32 }}>
+                        <input type="checkbox" checked={selectedIds.has(acc.login_id)} onChange={() => toggleId(acc.login_id)} />
+                      </td>
+                      <td style={{ padding: '7px 12px', fontFamily: 'monospace', color: '#0067c2', fontWeight: 600 }}>{acc.login_id}</td>
+                      <td style={{ padding: '7px 12px', fontWeight: 600 }}>{acc.name}</td>
+                      <td style={{ padding: '7px 12px', color: '#555' }}>{acc.org || '-'}</td>
+                      <td style={{ padding: '7px 12px' }}>
+                        <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: acc.role === 'admin' ? '#fee2e2' : '#dbeafe', color: acc.role === 'admin' ? '#dc2626' : '#1d4ed8' }}>
+                          {acc.role === 'admin' ? '관리자' : '학생'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '7px 12px', color: '#555' }}>{acc.email || '-'}</td>
+                      <td style={{ padding: '7px 12px' }}>
+                        <button onClick={() => handleDeleteSingle(acc.login_id)} style={{ background: 'none', border: '1px solid #dc2626', color: '#dc2626', borderRadius: 4, padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>삭제</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))
+        )}
+
+        {/* Also show hardcoded accounts as reference */}
+        <details style={{ marginTop: 20 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, color: '#888', padding: '8px 0' }}>기본 계정 (하드코딩) 보기</summary>
+          <div style={{ overflowX: 'auto', marginTop: 8 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: '#f0f2f7' }}>
+                  {['아이디', '이름', '소속', '역할'].map(h => (
+                    <th key={h} style={{ padding: '7px 12px', textAlign: 'left', fontWeight: 600, color: '#555', borderBottom: '1px solid #eee' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(HARDCODED_ACCOUNTS).map(([id, acc], i) => (
+                  <tr key={id} style={{ background: i % 2 === 0 ? '#fff' : '#fafbfc', borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '7px 12px', fontFamily: 'monospace', color: '#0067c2' }}>{id}</td>
+                    <td style={{ padding: '7px 12px' }}>{acc.name}</td>
+                    <td style={{ padding: '7px 12px', color: '#555' }}>{acc.org}</td>
+                    <td style={{ padding: '7px 12px', fontSize: 11 }}>
+                      <span style={{ background: acc.role === 'admin' ? '#fee2e2' : '#dbeafe', color: acc.role === 'admin' ? '#dc2626' : '#1d4ed8', padding: '1px 7px', borderRadius: 20, fontWeight: 700 }}>
+                        {acc.role === 'admin' ? '관리자' : '학생'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
       </div>
     )
   }
@@ -405,18 +635,10 @@ export default function AdminPage() {
 
     const [dueDate, setDueDate] = useState('')
 
-    const SB_URL = 'https://knpvayujykoqjncctxrr.supabase.co'
-    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHZheXVqeWtvcWpuY2N0eHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NzA3NDUsImV4cCI6MjA4OTE0Njc0NX0.rXlo5IsOW6FS5N1X3vgqNM1RvzB84TYPqVhnYyc6FSg'
-
     async function assignCase(userId: string, caseId: number, due: string) {
       const res = await fetch(`${SB_URL}/rest/v1/assignments`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SB_KEY,
-          'Authorization': `Bearer ${SB_KEY}`,
-          'Prefer': 'return=minimal',
-        },
+        headers: { ...SB_HDR, Prefer: 'return=minimal' },
         body: JSON.stringify({ user_id: userId, case_id: caseId, due_date: due || null, status: '미제출' }),
       })
       if (!res.ok) {
@@ -431,7 +653,7 @@ export default function AdminPage() {
       const [casesData, assignData] = await Promise.all([
         supabase.from('sample_cases').select('*').order('created_at', { ascending: false }).then(r => r.data || []),
         fetch(`${SB_URL}/rest/v1/assignments?select=*,sample_cases(*)&order=id.desc`, {
-          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+          headers: SB_HDR,
         }).then(r => r.json()),
       ])
       setCases(casesData)
@@ -458,7 +680,7 @@ export default function AdminPage() {
     async function deleteAssignment(id: string) {
       await fetch(`${SB_URL}/rest/v1/assignments?id=eq.${id}`, {
         method: 'DELETE',
-        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+        headers: SB_HDR,
       })
       fetchData()
     }
