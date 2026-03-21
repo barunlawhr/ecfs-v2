@@ -470,7 +470,7 @@ export default function AdminPage() {
     const [casesLoading, setCasesLoading] = useState(true)
     const [showModal, setShowModal] = useState(false)
     const [saving, setSaving] = useState(false)
-    const [deleteModal, setDeleteModal] = useState<{ id: number; title: string } | null>(null)
+    const [deleteModal, setDeleteModal] = useState<{ id: string; title: string } | null>(null)
     const [deleting, setDeleting] = useState(false)
     const [form, setForm] = useState({
       title: '', case_type: '대여금', court: '서울중앙지방법원',
