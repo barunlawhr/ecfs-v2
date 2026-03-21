@@ -26,6 +26,7 @@ export interface SampleCase {
   claim_reason?: string
   difficulty?: string
   is_active?: boolean
+  assigned_students?: string[]
   created_at: string
 }
 

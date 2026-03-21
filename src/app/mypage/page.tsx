@@ -91,11 +91,19 @@ export default function MyPage() {
     if (!user) return
     setAssignmentsLoading(true)
     const { data } = await supabase
-      .from('assignments')
-      .select('*,sample_cases(*)')
-      .eq('student_id', user.id)
-      .order('assigned_at', { ascending: false })
-    setAssignments(data || [])
+      .from('sample_cases')
+      .select('*')
+      .contains('assigned_students', [user.id])
+      .order('created_at', { ascending: false })
+    const transformed: Assignment[] = (data || []).map(sc => ({
+      id: String(sc.id),
+      case_id: String(sc.id),
+      student_id: user.id,
+      assigned_at: sc.created_at,
+      status: 'pending',
+      sample_cases: sc,
+    }))
+    setAssignments(transformed)
     setAssignmentsLoading(false)
   }
 

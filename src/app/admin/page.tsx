@@ -81,7 +81,7 @@ export default function AdminPage() {
 
         const [prRes, assignRes] = await Promise.all([
           supabase.from('practice_records').select('score, created_at'),
-          supabase.from('case_assignments').select('id', { count: 'exact', head: true }),
+          supabase.from('sample_cases').select('id').not('assigned_students', 'eq', '{}'),
         ])
 
         const records = prRes.data || []
@@ -401,12 +401,16 @@ export default function AdminPage() {
 
     const fetchData = useCallback(async () => {
       setAssignLoading(true)
-      const [caseRes, assignRes] = await Promise.all([
-        supabase.from('sample_cases').select('*').order('created_at', { ascending: false }),
-        supabase.from('case_assignments').select('*,sample_cases(*)').order('assigned_at', { ascending: false }),
-      ])
-      setCases(caseRes.data || [])
-      setCurrentAssignments(assignRes.data || [])
+      const { data: casesData } = await supabase.from('sample_cases').select('*').order('created_at', { ascending: false })
+      const allCases = casesData || []
+      setCases(allCases)
+      const syntheticAssignments: (Assignment & { sample_cases?: SampleCase })[] = []
+      allCases.forEach(sc => {
+        ;(sc.assigned_students || []).forEach((sid: string) => {
+          syntheticAssignments.push({ id: `${sc.id}-${sid}`, case_id: String(sc.id), student_id: sid, assigned_at: sc.created_at, status: 'pending', sample_cases: sc })
+        })
+      })
+      setCurrentAssignments(syntheticAssignments)
       setAssignLoading(false)
     }, [])
 
@@ -430,13 +434,10 @@ export default function AdminPage() {
       if (!selectedCase) { alert('사건을 선택해주세요.'); return }
       if (selectedStudents.size === 0) { alert('학생을 선택해주세요.'); return }
       setAssigning(true)
-      const rows = Array.from(selectedStudents).map(sid => ({
-        case_id: Number(selectedCase),
-        student_id: sid,
-        assigned_at: new Date().toISOString(),
-        status: 'pending',
-      }))
-      const { error } = await supabase.from('case_assignments').insert(rows)
+      const sc = cases.find(c => String(c.id) === selectedCase)
+      const current = sc?.assigned_students || []
+      const merged = Array.from(new Set([...current, ...Array.from(selectedStudents)]))
+      const { error } = await supabase.from('sample_cases').update({ assigned_students: merged }).eq('id', Number(selectedCase))
       setAssigning(false)
       if (error) { alert('배정 실패: ' + error.message); return }
       showToast(`${selectedStudents.size}명에게 배정 완료!`)
