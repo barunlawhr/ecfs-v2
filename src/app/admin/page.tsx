@@ -85,7 +85,7 @@ export default function AdminPage() {
 
         const [prRes, assignRes] = await Promise.all([
           supabase.from('practice_records').select('score, created_at'),
-          fetch(`${SURL}/rest/v1/case_assignments?select=id`, { headers: hdrs }).then(r => r.json()),
+          fetch(`${SURL}/rest/v1/assignments?select=id`, { headers: hdrs }).then(r => r.json()),
         ])
 
         const records = prRes.data || []
@@ -411,7 +411,7 @@ export default function AdminPage() {
       setAssignLoading(true)
       const [casesData, assignData] = await Promise.all([
         supabase.from('sample_cases').select('*').order('created_at', { ascending: false }).then(r => r.data || []),
-        fetch(`${SURL}/rest/v1/case_assignments?select=*,sample_cases(*)&order=assigned_at.desc`, { headers: hdrs }).then(r => r.json()),
+        fetch(`${SURL}/rest/v1/assignments?select=*,sample_cases(*)&order=assigned_at.desc`, { headers: hdrs }).then(r => r.json()),
       ])
       setCases(casesData)
       setCurrentAssignments(Array.isArray(assignData) ? assignData : [])
@@ -444,7 +444,7 @@ export default function AdminPage() {
         assigned_at: new Date().toISOString(),
         status: 'pending',
       }))
-      const res = await fetch(`${SURL}/rest/v1/case_assignments`, {
+      const res = await fetch(`${SURL}/rest/v1/assignments`, {
         method: 'POST',
         headers: { ...hdrs, Prefer: 'return=minimal' },
         body: JSON.stringify(rows),
