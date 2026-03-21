@@ -97,6 +97,8 @@ export default function MyPage() {
 
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [assignmentsLoading, setAssignmentsLoading] = useState(false)
+  const [allCases, setAllCases] = useState<Assignment[]>([])  // B방식: 전체 sample_cases
+  const [allCasesLoading, setAllCasesLoading] = useState(false)
   const [practiceRecords, setPracticeRecords] = useState<PracticeRecord[]>([])
   const [practiceLoading, setPracticeLoading] = useState(false)
   const [expandedFeedback, setExpandedFeedback] = useState<Record<string, boolean>>({})
@@ -108,9 +110,33 @@ export default function MyPage() {
 
   useEffect(() => {
     if (!user) return
-    if (activePage === 'active-cases' || activePage === 'assigned-cases' || activePage === 'status') fetchAssignments()
+    if (activePage === 'active-cases') fetchAllCases()
+    if (activePage === 'assigned-cases' || activePage === 'status') fetchAssignments()
     if (activePage === 'practice-records' || activePage === 'submitted-docs') fetchPracticeRecords()
   }, [activePage, user])
+
+  async function fetchAllCases() {
+    setAllCasesLoading(true)
+    try {
+      const res = await fetch(
+        `${SB_URL}/rest/v1/sample_cases?select=*&order=created_at.desc`,
+        { headers: SB_HDR }
+      )
+      const data = await res.json()
+      // sample_cases를 Assignment 형태로 변환 (id를 그대로 사용)
+      const converted: Assignment[] = Array.isArray(data) ? data.map((c: Assignment['sample_cases'] & { id: number; created_at?: string }) => ({
+        id: c.id,
+        student_id: '',
+        status: '진행중',
+        assigned_at: c.created_at || new Date().toISOString(),
+        sample_cases: c,
+      })) : []
+      setAllCases(converted)
+    } catch {
+      setAllCases([])
+    }
+    setAllCasesLoading(false)
+  }
 
   async function fetchAssignments() {
     if (!user) return
@@ -246,7 +272,7 @@ export default function MyPage() {
           <div style={{ background: '#1a3a6b', color: '#fff', padding: '9px 14px', fontSize: 13, fontWeight: 700 }}>나의 사건관리</div>
           <div style={{ padding: '14px 16px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, textAlign: 'center' }}>
             {[
-              { n: assignments.length, l: '진행중사건', c: '#006699' },
+              { n: allCases.length || assignments.length, l: '진행중사건', c: '#006699' },
               { n: 0, l: '미확인송달', c: '#555' },
               { n: 0, l: '관심사건', c: '#555' },
             ].map(({ n, l, c }) => (
@@ -708,7 +734,7 @@ export default function MyPage() {
       return `${mockCaseNo(a)}(${a.sample_cases?.case_type || '민사'})`
     }
 
-    const filtered = assignments.filter(a => {
+    const filtered = allCases.filter(a => {
       if (filterType !== '전체' && filterType !== '민사') return false
       if (filterCourt !== '전체' && !(a.sample_cases?.court || '').includes(filterCourt)) return false
       return true
@@ -772,7 +798,7 @@ export default function MyPage() {
         </div>
 
         {/* 테이블 */}
-        {assignmentsLoading ? (
+        {allCasesLoading ? (
           <div style={{ padding:60, textAlign:'center', color:'#aaa', background:'#fff' }}>⏳ 사건을 불러오는 중...</div>
         ) : total === 0 ? (
           <div style={{ padding:60, textAlign:'center', color:'#aaa', background:'#fff' }}>
