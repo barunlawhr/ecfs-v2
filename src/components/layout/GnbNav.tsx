@@ -392,11 +392,11 @@ export default function GnbNav({ active }: { active?: string }) {
         <nav style={{ maxWidth: 1160, margin: '0 auto', display: 'flex', alignItems: 'center', height: 70, padding: '0 20px' }}>
           {/* 로고 */}
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, marginRight: 40, flexShrink: 0, textDecoration: 'none' }}>
-            <div style={{ width: 54, height: 54, background: 'linear-gradient(135deg,#003087,#0067c2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 24, filter: 'brightness(0) invert(1)' }}>⚖</span>
+            <div style={{ width: 44, height: 44, background: 'linear-gradient(135deg,#003087,#0067c2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 26, filter: 'brightness(0) invert(1)' }}>⚖</span>
             </div>
             <div>
-              <div style={{ fontSize: 10, color: '#0067c2', fontWeight: 600, letterSpacing: 1 }}>대한민국 법원 전자소송포털</div>
+              <div style={{ fontSize: 10, color: '#0067c2', fontWeight: 600, letterSpacing: 0.5 }}>모의 전자소송포털</div>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#1a1a2e', letterSpacing: -0.5 }}>ECFS (전자사건접수시스템) 모의시스템</div>
             </div>
           </Link>
