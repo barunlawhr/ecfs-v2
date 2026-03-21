@@ -22,6 +22,7 @@ type ActivePage =
   | 'interest-cases'
   | 'confirmed-cases'
   | 'completed-cases'
+  | 'ecfs-reg'
   | 'pay'
   | 'myinfo-user'
   | 'myinfo-pw'
@@ -646,38 +647,157 @@ export default function MyPage() {
   )
 
   // ── SCHEDULE ─────────────────────────────────────────────────
-  const ScheduleContent = () => (
-    <div>
-      <PageHd title="재판일정" actions={<><ActBtn label="📌 나의 메뉴 추가" /><ActBtn label="🖨 출력" /></>} />
-      <div style={{ padding: 14, background: '#fff', borderBottom: '1px solid #eee', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-        <span style={{ fontSize: 12, color: '#555', fontWeight: 600 }}>기간</span>
-        <input type="date" defaultValue="2026-02-01" style={{ height: 32, border: '1px solid #c8cdd6', borderRadius: 3, padding: '0 8px', fontSize: 12, fontFamily: 'inherit' }} />
-        <span style={{ fontSize: 12 }}>~</span>
-        <input type="date" defaultValue="2026-03-31" style={{ height: 32, border: '1px solid #c8cdd6', borderRadius: 3, padding: '0 8px', fontSize: 12, fontFamily: 'inherit' }} />
-        <button style={{ height: 32, padding: '0 16px', background: '#003366', color: '#fff', border: 'none', borderRadius: 3, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>조 회</button>
+  const ScheduleContent = () => {
+    const [calYear, setCalYear] = useState(2026)
+    const [calMonth, setCalMonth] = useState(3)
+    const [selectedDate, setSelectedDate] = useState<number | null>(null)
+
+    type TrialEvent = { court: string; caseNo: string; dept: string; type: string; time: string; place: string; plaintiff: string; defendant: string }
+    const TRIAL_EVENTS: Record<string, TrialEvent[]> = {
+      '2026-3-12': [
+        { court: '의정부지법', caseNo: '2025가단50357', dept: '제11 민사 부', type: '변론기일', time: '10:20', place: '제12호법정(제3별관 1층)', plaintiff: '이정무 외 10명', defendant: '이은철 외 1명' },
+        { court: '서울서부지법', caseNo: '2023가단5727', dept: '민사21단독', type: '변론기일', time: '10:30', place: '제411호 법정', plaintiff: '진지훈 외 1명', defendant: '김용규 외 1명' },
+      ],
+      '2026-3-26': [
+        { court: '서울남부지법', caseNo: '2024가단260874 (보소)', dept: '민사4단독', type: '변론기일', time: '10:20', place: '별관 법정 201호', plaintiff: '김시형', defendant: '김상우' },
+      ],
+    }
+
+    const daysInMonth = new Date(calYear, calMonth, 0).getDate()
+    // Build weeks (Mon–Fri only)
+    const weeks: (number | null)[][] = []
+    let week: (number | null)[] = [null, null, null, null, null]
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dow = new Date(calYear, calMonth - 1, d).getDay()
+      if (dow === 0 || dow === 6) continue
+      week[dow - 1] = d
+      if (dow === 5) { weeks.push(week); week = [null, null, null, null, null] }
+    }
+    if (week.some(x => x !== null)) weeks.push(week)
+
+    const getEvents = (d: number) => TRIAL_EVENTS[`${calYear}-${calMonth}-${d}`] || []
+    const getCourtGroups = (d: number) => {
+      const map: Record<string, number> = {}
+      getEvents(d).forEach(e => { map[e.court] = (map[e.court] || 0) + 1 })
+      return Object.entries(map)
+    }
+
+    const selEvents = selectedDate ? getEvents(selectedDate) : []
+
+    return (
+      <div style={{ fontFamily: 'inherit' }}>
+        <PageHd title="재판일정" actions={<><ActBtn label="📌 나의 메뉴 추가" /><ActBtn label="🖨 출력" /></>} />
+
+        {/* 필터 */}
+        <div style={{ padding: '10px 16px', background: '#fff', borderBottom: '1px solid #e0e4ec', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, color: '#555', fontWeight: 600 }}>소송유형</span>
+          <select style={{ height: 30, border: '1px solid #c8cdd6', borderRadius: 3, padding: '0 6px', fontSize: 12, fontFamily: 'inherit' }}>
+            <option>민사</option><option>형사</option><option>가사</option><option>행정</option><option>전체</option>
+          </select>
+          <span style={{ fontSize: 12, color: '#555', fontWeight: 600 }}>법원</span>
+          <select style={{ height: 30, border: '1px solid #c8cdd6', borderRadius: 3, padding: '0 6px', fontSize: 12, fontFamily: 'inherit' }}>
+            <option>전체</option><option>서울중앙지법</option><option>서울서부지법</option><option>의정부지법</option><option>서울남부지법</option>
+          </select>
+          <button onClick={() => setCalMonth(m => m > 1 ? m - 1 : (setCalYear(y => y - 1), 12))} style={{ width: 26, height: 26, border: '1px solid #c8cdd6', background: '#fff', borderRadius: 3, cursor: 'pointer', fontSize: 15 }}>‹</button>
+          <select value={calYear} onChange={e => setCalYear(Number(e.target.value))} style={{ height: 30, border: '1px solid #c8cdd6', borderRadius: 3, padding: '0 4px', fontSize: 12, fontFamily: 'inherit' }}>
+            {[2024, 2025, 2026, 2027].map(y => <option key={y}>{y}</option>)}
+          </select>
+          <select value={calMonth} onChange={e => setCalMonth(Number(e.target.value))} style={{ height: 30, border: '1px solid #c8cdd6', borderRadius: 3, padding: '0 4px', fontSize: 12, fontFamily: 'inherit' }}>
+            {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+          <button onClick={() => setCalMonth(m => m < 12 ? m + 1 : (setCalYear(y => y + 1), 1))} style={{ width: 26, height: 26, border: '1px solid #c8cdd6', background: '#fff', borderRadius: 3, cursor: 'pointer', fontSize: 15 }}>›</button>
+          <button style={{ height: 30, padding: '0 20px', background: '#0098a3', color: '#fff', border: 'none', borderRadius: 3, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>조회</button>
+        </div>
+
+        {/* 달력 */}
+        <div style={{ padding: '0 16px 16px', background: '#fff' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr>
+                {['월','화','수','목','금'].map(d => (
+                  <th key={d} style={{ padding: '10px 0', textAlign: 'center', fontWeight: 600, color: '#444', border: '1px solid #dde0e8', background: '#f7f8fb' }}>{d}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {weeks.map((wk, wi) => (
+                <tr key={wi}>
+                  {wk.map((d, di) => (
+                    <td key={di} style={{ verticalAlign: 'top', padding: 8, height: 80, border: '1px solid #e8eaf0' }}>
+                      {d && (
+                        <>
+                          <div style={{ fontWeight: 500, color: '#333', marginBottom: 4, fontSize: 13 }}>{d}</div>
+                          {getCourtGroups(d).map(([court, cnt]) => (
+                            <div key={court} onClick={() => setSelectedDate(d)} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', padding: '2px 0' }}>
+                              <span style={{ color: '#1060b0', fontSize: 12 }}>■</span>
+                              <span style={{ color: '#1060b0', fontSize: 11, textDecoration: 'underline' }}>{court}[{cnt}]</span>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 참고하세요 */}
+        <div style={{ margin: '0 16px 16px', border: '1px solid #dde0e8', borderRadius: 6, padding: '12px 16px', display: 'flex', gap: 12, alignItems: 'flex-start', background: '#fafbfd' }}>
+          <div style={{ fontSize: 28, flexShrink: 0 }}>📋</div>
+          <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
+            <strong>참고하세요</strong><br />
+            • 소송유형 또는 법원을 전체로 조회한 결과 진행중사건이 500건 이상일 경우 조회가 제한될 수 있으니, 소송유형과 법원을 지정하여 조회하시기 바랍니다.
+          </div>
+        </div>
+
+        {/* 재판일정상세 모달 */}
+        {selectedDate !== null && (
+          <div onClick={() => setSelectedDate(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 6, width: 720, maxWidth: '95vw', boxShadow: '0 8px 32px rgba(0,0,0,.25)' }}>
+              <div style={{ background: '#1a3a6b', color: '#fff', padding: '12px 20px', borderRadius: '6px 6px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 700, fontSize: 15 }}>재판일정상세</span>
+                <button onClick={() => setSelectedDate(null)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+              </div>
+              <div style={{ padding: '16px 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <span style={{ color: '#0098a3', fontSize: 16, fontWeight: 900 }}>○</span>
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>{calYear}. {calMonth}. {selectedDate}. 재판일정</span>
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: '#f0f4fa' }}>
+                      {['법원','사건번호','재판부','기일종류','기일시간','기일장소','원고','피고'].map(h => (
+                        <th key={h} style={{ padding: '7px 8px', border: '1px solid #dde0e8', textAlign: 'center', fontWeight: 600, color: '#333', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selEvents.map((e, i) => (
+                      <tr key={i}>
+                        <td style={{ padding: '7px 8px', border: '1px solid #dde0e8', textAlign: 'center', whiteSpace: 'nowrap' }}>{e.court}</td>
+                        <td style={{ padding: '7px 8px', border: '1px solid #dde0e8', textAlign: 'center', whiteSpace: 'nowrap' }}>{e.caseNo}</td>
+                        <td style={{ padding: '7px 8px', border: '1px solid #dde0e8', textAlign: 'center' }}>{e.dept}</td>
+                        <td style={{ padding: '7px 8px', border: '1px solid #dde0e8', textAlign: 'center' }}>{e.type}</td>
+                        <td style={{ padding: '7px 8px', border: '1px solid #dde0e8', textAlign: 'center' }}>{e.time}</td>
+                        <td style={{ padding: '7px 8px', border: '1px solid #dde0e8', textAlign: 'center' }}>{e.place}</td>
+                        <td style={{ padding: '7px 8px', border: '1px solid #dde0e8', textAlign: 'center' }}>{e.plaintiff}</td>
+                        <td style={{ padding: '7px 8px', border: '1px solid #dde0e8', textAlign: 'center' }}>{e.defendant}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setSelectedDate(null)} style={{ padding: '6px 24px', background: '#fff', border: '1px solid #aaa', borderRadius: 3, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>닫기</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, background: '#fff' }}>
-        <thead>
-          <tr style={{ background: '#f5f6fa', borderBottom: '1px solid #dde0e8' }}>
-            {['법원', '사건번호', '기일종류', '기일일시', '장소'].map(h => (
-              <th key={h} style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, color: '#555' }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {SCHEDULE_ITEMS.map((s, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: '8px 12px', textAlign: 'center' }}>서울중앙지방법원</td>
-              <td style={{ padding: '8px 12px' }}>{s.caseNo.split(' ')[1] || s.caseNo}</td>
-              <td style={{ padding: '8px 12px', textAlign: 'center', color: '#006699', fontWeight: 600 }}>{s.event}</td>
-              <td style={{ padding: '8px 12px', textAlign: 'center' }}>{s.date} 10:00</td>
-              <td style={{ padding: '8px 12px', textAlign: 'center', color: '#888' }}>제{(i + 1) * 3}호 법정</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
+    )
+  }
 
   // ── PAY ──────────────────────────────────────────────────────
   const PayContent = () => (
@@ -1445,6 +1565,188 @@ export default function MyPage() {
     )
   }
 
+  // ── 전자소송사건등록 ──────────────────────────────────────────
+  const EcfsRegContent = () => {
+    const [agreed, setAgreed] = useState(false)
+    const [tab, setTab] = useState<'cert' | 'nocert'>('cert')
+    const [sosongType, setSosongType] = useState('민사')
+    const [selCourt, setSelCourt] = useState('수원지방법원')
+    const [caseYear, setCaseYear] = useState('2026')
+    const [caseGubun, setCaseGubun] = useState('가단')
+    const [caseNum, setCaseNum] = useState('')
+    const [multiCase, setMultiCase] = useState(false)
+    const [relationType, setRelationType] = useState('대리인')
+    const [certNo, setCertNo] = useState('')
+    const [partyName, setPartyName] = useState('')
+    const [foundCase, setFoundCase] = useState<{ court: string; plaintiff: string; defendant: string; caseName: string } | null>(null)
+    const [searched, setSearched] = useState(false)
+
+    // 가상 사건 데이터 — 나중에 더 추가하거나 API로 교체 가능
+    const VIRTUAL_CASES: Record<string, { court: string; plaintiff: string; defendant: string; caseName: string }> = {
+      '2026-가단-11234': { court: '서울중앙지방법원', plaintiff: '홍길동', defendant: '이순신', caseName: '손해배상' },
+      '2026-가단-22345': { court: '수원지방법원', plaintiff: '홍길동', defendant: '김철수', caseName: '대여금' },
+      '2025-가단-33456': { court: '인천지방법원', plaintiff: '김정호', defendant: '주식회사 사아자컨설팅', caseName: '물품대금' },
+      '2026-가단-44567': { court: '서울동부지방법원', plaintiff: '박민수', defendant: '이재영', caseName: '임대차보증금' },
+      '2025-타채-55001': { court: '서울중앙지방법원', plaintiff: '이민준', defendant: '주식회사 라마바기술', caseName: '채권압류' },
+    }
+
+    const handleSearch = () => {
+      if (!caseNum.trim()) { alert('사건번호를 입력하세요.'); return }
+      const key = `${caseYear}-${caseGubun}-${caseNum.trim()}`
+      const found = VIRTUAL_CASES[key] || null
+      setFoundCase(found)
+      setSearched(true)
+      if (!found) alert('등록된 가상 사건번호가 아닙니다. 확인 후 다시 입력하세요.')
+    }
+
+    const handleRegister = () => {
+      if (!agreed) { alert('동의 체크박스를 선택해주세요.'); return }
+      if (!caseNum.trim()) { alert('사건번호를 입력하세요.'); return }
+      alert('전자소송 사건등록이 완료되었습니다. (실습 모드)')
+    }
+
+    const fRow: React.CSSProperties = { display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #eee', fontSize: 13 }
+    const fLabel: React.CSSProperties = { fontWeight: 600, color: '#333', fontSize: 12 }
+    const sel: React.CSSProperties = { height: 30, border: '1px solid #c8cdd6', borderRadius: 3, padding: '0 6px', fontSize: 12, fontFamily: 'inherit' }
+
+    const SOSONG_TYPES = ['민사','형사','가사','보호','행정','특허','회생파산','민사(지급명령)','민사집행','과태료']
+    const COURTS = ['수원지방법원','서울중앙지방법원','서울서부지방법원','서울동부지방법원','서울남부지방법원','의정부지방법원','인천지방법원','부산지방법원','대구지방법원','광주지방법원','대전지방법원']
+    const GUBUN = ['가단','가합','가소','나','머','제가단','제가합','제가소','제나','제머']
+    const RELATION_TYPES = ['대리인','원고','피고','채권자','채무자','신청인','피신청인']
+
+    return (
+      <div style={{ fontFamily: 'inherit' }}>
+        <PageHd title="전자소송사건등록" actions={<><ActBtn label="📌 나의 메뉴 추가" /><ActBtn label="🖨 출력" /></>} />
+
+        {/* 안내문 */}
+        <div style={{ margin: '0 0 12px', padding: '16px 20px', border: '1px solid #dde0e8', borderRadius: 4, background: '#fff', fontSize: 12, lineHeight: 2, color: '#333' }}>
+          전자소송시스템을 이용하여 민사소송 등을 수행하고자 할 경우에는 반드시 해당 사건에 관하여 <strong>전자소송 동의를 하여야 합니다.</strong><br />
+          전자소송 동의를 한 경우에는 <strong style={{ color: '#c0392b' }}>법원에 제출할 서류를 전자소송시스템을 이용하여 전자문서로 제출</strong>하여야 합니다.<br />
+          전자소송 동의를 한 소송관계인에 대하여는 송달할 전자문서를 전자소송시스템에 등재하고 전자우편 등의 방법으로 그 사실을 통지함으로써 송달을 실시하고, 이때 소송관계인이 전자문서를 확인한 때 또는 전자문서 등재사실을 통지한 날부터 1주가 지난 날에 송달된 것으로 보게 됩니다(<strong>단, 후자의 경우 송달간주일은 1주가 지난 날 0시가 되므로, 기간 계산에 유의</strong>하여야 합니다).<br />
+          공동의 이해관계를 가진 여러 소송관계인 중 1인이 전자소송 동의를 하면 다른 공동동의자 전원의 확인서를 전자문서로 변환하여 제출하는 방법으로 전자문서를 단독으로 제출할 수 있습니다.<br />
+          또한 본안과 관련된 신청사건은 본안에 관한 전자소송 동의를 마친 경우에 한하여 전자소송으로 진행할 수 있습니다.<br />
+          다만 본안사건이 1회 기일 다음날 후에는 전자소송 동의를 하더라도 본안사건과 신청사건 모두 전자문서의 제출만 가능하고, 전자소송시스템을 통한 기록열람이나 송달은 재판장의 허가가 있어야 가능함을 유의하시기 바랍니다.
+        </div>
+
+        {/* 동의 체크박스 */}
+        <div style={{ padding: '10px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+          <input type="checkbox" id="ecfs-agree" checked={agreed} onChange={e => setAgreed(e.target.checked)} style={{ width: 15, height: 15, cursor: 'pointer' }} />
+          <label htmlFor="ecfs-agree" style={{ cursor: 'pointer' }}>이 사건에 관하여 전자소송시스템을 이용한 진행에 동의합니다.</label>
+        </div>
+
+        {/* 탭 */}
+        <div style={{ display: 'flex', marginBottom: 0 }}>
+          <button onClick={() => setTab('cert')} style={{ flex: 1, padding: '11px 0', border: '1px solid #c8cdd6', borderBottom: tab === 'cert' ? 'none' : '1px solid #c8cdd6', background: tab === 'cert' ? '#1a3a6b' : '#f0f2f6', color: tab === 'cert' ? '#fff' : '#555', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', borderRadius: '4px 0 0 0' }}>전자소송인증번호가 있는 경우</button>
+          <button onClick={() => setTab('nocert')} style={{ flex: 1, padding: '11px 0', border: '1px solid #c8cdd6', borderLeft: 'none', borderBottom: tab === 'nocert' ? 'none' : '1px solid #c8cdd6', background: tab === 'nocert' ? '#1a3a6b' : '#f0f2f6', color: tab === 'nocert' ? '#fff' : '#555', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', borderRadius: '0 4px 0 0' }}>전자소송인증번호가 없는 경우</button>
+        </div>
+
+        {/* 폼 영역 */}
+        <div style={{ border: '1px solid #c8cdd6', borderTop: 'none', padding: '16px 24px', background: '#fff', marginBottom: 12 }}>
+          <div style={fRow}>
+            <span style={fLabel}>소송유형</span>
+            <div><select value={sosongType} onChange={e => setSosongType(e.target.value)} style={sel}>
+              {SOSONG_TYPES.map(t => <option key={t}>{t}</option>)}
+            </select></div>
+          </div>
+          <div style={fRow}>
+            <span style={fLabel}>법원</span>
+            <div><select value={selCourt} onChange={e => setSelCourt(e.target.value)} style={sel}>
+              {COURTS.map(c => <option key={c}>{c}</option>)}
+            </select></div>
+          </div>
+          <div style={fRow}>
+            <span style={fLabel}>사건번호</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <select value={caseYear} onChange={e => setCaseYear(e.target.value)} style={{ ...sel, width: 68 }}>
+                {['2022','2023','2024','2025','2026','2027'].map(y => <option key={y}>{y}</option>)}
+              </select>
+              <select value={caseGubun} onChange={e => setCaseGubun(e.target.value)} style={{ ...sel, width: 72 }}>
+                {GUBUN.map(g => <option key={g}>{g}</option>)}
+              </select>
+              <input value={caseNum} onChange={e => setCaseNum(e.target.value)} placeholder="번호" style={{ ...sel, width: 80, padding: '0 6px' }} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}>
+                <input type="checkbox" checked={multiCase} onChange={e => setMultiCase(e.target.checked)} /> 사건구분 가나다순 정렬
+              </label>
+              <button onClick={handleSearch} style={{ height: 30, padding: '0 14px', background: '#555', color: '#fff', border: 'none', borderRadius: 3, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>조회</button>
+            </div>
+          </div>
+
+          {/* 조회 결과 */}
+          {searched && foundCase && (
+            <div style={{ marginTop: 0, padding: '10px 16px', background: '#f0f8f0', border: '1px solid #b2d8b2', borderRadius: 4, fontSize: 12, display: 'flex', gap: 24 }}>
+              <span>법원: <strong>{foundCase.court}</strong></span>
+              <span>사건명: <strong>{foundCase.caseName}</strong></span>
+              <span>원고: <strong>{foundCase.plaintiff}</strong></span>
+              <span>피고: <strong>{foundCase.defendant}</strong></span>
+            </div>
+          )}
+
+          <div style={fRow}>
+            <span style={fLabel}>소송관계인유형</span>
+            <div><select value={relationType} onChange={e => setRelationType(e.target.value)} style={sel}>
+              {RELATION_TYPES.map(r => <option key={r}>{r}</option>)}
+            </select></div>
+          </div>
+
+          {tab === 'cert' ? (
+            <div style={fRow}>
+              <span style={fLabel}>전자소송인증번호</span>
+              <input value={certNo} onChange={e => setCertNo(e.target.value)} placeholder="인증번호 입력" style={{ ...sel, width: 160, padding: '0 8px' }} />
+            </div>
+          ) : (
+            <div style={fRow}>
+              <span style={fLabel}>당사자명</span>
+              <input value={partyName} onChange={e => setPartyName(e.target.value)} placeholder="당사자명 입력" style={{ ...sel, width: 160, padding: '0 8px' }} />
+            </div>
+          )}
+
+          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}>
+            <button onClick={handleRegister} style={{ padding: '8px 40px', background: '#0098a3', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>등록</button>
+          </div>
+        </div>
+
+        {/* 참고하세요 */}
+        <div style={{ border: '1px solid #dde0e8', borderRadius: 6, padding: '14px 20px', background: '#fafbfd', marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{ fontSize: 28, flexShrink: 0 }}>📋</div>
+            <div style={{ fontSize: 12, color: '#555', lineHeight: 1.9 }}>
+              <strong>참고하세요</strong>
+              <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
+                <li>알림서비스는 자동으로 등록되며 '맞춤형알림서비스' 메뉴에서 변경이 가능합니다.</li>
+                <li>유대전의 알림서비스는 알림톡으로 우선 발송되며, 알림톡이 불가능한 경우 문자메시지로 발송됩니다.</li>
+                <li>문자메시지 발송은 1회 시도하며, 수신인의 대표 계정, 수신불가한 음영지역, 잘못된 전화번호 등 발송 실패 시 재시도하지 않습니다.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* 전자소송 인증번호 안내 */}
+        <div style={{ border: '1px solid #dde0e8', borderRadius: 6, padding: '14px 20px', background: '#fafbfd' }}>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{ fontSize: 28, flexShrink: 0 }}>📋</div>
+            <div style={{ fontSize: 12, color: '#555', lineHeight: 1.9 }}>
+              <strong>{tab === 'cert' ? '전자소송 인증번호를 받았습니까?' : '전자소송 인증번호를 받지 못했습니까?'}</strong>
+              <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
+                {tab === 'cert' ? (
+                  <>
+                    <li>송달받은 전자소송안내서에 표시된 전자소송 인증번호를 입력하여 실명확인을 받은 후, 전자소송절차 진행에 동의하여 해당 사건을 전자소송으로 진행할 수 있습니다.</li>
+                    <li>전자소송인증번호는 본안에 한하여 사용이 가능한 고유한 식별번호입니다. 따라서 대리인의 경우에는 당사자의 전자소송 인증번호를 사용할 수 없습니다.</li>
+                  </>
+                ) : (
+                  <>
+                    <li>해당 사건정보에 주민(사업자)등록번호가 입력되어있는 경우 인증번호 없이도 소송관계인 유형 및 당사자명을 입력하여 전자사건등록이 가능합니다.</li>
+                    <li>대리인은 본인의 주민(사업자)등록번호가 사건에 등록되지 않은 경우라도 대리인 정보를 입력하고 사건을 등록할 수 있습니다.</li>
+                    <li>소송위임장(필요시 담변서/반리서 작성), 소송수행자지정서를 전자적으로 제출하여 재판부의 확인을 받은 후 온라인으로 기록열람을 할 수 있습니다.</li>
+                  </>
+                )}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // ── 완료된사건 ───────────────────────────────────────────────
   const CompletedCasesContent = () => {
     const [filterType, setFilterType] = useState('전체')
@@ -1876,6 +2178,7 @@ export default function MyPage() {
       case 'delivery-detail': return <DeliveryDetailContent />
       case 'submit-detail': return <SubmitDetailContent />
       case 'completed-cases': return <CompletedCasesContent />
+      case 'ecfs-reg': return <EcfsRegContent />
       case 'myinfo-user': return <MyInfoContent type="user" />
       case 'myinfo-pw': return <MyInfoContent type="pw" />
       default: return <GenericContent title={genericTitle || activePage} />
@@ -1981,7 +2284,7 @@ export default function MyPage() {
           <GrpHd label="전자소송사건등록" gKey="전자소송사건등록" />
           {openGroups['전자소송사건등록'] && (
             <>
-              <SbItem label="전자소송사건등록" page="generic" title="전자소송사건등록" />
+              <SbItem label="전자소송사건등록" page="ecfs-reg" />
               <SbItem label="형사전자사본화사건등록" page="generic" title="형사전자사본화사건등록" />
             </>
           )}
