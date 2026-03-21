@@ -403,15 +403,36 @@ export default function AdminPage() {
     const [currentAssignments, setCurrentAssignments] = useState<(Assignment & { sample_cases?: SampleCase })[]>([])
     const [assignLoading, setAssignLoading] = useState(true)
 
-    const SURL = 'https://knpvayujykoqjncctxrr.supabase.co'
-    const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHZheXVqeWtvcWpuY2N0eHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NzA3NDUsImV4cCI6MjA4OTE0Njc0NX0.rXlo5IsOW6FS5N1X3vgqNM1RvzB84TYPqVhnYyc6FSg'
-    const hdrs = { 'Content-Type': 'application/json', apikey: SKEY, Authorization: `Bearer ${SKEY}` }
+    const [dueDate, setDueDate] = useState('')
+
+    const SB_URL = 'https://knpvayujykoqjncctxrr.supabase.co'
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHZheXVqeWtvcWpuY2N0eHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NzA3NDUsImV4cCI6MjA4OTE0Njc0NX0.rXlo5IsOW6FS5N1X3vgqNM1RvzB84TYPqVhnYyc6FSg'
+
+    async function assignCase(userId: string, caseId: number, due: string) {
+      const res = await fetch(`${SB_URL}/rest/v1/assignments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SB_KEY,
+          'Authorization': `Bearer ${SB_KEY}`,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({ user_id: userId, case_id: caseId, due_date: due || null, status: '미제출' }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(JSON.stringify(err))
+      }
+      return true
+    }
 
     const fetchData = useCallback(async () => {
       setAssignLoading(true)
       const [casesData, assignData] = await Promise.all([
         supabase.from('sample_cases').select('*').order('created_at', { ascending: false }).then(r => r.data || []),
-        fetch(`${SURL}/rest/v1/assignments?select=*,sample_cases(*)&order=assigned_at.desc`, { headers: hdrs }).then(r => r.json()),
+        fetch(`${SB_URL}/rest/v1/assignments?select=*,sample_cases(*)&order=id.desc`, {
+          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+        }).then(r => r.json()),
       ])
       setCases(casesData)
       setCurrentAssignments(Array.isArray(assignData) ? assignData : [])
@@ -438,30 +459,28 @@ export default function AdminPage() {
       if (!selectedCase) { alert('사건을 선택해주세요.'); return }
       if (selectedStudents.size === 0) { alert('학생을 선택해주세요.'); return }
       setAssigning(true)
-      const rows = Array.from(selectedStudents).map(sid => ({
-        case_id: Number(selectedCase),
-        student_id: sid,
-        assigned_at: new Date().toISOString(),
-        status: 'pending',
-      }))
-      const res = await fetch(`${SURL}/rest/v1/assignments`, {
-        method: 'POST',
-        headers: { ...hdrs, Prefer: 'return=minimal' },
-        body: JSON.stringify(rows),
-      })
-      setAssigning(false)
-      if (!res.ok) { const msg = await res.text(); alert('배정 실패: ' + msg); return }
-      showToast(`${selectedStudents.size}명에게 배정 완료!`)
-      setSelectedStudents(new Set())
-      setSelectedCase('')
-      fetchData()
+      try {
+        for (const uid of Array.from(selectedStudents)) {
+          await assignCase(uid, Number(selectedCase), dueDate)
+        }
+        showToast(`${selectedStudents.size}명에게 배정 완료!`)
+        setSelectedStudents(new Set())
+        setSelectedCase('')
+        setDueDate('')
+        fetchData()
+      } catch (e) {
+        alert('배정 실패: ' + String(e))
+      } finally {
+        setAssigning(false)
+      }
     }
 
-    // Group assignments by student
+    // Group assignments by user_id
     const assignByStudent: Record<string, typeof currentAssignments> = {}
     currentAssignments.forEach(a => {
-      if (!assignByStudent[a.student_id]) assignByStudent[a.student_id] = []
-      assignByStudent[a.student_id].push(a)
+      const uid = (a as Assignment & { user_id?: string }).user_id || a.student_id
+      if (!assignByStudent[uid]) assignByStudent[uid] = []
+      assignByStudent[uid].push(a)
     })
 
     return (
@@ -518,6 +537,15 @@ export default function AdminPage() {
           </div>
         </div>
 
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>마감일 (선택)</label>
+          <input
+            type="date"
+            value={dueDate}
+            onChange={e => setDueDate(e.target.value)}
+            style={{ padding: '8px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13 }}
+          />
+        </div>
         <button
           onClick={handleAssign}
           disabled={assigning}
