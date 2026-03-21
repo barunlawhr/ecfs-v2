@@ -469,6 +469,8 @@ export default function AdminPage() {
     const [casesLoading, setCasesLoading] = useState(true)
     const [showModal, setShowModal] = useState(false)
     const [saving, setSaving] = useState(false)
+    const [deleteModal, setDeleteModal] = useState<{ id: number; title: string } | null>(null)
+    const [deleting, setDeleting] = useState(false)
     const [form, setForm] = useState({
       title: '', case_type: '대여금', court: '서울중앙지방법원',
       plaintiff: '', defendant: '', claim_amount: '',
@@ -514,6 +516,17 @@ export default function AdminPage() {
       showToast('사건이 추가되었습니다.')
     }
 
+    async function handleDelete() {
+      if (!deleteModal) return
+      setDeleting(true)
+      const { error } = await supabase.from('sample_cases').delete().eq('id', deleteModal.id)
+      setDeleting(false)
+      if (error) { alert('삭제 실패: ' + error.message); return }
+      setDeleteModal(null)
+      fetchCases()
+      showToast('사건이 삭제되었습니다.')
+    }
+
     return (
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -533,14 +546,14 @@ export default function AdminPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#1a3a6b', color: '#fff' }}>
-                  {['제목', '유형', '법원', '원고', '피고', '난이도', '생성일'].map(h => (
+                  {['제목', '유형', '법원', '원고', '피고', '난이도', '생성일', '삭제'].map(h => (
                     <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {cases.length === 0 ? (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: 30, color: '#999' }}>등록된 사건이 없습니다.</td></tr>
+                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: 30, color: '#999' }}>등록된 사건이 없습니다.</td></tr>
                 ) : cases.map((c, i) => (
                   <tr key={c.id} style={{ background: i % 2 === 0 ? '#fff' : '#f8f9fb', borderBottom: '1px solid #eee' }}>
                     <td style={{ padding: '9px 12px', fontWeight: 600, color: '#1a3a6b', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</td>
@@ -554,6 +567,9 @@ export default function AdminPage() {
                       </span>
                     </td>
                     <td style={{ padding: '9px 12px', color: '#888', whiteSpace: 'nowrap' }}>{c.created_at?.slice(0, 10)}</td>
+                    <td style={{ padding: '9px 12px' }}>
+                      <button onClick={() => setDeleteModal({ id: c.id, title: c.title })} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>삭제</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -647,6 +663,25 @@ export default function AdminPage() {
                     {saving ? '저장 중...' : '저장하기'}
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Case Modal */}
+        {deleteModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: '#fff', borderRadius: 10, width: 380, boxShadow: '0 8px 32px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+              <div style={{ background: '#dc2626', color: '#fff', padding: '14px 20px', fontWeight: 700, fontSize: 15 }}>⚠️ 사건 삭제</div>
+              <div style={{ padding: '24px 20px', fontSize: 14, color: '#333', lineHeight: 1.7 }}>
+                <strong>'{deleteModal.title}'</strong> 사건을 삭제하시겠습니까?<br />
+                <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>⚠️ 삭제 후 복구할 수 없습니다.</span>
+              </div>
+              <div style={{ display: 'flex', gap: 10, padding: '0 20px 20px' }}>
+                <button onClick={() => setDeleteModal(null)} style={{ flex: 1, padding: '10px', border: '1px solid #ccc', background: '#f5f5f5', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>취소</button>
+                <button onClick={handleDelete} disabled={deleting} style={{ flex: 1, padding: '10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.7 : 1 }}>
+                  {deleting ? '삭제 중...' : '삭제'}
+                </button>
               </div>
             </div>
           </div>
