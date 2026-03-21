@@ -392,8 +392,8 @@ export default function GnbNav({ active }: { active?: string }) {
         <nav style={{ maxWidth: 1160, margin: '0 auto', display: 'flex', alignItems: 'center', height: 70, padding: '0 20px' }}>
           {/* 로고 */}
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, marginRight: 40, flexShrink: 0, textDecoration: 'none' }}>
-            <div style={{ width: 44, height: 44, background: 'linear-gradient(135deg,#003087,#0067c2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 26, filter: 'brightness(0) invert(1)' }}>⚖</span>
+            <div style={{ width: 44, height: 44, background: 'linear-gradient(135deg,#003087,#0067c2)', borderRadius: '50%', position: 'relative', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: 26, lineHeight: 1, filter: 'brightness(0) invert(1)' }}>⚖</span>
             </div>
             <div>
               <div style={{ fontSize: 10, color: '#0067c2', fontWeight: 600, letterSpacing: 0.5 }}>모의 전자소송포털</div>
