@@ -431,7 +431,7 @@ export default function AdminPage() {
       if (selectedStudents.size === 0) { alert('학생을 선택해주세요.'); return }
       setAssigning(true)
       const rows = Array.from(selectedStudents).map(sid => ({
-        case_id: selectedCase,
+        case_id: Number(selectedCase),
         student_id: sid,
         assigned_at: new Date().toISOString(),
         status: 'pending',
@@ -474,7 +474,7 @@ export default function AdminPage() {
               {selectedCase && (
                 <div style={{ marginTop: 10, padding: '10px 14px', background: '#f0f6ff', border: '1px solid #c8d8f0', borderRadius: 6, fontSize: 12, color: '#1a3a6b' }}>
                   {(() => {
-                    const sc = cases.find(c => c.id === selectedCase)
+                    const sc = cases.find(c => c.id === Number(selectedCase))
                     return sc ? `${sc.plaintiff} vs ${sc.defendant} | ${sc.court}` : ''
                   })()}
                 </div>
