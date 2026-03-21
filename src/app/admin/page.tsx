@@ -80,10 +80,24 @@ export default function AdminPage() {
   const router = useRouter()
   const [activePanel, setActivePanel] = useState<Panel>('dashboard')
   const [toast, setToast] = useState<string | null>(null)
+  const [siteTitle, setSiteTitle] = useState('전자소송 실습 관리자')
 
   useEffect(() => {
     if (!loading && (!user || user.role !== 'admin')) router.push('/')
   }, [user, loading, router])
+
+  useEffect(() => {
+    const update = () => {
+      const name = localStorage.getItem('site_name')
+      if (name && name.trim()) {
+        setSiteTitle(name.trim() + ' 관리자')
+        document.title = name.trim()
+      }
+    }
+    update()
+    window.addEventListener('site-settings-updated' as keyof WindowEventMap, update)
+    return () => window.removeEventListener('site-settings-updated' as keyof WindowEventMap, update)
+  }, [])
 
   if (loading) {
     return (
@@ -1310,7 +1324,7 @@ export default function AdminPage() {
 
       {/* Admin header */}
       <div style={{ background: 'linear-gradient(90deg,#0d2244,#1a3a6b)', color: '#fff', padding: '0 24px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 8px rgba(0,0,0,.2)' }}>
-        <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: -0.5 }}>⚖ 전자소송 실습 관리자</span>
+        <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: -0.5 }}>⚖ {siteTitle}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <span style={{ fontSize: 13, opacity: 0.8 }}>{user.name} 관리자</span>
           <button
