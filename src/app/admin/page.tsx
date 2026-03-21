@@ -175,31 +175,39 @@ export default function AdminPage() {
   // Account Management Panel
   // ─────────────────────────────────────────────
   function AccountsPanel() {
-    const [accounts, setAccounts] = useState<AccountRow[]>([])
+    const [rows, setRows] = useState<AccountRow[]>([])
     const [search, setSearch] = useState('')
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [showAddForm, setShowAddForm] = useState(false)
     const [saving, setSaving] = useState(false)
-    const [form, setForm] = useState({ login_id: '', password: '', name: '', org: '', cohort: '', email: '', role: 'student', bar_num: '' })
+    const [form, setForm] = useState({ login_id: '', password: '', name: '', org: '', email: '', role: 'student' })
     const fileRef = useRef<HTMLInputElement>(null)
 
-    function loadAccounts() {
-      setAccounts(getAllAccounts())
+    // DEFAULT_ACC 순서 고정 (student01~10, admin)
+    const DEFAULT_IDS = [
+      'student01','student02','student03','student04','student05',
+      'student06','student07','student08','student09','student10','admin',
+    ]
+
+    function loadRows() {
+      const localAccs = getLocalAccounts()
+      // 1) DEFAULT_ACC 먼저
+      const defaultRows: AccountRow[] = DEFAULT_IDS.map(id => {
+        const a = HARDCODED_ACCOUNTS[id]
+        return { login_id: id, name: a.name, org: a.org, role: a.role, cohort: '', bar_num: a.barNum, email: a.email, isHardcoded: true }
+      })
+      // 2) localStorage에만 있는 계정 (DEFAULT 아닌 것)
+      const extraRows: AccountRow[] = Object.entries(localAccs)
+        .filter(([id]) => !HARDCODED_ACCOUNTS[id])
+        .map(([id, a]) => ({ ...(a as AccountRow), login_id: id, isHardcoded: false }))
+      setRows([...defaultRows, ...extraRows])
     }
 
-    useEffect(() => { loadAccounts() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { loadRows() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-    const filtered = accounts.filter(a =>
-      a.login_id.includes(search) || a.name.includes(search) || (a.cohort || '').includes(search) || (a.org || '').includes(search)
+    const filtered = rows.filter(a =>
+      a.login_id.includes(search) || a.name.includes(search) || (a.org || '').includes(search)
     )
-
-    // Group by cohort
-    const cohortMap: Record<string, AccountRow[]> = {}
-    filtered.forEach(a => {
-      const key = a.cohort || (a.isHardcoded ? '기본 계정' : '미분류')
-      if (!cohortMap[key]) cohortMap[key] = []
-      cohortMap[key].push(a)
-    })
 
     function toggleId(id: string) {
       setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -207,43 +215,37 @@ export default function AdminPage() {
 
     function handleAdd() {
       if (!form.login_id || !form.password || !form.name) { alert('아이디, 비밀번호, 이름은 필수입니다.'); return }
-      setSaving(true)
       try {
-        const localAccs = getLocalAccounts()
-        localAccs[form.login_id] = { ...form }
-        localStorage.setItem(ACC_KEY, JSON.stringify(localAccs))
-        setForm({ login_id: '', password: '', name: '', org: '', cohort: '', email: '', role: 'student', bar_num: '' })
+        const stored = getLocalAccounts()
+        stored[form.login_id] = { ...form } as AccountRow
+        localStorage.setItem(ACC_KEY, JSON.stringify(stored))
+        setForm({ login_id: '', password: '', name: '', org: '', email: '', role: 'student' })
         setShowAddForm(false)
-        loadAccounts()
+        loadRows()
         showToast('계정이 추가되었습니다.')
-      } catch (e) {
-        alert('추가 실패: ' + String(e))
-      }
-      setSaving(false)
-    }
-
-    function handleDeleteSelected() {
-      if (selectedIds.size === 0) { alert('삭제할 계정을 선택해주세요.'); return }
-      const toDelete = Array.from(selectedIds).filter(id => !HARDCODED_ACCOUNTS[id])
-      const hardcodedCount = selectedIds.size - toDelete.length
-      if (toDelete.length === 0) { alert('기본 계정은 삭제할 수 없습니다.'); return }
-      if (!confirm(`선택한 ${toDelete.length}개 계정을 삭제하시겠습니까?${hardcodedCount > 0 ? ` (기본 계정 ${hardcodedCount}개 제외)` : ''}`)) return
-      const localAccs = getLocalAccounts()
-      toDelete.forEach(id => delete localAccs[id])
-      localStorage.setItem(ACC_KEY, JSON.stringify(localAccs))
-      setSelectedIds(new Set())
-      loadAccounts()
-      showToast(`${toDelete.length}개 계정이 삭제되었습니다.`)
+      } catch (e) { alert('추가 실패: ' + String(e)) }
     }
 
     function handleDeleteSingle(id: string) {
       if (HARDCODED_ACCOUNTS[id]) { alert('기본 계정은 삭제할 수 없습니다.'); return }
       if (!confirm(`'${id}' 계정을 삭제하시겠습니까?`)) return
-      const localAccs = getLocalAccounts()
-      delete localAccs[id]
-      localStorage.setItem(ACC_KEY, JSON.stringify(localAccs))
-      loadAccounts()
+      const stored = getLocalAccounts()
+      delete stored[id]
+      localStorage.setItem(ACC_KEY, JSON.stringify(stored))
+      loadRows()
       showToast('계정이 삭제되었습니다.')
+    }
+
+    function handleDeleteSelected() {
+      const toDelete = Array.from(selectedIds).filter(id => !HARDCODED_ACCOUNTS[id])
+      if (toDelete.length === 0) { alert('기본 계정은 삭제할 수 없습니다.'); return }
+      if (!confirm(`${toDelete.length}개 계정을 삭제하시겠습니까?`)) return
+      const stored = getLocalAccounts()
+      toDelete.forEach(id => delete stored[id])
+      localStorage.setItem(ACC_KEY, JSON.stringify(stored))
+      setSelectedIds(new Set())
+      loadRows()
+      showToast(`${toDelete.length}개 계정이 삭제되었습니다.`)
     }
 
     async function handleExcelImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -252,58 +254,46 @@ export default function AdminPage() {
       try {
         const xlsx = await import('xlsx')
         const buf = await file.arrayBuffer()
-        const wb = xlsx.read(buf)
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const rows: Record<string, string>[] = xlsx.utils.sheet_to_json(ws)
-        if (rows.length === 0) { alert('데이터가 없습니다.'); return }
+        const ws = xlsx.read(buf).Sheets[xlsx.read(buf).SheetNames[0]]
+        const jsonRows: Record<string, string>[] = xlsx.utils.sheet_to_json(ws)
+        if (!jsonRows.length) { alert('데이터가 없습니다.'); return }
         setSaving(true)
-        const localAccs = getLocalAccounts()
-        let ok = 0; let fail = 0
-        for (const row of rows) {
-          const acc = {
-            login_id: String(row['login_id'] || row['아이디'] || ''),
-            password: String(row['password'] || row['비밀번호'] || ''),
-            name: String(row['name'] || row['이름'] || ''),
-            org: String(row['org'] || row['소속'] || ''),
-            cohort: String(row['cohort'] || row['기수'] || ''),
-            email: String(row['email'] || row['이메일'] || ''),
-            role: String(row['role'] || row['역할'] || 'student'),
-            bar_num: String(row['bar_num'] || row['사원번호'] || ''),
-          }
-          if (!acc.login_id || !acc.password || !acc.name) { fail++; continue }
-          localAccs[acc.login_id] = acc
+        const stored = getLocalAccounts()
+        let ok = 0, fail = 0
+        for (const r of jsonRows) {
+          const id = String(r['login_id'] || r['아이디'] || '')
+          const pw = String(r['password'] || r['비밀번호'] || '')
+          const nm = String(r['name'] || r['이름'] || '')
+          if (!id || !pw || !nm) { fail++; continue }
+          stored[id] = { login_id: id, password: pw, name: nm, org: String(r['org']||r['소속']||''), email: String(r['email']||r['이메일']||''), role: String(r['role']||r['역할']||'student'), cohort: String(r['cohort']||r['기수']||''), bar_num: String(r['bar_num']||r['사원번호']||'') }
           ok++
         }
-        localStorage.setItem(ACC_KEY, JSON.stringify(localAccs))
+        localStorage.setItem(ACC_KEY, JSON.stringify(stored))
         setSaving(false)
-        loadAccounts()
+        loadRows()
         showToast(`${ok}개 계정 등록 완료${fail > 0 ? ` (${fail}개 실패)` : ''}`)
-      } catch (err) {
-        setSaving(false)
-        alert('Excel 파싱 오류: ' + String(err))
-      }
+      } catch (err) { setSaving(false); alert('Excel 파싱 오류: ' + String(err)) }
       if (fileRef.current) fileRef.current.value = ''
     }
 
-    const inp = { padding: '7px 10px', border: '1px solid #d0d8e8', borderRadius: 4, fontSize: 13, boxSizing: 'border-box' as const }
+    const inp: React.CSSProperties = { padding: '7px 10px', border: '1px solid #d0d8e8', borderRadius: 4, fontSize: 13, boxSizing: 'border-box', width: '100%' }
+    const extraCount = filtered.filter(a => !a.isHardcoded).length
 
     return (
       <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', marginBottom: 16 }}>👥 계정 관리</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', margin: 0 }}>👥 계정 관리</h2>
+          <span style={{ fontSize: 13, color: '#888' }}>기본 {DEFAULT_IDS.length}명 + 추가 {extraCount}명 = 총 {filtered.length}명</span>
+        </div>
 
         {/* Toolbar */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="이름·아이디·기수 검색..."
-            style={{ ...inp, flex: 1, minWidth: 180 }}
-          />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="이름·아이디·소속 검색..." style={{ ...inp, flex: 1, minWidth: 160 }} />
           <button onClick={() => setShowAddForm(v => !v)} style={{ padding: '7px 14px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
             + 개별 추가
           </button>
-          <label style={{ padding: '7px 14px', background: '#0067c2', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            📂 Excel 일괄 등록
+          <label style={{ padding: '7px 14px', background: '#0067c2', color: '#fff', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            📂 단체 추가 (Excel)
             <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleExcelImport} style={{ display: 'none' }} />
           </label>
           <button onClick={handleDeleteSelected} disabled={selectedIds.size === 0} style={{ padding: '7px 14px', background: selectedIds.size > 0 ? '#dc2626' : '#e5e7eb', color: selectedIds.size > 0 ? '#fff' : '#999', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: selectedIds.size > 0 ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}>
@@ -311,110 +301,94 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {/* Excel format hint */}
-        <div style={{ background: '#f0f7ff', border: '1px solid #b3d9f0', borderRadius: 4, padding: '8px 12px', fontSize: 11, color: '#1a4a6b', marginBottom: 12 }}>
-          📋 Excel 열 순서: <strong>login_id · password · name · org · cohort · email · role · bar_num</strong> (또는 한글: 아이디·비밀번호·이름·소속·기수·이메일·역할·사원번호)
-        </div>
-
-        {/* Add form */}
+        {/* 개별 추가 폼 */}
         {showAddForm && (
           <div style={{ background: '#f8f9fb', border: '1px solid #d0d8e8', borderRadius: 8, padding: 16, marginBottom: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: '#1a3a6b', marginBottom: 12 }}>신규 계정 추가</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 10 }}>
               {[
-                { label: '아이디 *', key: 'login_id' }, { label: '비밀번호 *', key: 'password' },
-                { label: '이름 *', key: 'name' }, { label: '기수', key: 'cohort' },
-                { label: '소속', key: 'org' }, { label: '이메일', key: 'email' }, { label: '사원번호', key: 'bar_num' },
+                { label: '아이디 *', key: 'login_id' },
+                { label: '비밀번호 *', key: 'password' },
+                { label: '이름 *', key: 'name' },
+                { label: '소속', key: 'org' },
+                { label: '이메일', key: 'email' },
               ].map(f => (
                 <div key={f.key}>
-                  <label style={{ fontSize: 11, color: '#555', fontWeight: 600, display: 'block', marginBottom: 3 }}>{f.label}</label>
-                  <input
-                    value={(form as Record<string, string>)[f.key]}
-                    onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-                    style={{ ...inp, width: '100%' }}
-                  />
+                  <label style={{ fontSize: 11, fontWeight: 600, color: '#555', display: 'block', marginBottom: 3 }}>{f.label}</label>
+                  <input value={(form as Record<string,string>)[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} style={inp} />
                 </div>
               ))}
               <div>
-                <label style={{ fontSize: 11, color: '#555', fontWeight: 600, display: 'block', marginBottom: 3 }}>역할</label>
-                <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))} style={{ ...inp, width: '100%' }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#555', display: 'block', marginBottom: 3 }}>역할</label>
+                <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))} style={inp}>
                   <option value="student">학생</option>
                   <option value="admin">관리자</option>
                 </select>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <div style={{ background: '#f0f7ff', border: '1px solid #b3d9f0', borderRadius: 4, padding: '7px 12px', fontSize: 11, color: '#1a4a6b', marginBottom: 10 }}>
+              📋 Excel 열 순서: <strong>login_id · password · name · org · email · role</strong> (또는 한글: 아이디·비밀번호·이름·소속·이메일·역할)
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setShowAddForm(false)} style={{ padding: '7px 16px', background: '#fff', border: '1px solid #ccc', borderRadius: 4, fontSize: 13, cursor: 'pointer' }}>취소</button>
-              <button onClick={handleAdd} disabled={saving} style={{ padding: '7px 20px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
-                {saving ? '저장 중...' : '추가하기'}
+              <button onClick={handleAdd} disabled={saving} style={{ padding: '7px 20px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                추가하기
               </button>
             </div>
           </div>
         )}
 
-        {/* Account list grouped by cohort */}
-        {Object.keys(cohortMap).length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#999', border: '1px solid #eee', borderRadius: 8 }}>
-            등록된 계정이 없습니다.
-          </div>
-        ) : (
-          Object.entries(cohortMap).sort().map(([cohort, rows]) => (
-            <div key={cohort} style={{ marginBottom: 20 }}>
-              <div style={{ background: '#1a3a6b', color: '#fff', padding: '8px 14px', borderRadius: '6px 6px 0 0', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-                🎓 {cohort}
-                <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>({rows.length}명)</span>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 'auto', cursor: 'pointer', fontWeight: 400, fontSize: 12 }}>
-                  <input
-                    type="checkbox"
-                    checked={rows.every(r => selectedIds.has(r.login_id))}
-                    onChange={e => {
-                      setSelectedIds(prev => {
-                        const n = new Set(prev)
-                        rows.forEach(r => e.target.checked ? n.add(r.login_id) : n.delete(r.login_id))
-                        return n
-                      })
-                    }}
-                  />
-                  기수 전체 선택
-                </label>
-              </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, border: '1px solid #d0d8e8', borderTop: 'none' }}>
-                <thead>
-                  <tr style={{ background: '#f5f7fb' }}>
-                    {['', '아이디', '이름', '소속', '역할', '이메일', '삭제'].map((h, i) => (
-                      <th key={i} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#333', fontSize: 12, borderBottom: '1px solid #d0d8e8', whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((acc, i) => (
-                    <tr key={acc.login_id} style={{ background: i % 2 === 0 ? '#fff' : '#fafbfc', borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '7px 12px', width: 32 }}>
-                        <input type="checkbox" checked={selectedIds.has(acc.login_id)} onChange={() => toggleId(acc.login_id)} />
-                      </td>
-                      <td style={{ padding: '7px 12px', fontFamily: 'monospace', color: '#0067c2', fontWeight: 600 }}>{acc.login_id}</td>
-                      <td style={{ padding: '7px 12px', fontWeight: 600 }}>{acc.name}</td>
-                      <td style={{ padding: '7px 12px', color: '#555' }}>{acc.org || '-'}</td>
-                      <td style={{ padding: '7px 12px' }}>
-                        <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: acc.role === 'admin' ? '#fee2e2' : '#dbeafe', color: acc.role === 'admin' ? '#dc2626' : '#1d4ed8' }}>
-                          {acc.role === 'admin' ? '관리자' : '학생'}
-                        </span>
-                        {acc.isHardcoded && <span style={{ fontSize: 10, color: '#aaa', marginLeft: 5 }}>기본</span>}
-                      </td>
-                      <td style={{ padding: '7px 12px', color: '#555' }}>{acc.email || '-'}</td>
-                      <td style={{ padding: '7px 12px' }}>
-                        {acc.isHardcoded
-                          ? <span style={{ fontSize: 11, color: '#aaa' }}>삭제불가</span>
-                          : <button onClick={() => handleDeleteSingle(acc.login_id)} style={{ background: 'none', border: '1px solid #dc2626', color: '#dc2626', borderRadius: 4, padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>삭제</button>
-                        }
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))
-        )}
+        {/* 계정 목록 테이블 */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, border: '1px solid #d0d8e8', borderRadius: 6, overflow: 'hidden' }}>
+          <thead>
+            <tr style={{ background: '#1a3a6b', color: '#fff' }}>
+              <th style={{ padding: '9px 12px', width: 36, textAlign: 'center' }}>
+                <input type="checkbox"
+                  checked={filtered.filter(a => !a.isHardcoded).length > 0 && filtered.filter(a => !a.isHardcoded).every(a => selectedIds.has(a.login_id))}
+                  onChange={e => {
+                    setSelectedIds(prev => {
+                      const n = new Set(prev)
+                      filtered.filter(a => !a.isHardcoded).forEach(a => e.target.checked ? n.add(a.login_id) : n.delete(a.login_id))
+                      return n
+                    })
+                  }}
+                />
+              </th>
+              {['아이디', '이름', '소속', '역할', '이메일', '삭제'].map(h => (
+                <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr><td colSpan={7} style={{ padding: 32, textAlign: 'center', color: '#999' }}>검색 결과가 없습니다.</td></tr>
+            ) : filtered.map(acc => (
+              <tr key={acc.login_id} style={{ background: acc.isHardcoded ? '#f5f7fc' : '#fff', borderBottom: '1px solid #e8edf5' }}>
+                <td style={{ padding: '7px 12px', textAlign: 'center' }}>
+                  {!acc.isHardcoded && (
+                    <input type="checkbox" checked={selectedIds.has(acc.login_id)} onChange={() => toggleId(acc.login_id)} />
+                  )}
+                </td>
+                <td style={{ padding: '7px 12px', fontFamily: 'monospace', color: '#0067c2', fontWeight: 600 }}>{acc.login_id}</td>
+                <td style={{ padding: '7px 12px', fontWeight: 600 }}>{acc.name}</td>
+                <td style={{ padding: '7px 12px', color: '#555' }}>{acc.org || '-'}</td>
+                <td style={{ padding: '7px 12px' }}>
+                  <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: acc.role === 'admin' ? '#fee2e2' : '#dbeafe', color: acc.role === 'admin' ? '#dc2626' : '#1d4ed8' }}>
+                    {acc.role === 'admin' ? '관리자' : '학생'}
+                  </span>
+                  {acc.isHardcoded && <span style={{ fontSize: 10, color: '#9ca3af', marginLeft: 6, border: '1px solid #d1d5db', borderRadius: 3, padding: '1px 5px' }}>기본</span>}
+                </td>
+                <td style={{ padding: '7px 12px', color: '#666' }}>{acc.email || '-'}</td>
+                <td style={{ padding: '7px 12px' }}>
+                  {acc.isHardcoded
+                    ? <span style={{ fontSize: 11, color: '#c0c0c0' }}>–</span>
+                    : <button onClick={() => handleDeleteSingle(acc.login_id)} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>삭제</button>
+                  }
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     )
   }
