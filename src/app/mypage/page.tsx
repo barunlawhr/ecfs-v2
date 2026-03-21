@@ -13,6 +13,7 @@ const SB_HDR = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
 
 type ActivePage =
   | 'status'
+  | 'active-cases'
   | 'assigned-cases'
   | 'practice-records'
   | 'submitted-docs'
@@ -107,7 +108,7 @@ export default function MyPage() {
 
   useEffect(() => {
     if (!user) return
-    if (activePage === 'assigned-cases' || activePage === 'status') fetchAssignments()
+    if (activePage === 'active-cases' || activePage === 'assigned-cases' || activePage === 'status') fetchAssignments()
     if (activePage === 'practice-records' || activePage === 'submitted-docs') fetchPracticeRecords()
   }, [activePage, user])
 
@@ -674,6 +675,231 @@ export default function MyPage() {
     )
   }
 
+  // ── ACTIVE CASES (진행중사건) ─────────────────────────────────
+  const ActiveCasesContent = () => {
+    const [filterType, setFilterType] = useState('전체')
+    const [filterCourt, setFilterCourt] = useState('전체')
+    const [currentPage, setCurrentPage] = useState(1)
+    const [menuModal, setMenuModal] = useState<Assignment | null>(null)
+    const perPage = 10
+
+    const LAWSUIT_TYPES = ['전체','민사','형사','가사','보호','행정','특허','회생파산','민사(지급명령)','민사집행','관태료']
+    const COURTS = ['전체','서울중앙지방법원','서울동부지방법원','서울서부지방법원','서울남부지방법원','서울북부지방법원','수원지방법원','인천지방법원','의정부지방법원','춘천지방법원','대전지방법원','청주지방법원','대구지방법원','부산지방법원','울산지방법원','창원지방법원','광주지방법원','전주지방법원','제주지방법원']
+    const JAEJANBU: Record<string, string> = { '대여금':'민사4단독','손해배상':'민사2단독','매매대금':'민사3단독','임금':'민사4단독','부당이득금':'민사5단독','소유권이전등기':'민사합의11부','기타':'민사1단독' }
+
+    function mockCaseNo(a: Assignment) {
+      const year = a.assigned_at?.slice(0,4) || '2026'
+      const code = a.sample_cases?.case_type === '소유권이전등기' ? '가합' : '가단'
+      return `${year}${code}${String(a.id).padStart(5,'0')}`
+    }
+    function mockHearingDate(a: Assignment) {
+      if (!a.assigned_at) return ''
+      const d = new Date(a.assigned_at); d.setDate(d.getDate()+45)
+      const times = ['10:00','10:30','11:00','14:00','14:30']
+      return `${d.toISOString().slice(0,10)} ${times[a.id % 5]}`
+    }
+    function mockRoom(a: Assignment) {
+      return ['제1법정','제2법정','제3법정','제11법정','제201호 법정'][a.id % 5]
+    }
+    function courtShort(c: string) {
+      return c.replace('지방법원','지법').replace('고등법원','고법')
+    }
+    function caseLabel(a: Assignment) {
+      return `${mockCaseNo(a)}(${a.sample_cases?.case_type || '민사'})`
+    }
+
+    const filtered = assignments.filter(a => {
+      if (filterType !== '전체' && filterType !== '민사') return false
+      if (filterCourt !== '전체' && !(a.sample_cases?.court || '').includes(filterCourt)) return false
+      return true
+    })
+    const total = filtered.length
+    const totalPages = Math.max(1, Math.ceil(total / perPage))
+    const paged = filtered.slice((currentPage-1)*perPage, currentPage*perPage)
+
+    const tdS: React.CSSProperties = { padding:'7px 8px', fontSize:12, borderBottom:'1px solid #e8edf0', verticalAlign:'middle' }
+
+    return (
+      <div style={{ fontFamily:'inherit' }}>
+        <PageHd title="진행중사건" actions={<><ActBtn label="📌 나의 메뉴 추가" /><ActBtn label="🖨 출력" /></>} />
+
+        {/* 필터 영역 */}
+        <div style={{ background:'#fff', borderBottom:'1px solid #dde0e8', padding:'10px 14px', display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, color:'#555', fontWeight:600, minWidth:40 }}>소송유형</span>
+            <select value={filterType} onChange={e=>{setFilterType(e.target.value);setCurrentPage(1)}} style={{ height:30, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+              {LAWSUIT_TYPES.map(t=><option key={t}>{t}</option>)}
+            </select>
+            <select style={{ height:30, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+              {['전체','민사본안','민사신청','항고제재고','기타'].map(t=><option key={t}>{t}</option>)}
+            </select>
+            <span style={{ fontSize:12, color:'#555', fontWeight:600, minWidth:20, marginLeft:8 }}>법원</span>
+            <select value={filterCourt} onChange={e=>{setFilterCourt(e.target.value);setCurrentPage(1)}} style={{ height:30, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+              {COURTS.map(c=><option key={c}>{c}</option>)}
+            </select>
+            <button style={{ height:30, padding:'0 10px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>나이법원설정</button>
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <label style={{ fontSize:12, display:'flex', alignItems:'center', gap:4, cursor:'pointer' }}><input type="radio" name="searchMode" defaultChecked style={{ margin:0 }}/>접수일자</label>
+            <label style={{ fontSize:12, display:'flex', alignItems:'center', gap:4, cursor:'pointer' }}><input type="radio" name="searchMode" style={{ margin:0 }}/>사건번호</label>
+            <input type="date" style={{ height:30, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 6px', fontSize:12, fontFamily:'inherit' }} />
+            <span style={{ fontSize:12 }}>~</span>
+            <input type="date" style={{ height:30, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 6px', fontSize:12, fontFamily:'inherit' }} />
+            {['오늘','3일','1주일','1개월','전체'].map(l=>(
+              <button key={l} style={{ height:28, padding:'0 10px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>{l}</button>
+            ))}
+          </div>
+          <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, color:'#555', fontWeight:600, minWidth:40 }}>정렬순서</span>
+            {[['접수일↓','접수일↑'],['법원↑','법원↓'],['사건번호↓','사건번호↑']].map((opts,i)=>(
+              <select key={i} defaultValue={opts[0]} style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, padding:'0 4px', fontFamily:'inherit' }}>
+                {opts.map(o=><option key={o}>{o}</option>)}
+              </select>
+            ))}
+          </div>
+          <div style={{ textAlign:'center' }}>
+            <button style={{ height:34, padding:'0 40px', background:'#003366', color:'#fff', border:'none', borderRadius:3, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>조 회</button>
+          </div>
+        </div>
+
+        {/* 상단 액션 버튼 */}
+        <div style={{ background:'#fff', borderBottom:'1px solid #dde0e8', padding:'6px 14px', display:'flex', justifyContent:'flex-end', gap:6 }}>
+          <ActBtn label="관심사건 지정" />
+          <ActBtn label="완료사건 지정" />
+          <button style={{ height:28, padding:'0 10px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', gap:4, fontFamily:'inherit' }}>
+            <span style={{ fontSize:13 }}>📗</span> 엑셀로 저장
+          </button>
+        </div>
+
+        {/* 테이블 */}
+        {assignmentsLoading ? (
+          <div style={{ padding:60, textAlign:'center', color:'#aaa', background:'#fff' }}>⏳ 사건을 불러오는 중...</div>
+        ) : total === 0 ? (
+          <div style={{ padding:60, textAlign:'center', color:'#aaa', background:'#fff' }}>
+            <div style={{ fontSize:36, marginBottom:12 }}>📋</div>
+            진행중인 사건이 없습니다.
+          </div>
+        ) : (
+          <div style={{ background:'#fff', overflowX:'auto' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+              <thead>
+                <tr style={{ background:'#f0f3f8', borderBottom:'2px solid #b8c8e0' }}>
+                  <th style={{ padding:'8px 8px', width:28 }}><input type="checkbox" /></th>
+                  {['법원','사건번호','재판부','사건지위','접수일자','원고','피고','기일시간','기일장소','바로가기'].map(h=>(
+                    <th key={h} style={{ padding:'8px 8px', fontWeight:600, fontSize:11, color:'#333', whiteSpace:'nowrap', textAlign:'center' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {paged.map((a, i) => {
+                  const sc = a.sample_cases || {}
+                  const caseNo = mockCaseNo(a)
+                  const hearing = mockHearingDate(a)
+                  return (
+                    <tr key={a.id} style={{ background: i%2===0 ? '#fff' : '#fafbfe', borderBottom:'1px solid #e8edf0' }}>
+                      <td style={{ ...tdS, textAlign:'center' }}><input type="checkbox" /></td>
+                      <td style={{ ...tdS, whiteSpace:'nowrap' }}>{courtShort(sc.court || '서울중앙지법')}</td>
+                      <td style={{ ...tdS }}>
+                        <span
+                          onClick={() => goToApply(sc)}
+                          style={{ color:'#0057a8', textDecoration:'underline', cursor:'pointer', fontWeight:600, whiteSpace:'nowrap' }}
+                        >{caseNo}</span>
+                      </td>
+                      <td style={{ ...tdS, textAlign:'center', whiteSpace:'nowrap', color:'#555' }}>{JAEJANBU[sc.case_type||''] || '민사1단독'}</td>
+                      <td style={{ ...tdS, textAlign:'center', color:'#555' }}>원고대리인</td>
+                      <td style={{ ...tdS, textAlign:'center', whiteSpace:'nowrap', color:'#555' }}>{a.assigned_at?.slice(0,10).replace(/-/g,'.')}</td>
+                      <td style={{ ...tdS, maxWidth:80, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sc.plaintiff || '–'}</td>
+                      <td style={{ ...tdS, maxWidth:80, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{sc.defendant || '–'}</td>
+                      <td style={{ ...tdS, textAlign:'center', whiteSpace:'nowrap', color:'#555', fontSize:11 }}>{hearing}</td>
+                      <td style={{ ...tdS, textAlign:'center', whiteSpace:'nowrap', color:'#888', fontSize:11 }}>{hearing ? mockRoom(a) : ''}</td>
+                      <td style={{ ...tdS, textAlign:'center' }}>
+                        <button
+                          onClick={() => setMenuModal(a)}
+                          style={{ height:24, padding:'0 8px', background:'#fff', border:'1px solid #8899bb', borderRadius:3, fontSize:11, cursor:'pointer', color:'#003366', fontFamily:'inherit' }}
+                        >메뉴선택</button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* 페이지네이션 */}
+        {total > 0 && (
+          <div style={{ background:'#fff', borderTop:'1px solid #e8edf0', padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
+            <span style={{ fontSize:12, color:'#555' }}>총 <strong>{total}</strong>건</span>
+            <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+              <button onClick={()=>setCurrentPage(1)} disabled={currentPage===1} style={{ width:26, height:26, border:'1px solid #ccc', background:'#fff', borderRadius:3, cursor:'pointer', fontSize:11 }}>«</button>
+              <button onClick={()=>setCurrentPage(p=>Math.max(1,p-1))} disabled={currentPage===1} style={{ width:26, height:26, border:'1px solid #ccc', background:'#fff', borderRadius:3, cursor:'pointer', fontSize:12 }}>‹</button>
+              {Array.from({length:totalPages},(_,i)=>i+1).map(p=>(
+                <button key={p} onClick={()=>setCurrentPage(p)} style={{ width:26, height:26, border:`1px solid ${p===currentPage?'#003366':'#ccc'}`, background:p===currentPage?'#003366':'#fff', color:p===currentPage?'#fff':'#333', borderRadius:3, cursor:'pointer', fontSize:12, fontWeight:p===currentPage?700:400 }}>{p}</button>
+              ))}
+              <button onClick={()=>setCurrentPage(p=>Math.min(totalPages,p+1))} disabled={currentPage===totalPages} style={{ width:26, height:26, border:'1px solid #ccc', background:'#fff', borderRadius:3, cursor:'pointer', fontSize:12 }}>›</button>
+              <button onClick={()=>setCurrentPage(totalPages)} disabled={currentPage===totalPages} style={{ width:26, height:26, border:'1px solid #ccc', background:'#fff', borderRadius:3, cursor:'pointer', fontSize:11 }}>»</button>
+            </div>
+            <select defaultValue="10" style={{ height:28, border:'1px solid #ccc', borderRadius:3, fontSize:11, padding:'0 4px', fontFamily:'inherit' }}>
+              {['10','20','30'].map(n=><option key={n}>{n}개씩 보기</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* 참고하세요 */}
+        <div style={{ background:'#f8f9fc', border:'1px solid #dde0e8', borderTop:'none', borderRadius:'0 0 4px 4px', padding:'14px 18px', display:'flex', gap:12, alignItems:'flex-start' }}>
+          <div style={{ fontSize:28, marginTop:2 }}>🖥</div>
+          <div>
+            <div style={{ fontSize:12, fontWeight:700, color:'#003366', marginBottom:6 }}>참고하세요</div>
+            <ul style={{ margin:0, paddingLeft:16, fontSize:11, color:'#555', lineHeight:1.9 }}>
+              <li>전자소송인증번호 없이 전자소송사건등록을 한 대리인이나 참가신청서를 제출한 참가인은 재판부에서 관련서류를 확인하기 전에는 사건 기록열람과 알림서비스변경을 할 수 없습니다.</li>
+              <li>본소에 병합된 사건의 경우 소송서류제출, 소송비용납부, 알림서비스변경을 할 수 없으며, 본소 사건번호로 진행하시기 바랍니다.</li>
+              <li>완료사건 지정은 <strong>확정일</strong> 또는 <strong>기록인계일이 입력된 사건</strong>이나 본소인 중 <strong>송기록 송부일이 입력된 사건</strong>에 한하여 완료된 사건으로 지정 가능합니다.</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* 메뉴선택 모달 */}
+        {menuModal && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.5)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ background:'#fff', borderRadius:6, width:480, boxShadow:'0 8px 32px rgba(0,0,0,.3)', overflow:'hidden' }}>
+              {/* 모달 헤더 */}
+              <div style={{ background:'linear-gradient(90deg,#0d2244,#1a3a6b)', color:'#fff', padding:'12px 18px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ fontWeight:700, fontSize:15 }}>메뉴선택</span>
+                <button onClick={()=>setMenuModal(null)} style={{ background:'none', border:'none', color:'#fff', fontSize:20, cursor:'pointer', lineHeight:1 }}>✕</button>
+              </div>
+              {/* 사건번호 */}
+              <div style={{ padding:'18px 20px 8px', textAlign:'center' }}>
+                <div style={{ fontSize:14, fontWeight:700, color:'#003366', marginBottom:6 }}>{caseLabel(menuModal)}</div>
+                <div style={{ fontSize:12, color:'#555' }}>아래 항목을 클릭하시면, 해당 화면으로 바로가기 됩니다.</div>
+              </div>
+              {/* 버튼 그리드 */}
+              <div style={{ padding:'12px 20px', display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                {[
+                  { label:'사건기록열람', action: null },
+                  { label:'제출/송달내역', action: null },
+                  { label:'관련사건등록', action: null },
+                  { label:'관련사건조회', action: null },
+                  { label:'재증명신청', action: null },
+                  { label:'📝 소장 작성하기', action: () => { setMenuModal(null); goToApply(menuModal.sample_cases || {}) }, primary: true },
+                ].map(({ label, action, primary }) => (
+                  <button
+                    key={label}
+                    onClick={action ? action : () => alert('실습 모드에서는 지원하지 않는 기능입니다.')}
+                    style={{ padding:'12px 8px', border:`1px solid ${primary ? '#0067c2' : '#8899bb'}`, background: primary ? '#0067c2' : '#fff', color: primary ? '#fff' : '#003366', borderRadius:4, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}
+                  >{label}</button>
+                ))}
+              </div>
+              {/* 닫기 */}
+              <div style={{ padding:'8px 20px 18px', textAlign:'center' }}>
+                <button onClick={()=>setMenuModal(null)} style={{ height:34, padding:'0 40px', background:'#555', color:'#fff', border:'none', borderRadius:3, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>닫기</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // ── GENERIC ──────────────────────────────────────────────────
   const GenericContent = ({ title }: { title: string }) => (
     <div>
@@ -691,6 +917,7 @@ export default function MyPage() {
   function renderContent() {
     switch (activePage) {
       case 'status': return <StatusContent />
+      case 'active-cases': return <ActiveCasesContent />
       case 'assigned-cases': return <AssignedCasesContent />
       case 'practice-records': return <PracticeRecordsContent />
       case 'submitted-docs': return <SubmittedDocsContent />
@@ -727,7 +954,7 @@ export default function MyPage() {
           <GrpHd label="나의사건관리" gKey="나의사건관리" />
           {openGroups['나의사건관리'] && (
             <>
-              <SbItem label="진행중사건" page="assigned-cases" />
+              <SbItem label="진행중사건" page="active-cases" />
               <SbItem label="관심사건" page="generic" title="관심사건" />
               <SbItem label="확정된사건" page="generic" title="확정된사건" />
               <SbItem label="완료된사건" page="generic" title="완료된사건" />
