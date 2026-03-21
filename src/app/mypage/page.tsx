@@ -1581,14 +1581,19 @@ export default function MyPage() {
     const [foundCase, setFoundCase] = useState<{ court: string; plaintiff: string; defendant: string; caseName: string } | null>(null)
     const [searched, setSearched] = useState(false)
 
-    // 가상 사건 데이터 — 나중에 더 추가하거나 API로 교체 가능
-    const VIRTUAL_CASES: Record<string, { court: string; plaintiff: string; defendant: string; caseName: string }> = {
-      '2026-가단-11234': { court: '서울중앙지방법원', plaintiff: '홍길동', defendant: '이순신', caseName: '손해배상' },
-      '2026-가단-22345': { court: '수원지방법원', plaintiff: '홍길동', defendant: '김철수', caseName: '대여금' },
-      '2025-가단-33456': { court: '인천지방법원', plaintiff: '김정호', defendant: '주식회사 사아자컨설팅', caseName: '물품대금' },
-      '2026-가단-44567': { court: '서울동부지방법원', plaintiff: '박민수', defendant: '이재영', caseName: '임대차보증금' },
-      '2025-타채-55001': { court: '서울중앙지방법원', plaintiff: '이민준', defendant: '주식회사 라마바기술', caseName: '채권압류' },
-    }
+    // 가상 사건 데이터 — admin에서 관리, localStorage(ecfs_virtual_cases) 우선, 없으면 기본값
+    const DEFAULT_VIRTUAL_CASES = [
+      { id: 'd1', caseYear: '2026', caseGubun: '가단', caseNum: '11234', court: '서울중앙지방법원', plaintiff: '홍길동', defendant: '이순신', caseName: '손해배상' },
+      { id: 'd2', caseYear: '2026', caseGubun: '가단', caseNum: '22345', court: '수원지방법원', plaintiff: '홍길동', defendant: '김철수', caseName: '대여금' },
+      { id: 'd3', caseYear: '2025', caseGubun: '가단', caseNum: '33456', court: '인천지방법원', plaintiff: '김정호', defendant: '주식회사 사아자컨설팅', caseName: '물품대금' },
+      { id: 'd4', caseYear: '2026', caseGubun: '가단', caseNum: '44567', court: '서울동부지방법원', plaintiff: '박민수', defendant: '이재영', caseName: '임대차보증금' },
+      { id: 'd5', caseYear: '2025', caseGubun: '타채', caseNum: '55001', court: '서울중앙지방법원', plaintiff: '이민준', defendant: '주식회사 라마바기술', caseName: '채권압류' },
+    ]
+    const vcList: typeof DEFAULT_VIRTUAL_CASES = (() => {
+      try { const d = JSON.parse(localStorage.getItem('ecfs_virtual_cases') || 'null'); return Array.isArray(d) && d.length > 0 ? d : DEFAULT_VIRTUAL_CASES } catch { return DEFAULT_VIRTUAL_CASES }
+    })()
+    const VIRTUAL_CASES: Record<string, { court: string; plaintiff: string; defendant: string; caseName: string }> =
+      Object.fromEntries(vcList.map(c => [`${c.caseYear}-${c.caseGubun}-${c.caseNum}`, { court: c.court, plaintiff: c.plaintiff, defendant: c.defendant, caseName: c.caseName }]))
 
     const handleSearch = () => {
       if (!caseNum.trim()) { alert('사건번호를 입력하세요.'); return }

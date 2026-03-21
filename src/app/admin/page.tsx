@@ -45,7 +45,7 @@ function getAllAccounts(): AccountRow[] {
   return Object.values(merged)
 }
 
-type Panel = 'dashboard' | 'accounts' | 'cases' | 'assign' | 'records' | 'ecfs-reg' | 'settings'
+type Panel = 'dashboard' | 'accounts' | 'cases' | 'assign' | 'records' | 'ecfs-reg' | 'ecfs-cases' | 'settings'
 
 const PANEL_ITEMS: { key: Panel; icon: string; label: string }[] = [
   { key: 'dashboard', icon: '📊', label: '대시보드' },
@@ -54,6 +54,7 @@ const PANEL_ITEMS: { key: Panel; icon: string; label: string }[] = [
   { key: 'assign', icon: '🎯', label: '학생 배정' },
   { key: 'records', icon: '📈', label: '실습 현황' },
   { key: 'ecfs-reg', icon: '📝', label: '전자소송등록 현황' },
+  { key: 'ecfs-cases', icon: '⚖️', label: '전자소송 가상사건' },
   { key: 'settings', icon: '⚙', label: '설정' },
 ]
 
@@ -1029,6 +1030,184 @@ export default function AdminPage() {
   }
 
   // ─────────────────────────────────────────────
+  // EcfsCases Panel — 전자소송 가상사건 관리
+  // ─────────────────────────────────────────────
+  function EcfsCasesPanel() {
+    interface VCase {
+      id: string; caseYear: string; caseGubun: string; caseNum: string
+      court: string; plaintiff: string; defendant: string; caseName: string
+    }
+    const DEFAULT: VCase[] = [
+      { id: 'd1', caseYear: '2026', caseGubun: '가단', caseNum: '11234', court: '서울중앙지방법원', plaintiff: '홍길동', defendant: '이순신', caseName: '손해배상' },
+      { id: 'd2', caseYear: '2026', caseGubun: '가단', caseNum: '22345', court: '수원지방법원', plaintiff: '홍길동', defendant: '김철수', caseName: '대여금' },
+      { id: 'd3', caseYear: '2025', caseGubun: '가단', caseNum: '33456', court: '인천지방법원', plaintiff: '김정호', defendant: '주식회사 사아자컨설팅', caseName: '물품대금' },
+      { id: 'd4', caseYear: '2026', caseGubun: '가단', caseNum: '44567', court: '서울동부지방법원', plaintiff: '박민수', defendant: '이재영', caseName: '임대차보증금' },
+      { id: 'd5', caseYear: '2025', caseGubun: '타채', caseNum: '55001', court: '서울중앙지방법원', plaintiff: '이민준', defendant: '주식회사 라마바기술', caseName: '채권압류' },
+    ]
+    const GUBUN = ['가단','가합','가소','나','머','타채','카합','카단','제가단','제가합','제가소','제나','제머']
+    const COURTS = ['서울중앙지방법원','서울서부지방법원','서울동부지방법원','서울남부지방법원','서울북부지방법원','수원지방법원','인천지방법원','의정부지방법원','부산지방법원','대구지방법원','광주지방법원','대전지방법원']
+
+    const BLANK: VCase = { id: '', caseYear: '2026', caseGubun: '가단', caseNum: '', court: '서울중앙지방법원', plaintiff: '', defendant: '', caseName: '' }
+
+    const [list, setList] = useState<VCase[]>([])
+    const [showForm, setShowForm] = useState(false)
+    const [form, setForm] = useState<VCase>(BLANK)
+    const [editId, setEditId] = useState<string | null>(null)
+    const [deleteModal, setDeleteModal] = useState<VCase | null>(null)
+
+    function load() {
+      try {
+        const d = JSON.parse(localStorage.getItem('ecfs_virtual_cases') || 'null')
+        setList(Array.isArray(d) && d.length > 0 ? d : DEFAULT)
+      } catch { setList(DEFAULT) }
+    }
+    function save(updated: VCase[]) {
+      localStorage.setItem('ecfs_virtual_cases', JSON.stringify(updated))
+      setList(updated)
+    }
+
+    useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    function handleSubmit() {
+      if (!form.caseNum.trim()) { alert('사건번호를 입력하세요.'); return }
+      if (!form.plaintiff.trim() || !form.defendant.trim()) { alert('원고와 피고를 입력하세요.'); return }
+      if (!form.caseName.trim()) { alert('사건명을 입력하세요.'); return }
+      const dup = list.find(c => c.caseYear === form.caseYear && c.caseGubun === form.caseGubun && c.caseNum === form.caseNum.trim() && c.id !== editId)
+      if (dup) { alert('동일한 사건번호가 이미 존재합니다.'); return }
+      if (editId) {
+        save(list.map(c => c.id === editId ? { ...form, caseNum: form.caseNum.trim(), id: editId } : c))
+        showToast('사건이 수정되었습니다.')
+      } else {
+        save([...list, { ...form, caseNum: form.caseNum.trim(), id: String(Date.now()) }])
+        showToast('사건이 추가되었습니다.')
+      }
+      setShowForm(false); setEditId(null); setForm(BLANK)
+    }
+    function startEdit(c: VCase) { setForm(c); setEditId(c.id); setShowForm(true) }
+    function confirmDelete() {
+      if (!deleteModal) return
+      save(list.filter(c => c.id !== deleteModal.id))
+      setDeleteModal(null)
+      showToast('사건이 삭제되었습니다.')
+    }
+    function resetToDefault() {
+      save(DEFAULT)
+      showToast('기본 사건 목록으로 초기화되었습니다.')
+    }
+
+    const inp: React.CSSProperties = { padding: '7px 10px', border: '1px solid #d0d8e8', borderRadius: 4, fontSize: 13, boxSizing: 'border-box', width: '100%' }
+
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', margin: 0 }}>⚖️ 전자소송 가상사건 관리</h2>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={resetToDefault} style={{ padding: '7px 14px', background: '#f0f4fc', color: '#1a3a6b', border: '1px solid #c8d8f0', borderRadius: 5, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>기본값 복원</button>
+            <button onClick={() => { setForm(BLANK); setEditId(null); setShowForm(v => !v) }} style={{ padding: '7px 16px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 5, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>+ 사건 추가</button>
+          </div>
+        </div>
+
+        <div style={{ background: '#fffbf0', border: '1px solid #f0e0b0', borderRadius: 6, padding: '10px 16px', fontSize: 12, color: '#7c5800', marginBottom: 14 }}>
+          📋 여기서 관리하는 사건은 <strong>전자소송사건등록</strong> 페이지의 사건번호 조회 시 불러올 수 있는 가상 사건 목록입니다.
+        </div>
+
+        {/* 추가/수정 폼 */}
+        {showForm && (
+          <div style={{ background: '#f8f9fb', border: '1px solid #d0d8e8', borderRadius: 8, padding: 18, marginBottom: 18 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#1a3a6b', marginBottom: 14 }}>{editId ? '사건 수정' : '새 사건 추가'}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 12 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#555', display: 'block', marginBottom: 3 }}>사건연도</label>
+                <select value={form.caseYear} onChange={e => setForm(p => ({ ...p, caseYear: e.target.value }))} style={inp}>
+                  {['2022','2023','2024','2025','2026','2027'].map(y => <option key={y}>{y}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#555', display: 'block', marginBottom: 3 }}>구분</label>
+                <select value={form.caseGubun} onChange={e => setForm(p => ({ ...p, caseGubun: e.target.value }))} style={inp}>
+                  {GUBUN.map(g => <option key={g}>{g}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#555', display: 'block', marginBottom: 3 }}>번호 *</label>
+                <input value={form.caseNum} onChange={e => setForm(p => ({ ...p, caseNum: e.target.value }))} placeholder="예: 11234" style={inp} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#555', display: 'block', marginBottom: 3 }}>법원</label>
+                <select value={form.court} onChange={e => setForm(p => ({ ...p, court: e.target.value }))} style={inp}>
+                  {COURTS.map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#555', display: 'block', marginBottom: 3 }}>사건명 *</label>
+                <input value={form.caseName} onChange={e => setForm(p => ({ ...p, caseName: e.target.value }))} placeholder="예: 손해배상" style={inp} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#555', display: 'block', marginBottom: 3 }}>원고 *</label>
+                <input value={form.plaintiff} onChange={e => setForm(p => ({ ...p, plaintiff: e.target.value }))} placeholder="원고 이름" style={inp} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#555', display: 'block', marginBottom: 3 }}>피고 *</label>
+                <input value={form.defendant} onChange={e => setForm(p => ({ ...p, defendant: e.target.value }))} placeholder="피고 이름" style={inp} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => { setShowForm(false); setEditId(null); setForm(BLANK) }} style={{ padding: '7px 16px', background: '#fff', border: '1px solid #ccc', borderRadius: 4, fontSize: 13, cursor: 'pointer' }}>취소</button>
+              <button onClick={handleSubmit} style={{ padding: '7px 24px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{editId ? '수정하기' : '추가하기'}</button>
+            </div>
+          </div>
+        )}
+
+        {/* 사건 목록 */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, border: '1px solid #d0d8e8', borderRadius: 6, overflow: 'hidden' }}>
+          <thead>
+            <tr style={{ background: '#1a3a6b', color: '#fff' }}>
+              {['사건번호', '법원', '사건명', '원고', '피고', '수정', '삭제'].map(h => (
+                <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {list.length === 0 ? (
+              <tr><td colSpan={7} style={{ padding: 32, textAlign: 'center', color: '#999' }}>등록된 가상 사건이 없습니다.</td></tr>
+            ) : list.map((c, i) => (
+              <tr key={c.id} style={{ background: i % 2 === 0 ? '#fff' : '#f8f9fb', borderBottom: '1px solid #eee' }}>
+                <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: '#0067c2', fontWeight: 600, whiteSpace: 'nowrap' }}>{c.caseYear}{c.caseGubun}{c.caseNum}</td>
+                <td style={{ padding: '8px 12px', color: '#555', whiteSpace: 'nowrap' }}>{c.court}</td>
+                <td style={{ padding: '8px 12px' }}><span style={{ background: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>{c.caseName}</span></td>
+                <td style={{ padding: '8px 12px' }}>{c.plaintiff}</td>
+                <td style={{ padding: '8px 12px' }}>{c.defendant}</td>
+                <td style={{ padding: '8px 12px' }}>
+                  <button onClick={() => startEdit(c)} style={{ background: '#0067c2', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>수정</button>
+                </td>
+                <td style={{ padding: '8px 12px' }}>
+                  <button onClick={() => setDeleteModal(c)} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>삭제</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {deleteModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: '#fff', borderRadius: 10, width: 360, boxShadow: '0 8px 32px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+              <div style={{ background: '#dc2626', color: '#fff', padding: '14px 20px', fontWeight: 700, fontSize: 15 }}>⚠️ 사건 삭제</div>
+              <div style={{ padding: '24px 20px', fontSize: 14, color: '#333', lineHeight: 1.7 }}>
+                <strong>{deleteModal.caseYear}{deleteModal.caseGubun}{deleteModal.caseNum}</strong> 사건을 삭제하시겠습니까?<br />
+                <span style={{ fontSize: 12, color: '#888' }}>({deleteModal.plaintiff} vs {deleteModal.defendant})</span>
+              </div>
+              <div style={{ display: 'flex', gap: 10, padding: '0 20px 20px' }}>
+                <button onClick={() => setDeleteModal(null)} style={{ flex: 1, padding: '10px', border: '1px solid #ccc', background: '#f5f5f5', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>취소</button>
+                <button onClick={confirmDelete} style={{ flex: 1, padding: '10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>삭제</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ─────────────────────────────────────────────
   // EcfsReg Panel
   // ─────────────────────────────────────────────
   function EcfsRegPanel() {
@@ -1509,6 +1688,7 @@ export default function AdminPage() {
       case 'assign': return <AssignPanel />
       case 'records': return <RecordsPanel />
       case 'ecfs-reg': return <EcfsRegPanel />
+      case 'ecfs-cases': return <EcfsCasesPanel />
       case 'settings': return <SettingsPanel />
       default: return <DashboardPanel />
     }
