@@ -28,6 +28,9 @@ type ActivePage =
   | 'all-delivery'
   | 'unread-delivery'
   | 'alert-service'
+  | 'doc-history'
+  | 'delivery-detail'
+  | 'submit-detail'
   | 'generic'
 
 interface Assignment {
@@ -48,6 +51,16 @@ interface Assignment {
     key_facts?: string
     difficulty?: string
   }
+}
+
+interface ViewDocCase {
+  caseNo: string; court: string; dept: string
+  plaintiff: string; defendant: string; caseName: string
+}
+interface DocItem {
+  no: number; docName: string; gubun: '송달' | '제출'
+  submitDate: string; delivDate: string; confirmDate: string
+  docSubmitNo?: string; sender?: string; submitter?: string
 }
 
 interface PracticeRecord {
@@ -109,6 +122,8 @@ export default function MyPage() {
   const [practiceRecords, setPracticeRecords] = useState<PracticeRecord[]>([])
   const [practiceLoading, setPracticeLoading] = useState(false)
   const [expandedFeedback, setExpandedFeedback] = useState<Record<string, boolean>>({})
+  const [viewDocCase, setViewDocCase] = useState<ViewDocCase | null>(null)
+  const [viewDocItem, setViewDocItem] = useState<DocItem | null>(null)
 
   useEffect(() => {
     if (!loading && !user) router.push('/')
@@ -207,40 +222,46 @@ export default function MyPage() {
   if (!user || user.role === 'admin') return null
 
   // ── Sidebar helpers ──────────────────────────────────────────
-  const SbItem = ({ label, page, title = '', indent = true }: { label: string; page: ActivePage; title?: string; indent?: boolean }) => (
-    <div
-      onClick={() => navTo(page, title || label)}
-      style={{
-        padding: indent ? '7px 16px 7px 30px' : '7px 16px',
-        fontSize: 13,
-        cursor: 'pointer',
-        background: activePage === page && (title === genericTitle || !title) ? '#e8f0fc' : 'transparent',
-        color: activePage === page && (title === genericTitle || !title) ? '#0067c2' : '#333',
-        fontWeight: activePage === page && (title === genericTitle || !title) ? 700 : 400,
-        borderLeft: activePage === page && (title === genericTitle || !title) ? '3px solid #0067c2' : '3px solid transparent',
-      }}
-    >
-      {label}
-    </div>
-  )
+  const SbItem = ({ label, page, title = '', indent = true }: { label: string; page: ActivePage; title?: string; indent?: boolean }) => {
+    const isActive = activePage === page && (title === genericTitle || !title)
+    return (
+      <div
+        onClick={() => navTo(page, title || label)}
+        style={{
+          padding: indent ? '7px 16px 7px 28px' : '7px 16px',
+          fontSize: 13,
+          cursor: 'pointer',
+          background: isActive ? '#eef4ff' : '#fff',
+          color: isActive ? '#0067c2' : '#444',
+          fontWeight: isActive ? 600 : 400,
+          borderBottom: '1px solid #eef0f5',
+          borderLeft: isActive ? '3px solid #0067c2' : '3px solid transparent',
+        }}
+      >
+        {label}
+      </div>
+    )
+  }
 
   const GrpHd = ({ label, gKey, gold }: { label: string; gKey: string; gold?: boolean }) => (
     <div
       onClick={() => toggleGroup(gKey)}
       style={{
-        padding: '8px 16px',
-        fontSize: 12,
-        fontWeight: 700,
-        background: gold ? '#7c5800' : '#2a3f6b',
-        color: gold ? '#ffe082' : '#b8c8e8',
+        padding: '9px 16px',
+        fontSize: 13,
+        fontWeight: 600,
+        background: gold ? '#7c5800' : '#f0f2f6',
+        color: gold ? '#ffe082' : '#333',
         cursor: 'pointer',
         display: 'flex',
         justifyContent: 'space-between',
+        alignItems: 'center',
         userSelect: 'none',
+        borderBottom: '1px solid #dde0ea',
       }}
     >
       <span>{label}</span>
-      <span>{openGroups[gKey] ? '▲' : '▼'}</span>
+      <span style={{ fontSize: 10, color: gold ? '#ffe082' : '#999' }}>{openGroups[gKey] ? '▲' : '▼'}</span>
     </div>
   )
 
@@ -267,6 +288,36 @@ export default function MyPage() {
       {label}
     </button>
   )
+
+  // ── 사건기본정보 공용 테이블 ──────────────────────────────────
+  const CaseInfoTable = ({ ci }: { ci: ViewDocCase }) => {
+    const thS: React.CSSProperties = { padding:'8px 14px', background:'#f5f6fa', fontWeight:600, color:'#555', width:'12%', textAlign:'left', whiteSpace:'nowrap', borderBottom:'1px solid #eee', fontSize:12 }
+    const tdS: React.CSSProperties = { padding:'8px 14px', width:'38%', fontSize:12, borderBottom:'1px solid #eee' }
+    return (
+      <div style={{ background:'#fff' }}>
+        <div style={{ padding:'8px 14px', fontSize:13, fontWeight:700, color:'#003366', borderBottom:'1px solid #dde0e8', display:'flex', alignItems:'center', gap:6 }}>
+          <span style={{ color:'#0098a3', fontSize:15 }}>○</span> 사건기본정보
+        </div>
+        <table style={{ width:'100%', borderCollapse:'collapse' }}>
+          <tbody>
+            <tr>
+              <th style={thS}>법원</th><td style={tdS}>{ci.court}</td>
+              <th style={thS}>사건번호</th><td style={{...tdS, fontWeight:600, color:'#0057a8'}}>{ci.caseNo}</td>
+            </tr>
+            <tr>
+              <th style={thS}>재판부</th><td style={tdS}>{ci.dept}</td>
+              <th style={thS}>사건명</th><td style={tdS}>{ci.caseName}</td>
+            </tr>
+            <tr>
+              <th style={{...thS, borderBottom:'none'}}>원고</th><td style={{...tdS, borderBottom:'none'}}>{ci.plaintiff}</td>
+              <th style={{...thS, borderBottom:'none', background:'#fff0f0', color:'#c0392b'}}>피고</th>
+              <td style={{...tdS, borderBottom:'none'}}>{ci.defendant}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    )
+  }
 
   // ── STATUS PAGE ──────────────────────────────────────────────
   const StatusContent = () => {
@@ -917,7 +968,7 @@ export default function MyPage() {
               <div style={{ padding:'12px 20px', display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
                 {[
                   { label:'사건기록열람', action: null },
-                  { label:'제출/송달내역', action: null },
+                  { label:'제출/송달내역', action: () => { setMenuModal(null); setViewDocCase({ caseNo: mockCaseNo(menuModal!), court: menuModal!.sample_cases?.court || '서울중앙지방법원', dept: JAEJANBU[menuModal!.sample_cases?.case_type||''] || '민사1단독', plaintiff: (menuModal!.sample_cases?.plaintiff || '홍길동') + ' 외 1명', defendant: (menuModal!.sample_cases?.defendant || '이순신') + ' 외 1명', caseName: menuModal!.sample_cases?.case_type || '손해배상 등' }); navTo('doc-history') } },
                   { label:'관련사건등록', action: null },
                   { label:'관련사건조회', action: null },
                   { label:'재증명신청', action: null },
@@ -1394,6 +1445,263 @@ export default function MyPage() {
     )
   }
 
+  // ── 전자문서제출/송달내역 (목록) ─────────────────────────────
+  const DocHistoryContent = () => {
+    const [filterGubun, setFilterGubun] = useState('전체')
+    const [searchText, setSearchText] = useState('')
+    const [currentPage, setCurrentPage] = useState(1)
+    const perPage = 10
+    const ci = viewDocCase || { caseNo:'2026가단11234', court:'서울중앙지방법원', dept:'민사3단독', plaintiff:'홍길동 외 1명', defendant:'이순신 외 1명', caseName:'손해배상 등' }
+
+    const DOCS: DocItem[] = [
+      { no:1,  docName:'변경기일통지서',                      gubun:'송달', submitDate:'', delivDate:'2026.01.19', confirmDate:'2026.01.27(자동확인)', docSubmitNo:'2097108001234' },
+      { no:2,  docName:'준비서면',                            gubun:'제출', submitDate:'2026.01.11', delivDate:'', confirmDate:'', submitter:'홍길동(practice01)' },
+      { no:3,  docName:'준비서면부본(26.01.05.자)',            gubun:'송달', submitDate:'', delivDate:'2026.01.12', confirmDate:'2026.01.19', docSubmitNo:'2097107998765' },
+      { no:4,  docName:'기일변경명령등본',                     gubun:'송달', submitDate:'', delivDate:'2025.12.26', confirmDate:'2025.12.27', docSubmitNo:'2097107956789' },
+      { no:5,  docName:'변경기일통지서',                      gubun:'송달', submitDate:'', delivDate:'2025.11.19', confirmDate:'2025.11.23', docSubmitNo:'2097107923456' },
+      { no:6,  docName:'서증 직접 신청서부본(25.10.14.자)',   gubun:'송달', submitDate:'', delivDate:'2025.10.15', confirmDate:'2025.10.19', docSubmitNo:'2097107889012' },
+      { no:7,  docName:'준비서면부본(25.10.14.자)',            gubun:'송달', submitDate:'', delivDate:'2025.10.15', confirmDate:'2025.10.19', docSubmitNo:'2097107889011' },
+      { no:8,  docName:'변경기일통지서',                      gubun:'송달', submitDate:'', delivDate:'2025.10.15', confirmDate:'2025.10.19', docSubmitNo:'2097107889010' },
+      { no:9,  docName:'서증부본(25.08.08.자)',                gubun:'송달', submitDate:'', delivDate:'2025.08.08', confirmDate:'2025.08.09', docSubmitNo:'2097107845678' },
+      { no:10, docName:'증거설명서부본(25.08.08.자)',          gubun:'송달', submitDate:'', delivDate:'2025.08.08', confirmDate:'2025.08.09', docSubmitNo:'2097107845677' },
+      { no:11, docName:'답변서부본',                          gubun:'송달', submitDate:'', delivDate:'2026.02.25', confirmDate:'2026.02.26', docSubmitNo:'2097108023456' },
+      { no:12, docName:'소장',                                gubun:'제출', submitDate:'2026.02.15', delivDate:'', confirmDate:'', submitter:'홍길동(practice01)' },
+      { no:13, docName:'소장부본',                            gubun:'송달', submitDate:'', delivDate:'2026.02.15', confirmDate:'2026.02.15', docSubmitNo:'2097108012345' },
+      { no:14, docName:'기일통지서',                          gubun:'송달', submitDate:'', delivDate:'2026.03.10', confirmDate:'2026.03.11', docSubmitNo:'2097108034567' },
+      { no:15, docName:'증거신청서',                          gubun:'제출', submitDate:'2026.03.20', delivDate:'', confirmDate:'', submitter:'홍길동(practice01)' },
+    ]
+
+    const filtered = DOCS.filter(d => {
+      if (filterGubun !== '전체' && d.gubun !== filterGubun) return false
+      if (searchText && !d.docName.includes(searchText)) return false
+      return true
+    })
+    const total = filtered.length
+    const totalPages = Math.max(1, Math.ceil(total / perPage))
+    const paged = filtered.slice((currentPage-1)*perPage, currentPage*perPage)
+    const tdS: React.CSSProperties = { padding:'7px 10px', fontSize:12, borderBottom:'1px solid #eee', verticalAlign:'middle', textAlign:'center' }
+
+    function goDetail(doc: DocItem) {
+      setViewDocItem(doc)
+      navTo(doc.gubun === '송달' ? 'delivery-detail' : 'submit-detail')
+    }
+
+    return (
+      <div>
+        <PageHd title="전자문서제출/송달내역" actions={<ActBtn label="🖨 출력" />} />
+        <CaseInfoTable ci={ci} />
+
+        {/* 필터 */}
+        <div style={{ background:'#fff', borderBottom:'1px solid #eee', padding:'8px 14px', display:'flex', gap:8, alignItems:'center' }}>
+          <select value={filterGubun} onChange={e=>{setFilterGubun(e.target.value);setCurrentPage(1)}} style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+            {['전체','송달','제출'].map(t=><option key={t}>{t}</option>)}
+          </select>
+          <div style={{ flex:1 }} />
+          <input type="text" value={searchText} onChange={e=>setSearchText(e.target.value)} placeholder="문서검색" style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 8px', fontSize:12, fontFamily:'inherit', width:180 }} />
+          <button onClick={()=>setCurrentPage(1)} style={{ height:28, padding:'0 12px', background:'#003366', color:'#fff', border:'none', borderRadius:3, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>결과내검색</button>
+        </div>
+
+        {/* 테이블 */}
+        <div style={{ background:'#fff', overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <thead>
+              <tr style={{ background:'#f0f3f8', borderBottom:'2px solid #b8c8e0' }}>
+                {['번호','문서명','구분','제출일자','송달일자','송달확인일자','상세내역'].map(h=>(
+                  <th key={h} style={{ padding:'8px 10px', fontWeight:600, fontSize:11, color:'#333', textAlign:'center', whiteSpace:'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((doc, i) => (
+                <tr key={doc.no} style={{ background:i%2===0?'#fff':'#fafbfe', borderBottom:'1px solid #eee' }}>
+                  <td style={tdS}>{doc.no}</td>
+                  <td style={{...tdS, textAlign:'left'}}>
+                    {doc.gubun === '송달'
+                      ? <span style={{ color:'#0057a8', textDecoration:'underline', cursor:'pointer', fontWeight:600 }} onClick={()=>goDetail(doc)}>{doc.docName}</span>
+                      : doc.docName}
+                  </td>
+                  <td style={tdS}><span style={{ color:doc.gubun==='송달'?'#006699':'#555', fontWeight:doc.gubun==='송달'?600:400 }}>{doc.gubun}</span></td>
+                  <td style={tdS}>{doc.submitDate || '-'}</td>
+                  <td style={tdS}>{doc.delivDate || '-'}</td>
+                  <td style={tdS}>{doc.confirmDate || '-'}</td>
+                  <td style={tdS}>
+                    <button onClick={()=>goDetail(doc)} style={{ height:24, padding:'0 10px', background:'#fff', border:'1px solid #8899bb', borderRadius:3, fontSize:11, cursor:'pointer', color:'#003366', fontFamily:'inherit' }}>조회</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 페이지네이션 */}
+        <div style={{ background:'#fff', borderTop:'1px solid #e8edf0', padding:'10px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
+          <span style={{ fontSize:12, color:'#555' }}>총 <strong>{total}</strong>건</span>
+          <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+            <button onClick={()=>setCurrentPage(1)} disabled={currentPage===1} style={{ width:26, height:26, border:'1px solid #ccc', background:'#fff', borderRadius:3, cursor:'pointer', fontSize:11 }}>«</button>
+            <button onClick={()=>setCurrentPage(p=>Math.max(1,p-1))} disabled={currentPage===1} style={{ width:26, height:26, border:'1px solid #ccc', background:'#fff', borderRadius:3, cursor:'pointer', fontSize:12 }}>‹</button>
+            {Array.from({length:totalPages},(_,i)=>i+1).map(p=>(
+              <button key={p} onClick={()=>setCurrentPage(p)} style={{ width:26, height:26, border:`1px solid ${p===currentPage?'#003366':'#ccc'}`, background:p===currentPage?'#003366':'#fff', color:p===currentPage?'#fff':'#333', borderRadius:3, cursor:'pointer', fontSize:12, fontWeight:p===currentPage?700:400 }}>{p}</button>
+            ))}
+            <button onClick={()=>setCurrentPage(p=>Math.min(totalPages,p+1))} disabled={currentPage===totalPages} style={{ width:26, height:26, border:'1px solid #ccc', background:'#fff', borderRadius:3, cursor:'pointer', fontSize:12 }}>›</button>
+            <button onClick={()=>setCurrentPage(totalPages)} disabled={currentPage===totalPages} style={{ width:26, height:26, border:'1px solid #ccc', background:'#fff', borderRadius:3, cursor:'pointer', fontSize:11 }}>»</button>
+          </div>
+          <select defaultValue="10" style={{ height:26, border:'1px solid #ccc', borderRadius:3, fontSize:11, padding:'0 4px', fontFamily:'inherit' }}>
+            {['10','20','30'].map(n=><option key={n}>{n}개씩 보기</option>)}
+          </select>
+        </div>
+        <div style={{ padding:'12px 16px', background:'#fff', borderTop:'1px solid #eee' }}>
+          <button onClick={()=>navTo('active-cases')} style={{ height:32, padding:'0 20px', background:'#fff', border:'1px solid #8899bb', borderRadius:3, fontSize:12, cursor:'pointer', color:'#333', fontFamily:'inherit' }}>이전으로 가기</button>
+        </div>
+        <div style={{ background:'#f8f9fc', border:'1px solid #dde0e8', borderTop:'none', padding:'14px 18px', display:'flex', gap:12, alignItems:'flex-start' }}>
+          <div style={{ fontSize:22, marginTop:2 }}>🖥</div>
+          <div>
+            <div style={{ fontSize:12, fontWeight:700, color:'#003366', marginBottom:6 }}>참고하세요</div>
+            <ul style={{ margin:0, paddingLeft:16, fontSize:11, color:'#555', lineHeight:1.9 }}>
+              <li>전자소송으로 처리된 문서들의 제출 및 송달 내역을 확인할 수 있습니다.</li>
+              <li>송달문서 클릭 시 송달내역 상세 정보 및 조회이력을 확인할 수 있습니다.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── 송달내역 상세 ─────────────────────────────────────────────
+  const DeliveryDetailContent = () => {
+    const doc = viewDocItem
+    const ci = viewDocCase || { caseNo:'2026가단11234', court:'서울중앙지방법원', dept:'민사3단독', plaintiff:'홍길동 외 1명', defendant:'이순신 외 1명', caseName:'손해배상 등' }
+    const hasHistory = doc?.confirmDate && !doc.confirmDate.includes('자동확인')
+    const thS: React.CSSProperties = { padding:'9px 14px', background:'#f5f6fa', fontWeight:600, color:'#555', width:'14%', textAlign:'left', whiteSpace:'nowrap', borderBottom:'1px solid #eee', fontSize:12 }
+    const tdS: React.CSSProperties = { padding:'9px 14px', borderBottom:'1px solid #eee', fontSize:12 }
+
+    return (
+      <div>
+        <PageHd title="송달내역" actions={<ActBtn label="🖨 출력" />} />
+        <CaseInfoTable ci={ci} />
+
+        {/* 송달내역상세 */}
+        <div style={{ background:'#fff', marginTop:8 }}>
+          <div style={{ padding:'8px 14px', fontSize:13, fontWeight:700, color:'#003366', borderBottom:'1px solid #dde0e8', display:'flex', alignItems:'center', gap:6 }}>
+            <span style={{ color:'#0098a3', fontSize:15 }}>○</span> 송달내역상세
+          </div>
+          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <tbody>
+              <tr><th style={thS}>송달문서명</th><td style={tdS}>{doc?.docName || '–'}</td></tr>
+              <tr><th style={thS}>송달자명</th><td style={tdS}>홍길동(practice01)</td></tr>
+              <tr><th style={thS}>발송일자</th><td style={tdS}>{doc?.delivDate?.replace(/\(.*\)/,'') || '–'}</td></tr>
+              <tr><th style={thS}>수신일자</th><td style={tdS}>{doc?.confirmDate?.replace(/\(.*\)/,'') || '–'}</td></tr>
+              <tr><th style={thS}>문서제출번호</th><td style={tdS}>{doc?.docSubmitNo || '–'}</td></tr>
+              <tr>
+                <th style={{...thS, borderBottom:'none'}}>문서확인</th>
+                <td style={{...tdS, borderBottom:'none'}}>
+                  <span onClick={()=>alert('실습 모드 — 문서 열람')} style={{ color:'#0057a8', textDecoration:'underline', cursor:'pointer' }}>{doc?.docName || '–'}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* 송달조회이력 */}
+        <div style={{ background:'#fff', marginTop:8 }}>
+          <div style={{ padding:'8px 14px', fontSize:13, fontWeight:700, color:'#003366', borderBottom:'1px solid #dde0e8', display:'flex', alignItems:'center', gap:6 }}>
+            <span style={{ color:'#0098a3', fontSize:15 }}>○</span> 송달조회이력
+          </div>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <thead>
+              <tr style={{ background:'#f0f3f8', borderBottom:'2px solid #b8c8e0' }}>
+                {['조회일자','조회시간','조회자명','조회자아이디'].map(h=>(
+                  <th key={h} style={{ padding:'8px 14px', fontWeight:600, fontSize:11, color:'#333', textAlign:'center' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {hasHistory ? (
+                <tr>
+                  <td style={{ padding:'8px 14px', textAlign:'center', borderBottom:'1px solid #eee' }}>{doc!.confirmDate!.replace(/\(.*\)/,'')}</td>
+                  <td style={{ padding:'8px 14px', textAlign:'center', borderBottom:'1px solid #eee' }}>09:15:22</td>
+                  <td style={{ padding:'8px 14px', textAlign:'center', borderBottom:'1px solid #eee' }}>홍길동</td>
+                  <td style={{ padding:'8px 14px', textAlign:'center', borderBottom:'1px solid #eee' }}>practice01</td>
+                </tr>
+              ) : (
+                <tr>
+                  <td colSpan={4} style={{ padding:'32px', textAlign:'center', fontSize:12, color:'#999' }}>조회된 결과가 없습니다.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ padding:'12px 16px', background:'#fff', borderTop:'1px solid #eee', marginTop:8 }}>
+          <button onClick={()=>navTo('doc-history')} style={{ height:32, padding:'0 20px', background:'#fff', border:'1px solid #8899bb', borderRadius:3, fontSize:12, cursor:'pointer', color:'#333', fontFamily:'inherit' }}>이전으로 가기</button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── 제출상세내역 ──────────────────────────────────────────────
+  const SubmitDetailContent = () => {
+    const doc = viewDocItem
+    const ci = viewDocCase || { caseNo:'2026가단11234', court:'서울중앙지방법원', dept:'민사3단독', plaintiff:'홍길동 외 1명', defendant:'이순신 외 1명', caseName:'손해배상 등' }
+    const thS: React.CSSProperties = { padding:'9px 14px', background:'#f5f6fa', fontWeight:600, color:'#555', width:'14%', textAlign:'left', whiteSpace:'nowrap', borderBottom:'1px solid #eee', fontSize:12 }
+    const tdS: React.CSSProperties = { padding:'9px 14px', borderBottom:'1px solid #eee', fontSize:12 }
+
+    return (
+      <div>
+        <PageHd title="제출상세내역" actions={<ActBtn label="🖨 출력" />} />
+        <CaseInfoTable ci={ci} />
+
+        {/* 접수내역 */}
+        <div style={{ background:'#fff', marginTop:8 }}>
+          <div style={{ padding:'8px 14px', fontSize:13, fontWeight:700, color:'#003366', borderBottom:'1px solid #dde0e8', display:'flex', alignItems:'center', gap:6 }}>
+            <span style={{ color:'#0098a3', fontSize:15 }}>○</span> 접수내역
+          </div>
+          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <tbody>
+              <tr>
+                <th style={thS}>제출문서명</th>
+                <td style={tdS}><span onClick={()=>alert('실습 모드 — 문서 열람')} style={{ color:'#0057a8', textDecoration:'underline', cursor:'pointer' }}>{doc?.docName || '–'}</span></td>
+                <th style={thS}>접수일시</th>
+                <td style={tdS}>{doc?.submitDate ? doc.submitDate + ' 19:57' : '–'}</td>
+              </tr>
+              <tr>
+                <th style={{...thS, borderBottom:'none'}}>제출자명</th>
+                <td style={{...tdS, borderBottom:'none'}} colSpan={3}>홍길동(practice01)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* 서명내역 */}
+        <div style={{ background:'#fff', marginTop:8 }}>
+          <div style={{ padding:'8px 14px', fontSize:13, fontWeight:700, color:'#003366', borderBottom:'1px solid #dde0e8', display:'flex', alignItems:'center', gap:6 }}>
+            <span style={{ color:'#0098a3', fontSize:15 }}>○</span> 서명내역
+          </div>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <thead>
+              <tr style={{ background:'#f0f3f8', borderBottom:'2px solid #b8c8e0' }}>
+                {['문서명','서명일시','서명자구분','서명자명(전자소송ID)'].map(h=>(
+                  <th key={h} style={{ padding:'8px 12px', fontWeight:600, fontSize:11, color:'#333', textAlign:'center' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{ padding:'8px 12px', textAlign:'center', borderBottom:'1px solid #eee' }}>{doc?.docName || '–'}</td>
+                <td style={{ padding:'8px 12px', textAlign:'center', borderBottom:'1px solid #eee' }}>{doc?.submitDate ? doc.submitDate + ' 19:57' : '–'}</td>
+                <td style={{ padding:'8px 12px', textAlign:'center', borderBottom:'1px solid #eee' }}>피고대리인</td>
+                <td style={{ padding:'8px 12px', textAlign:'center', borderBottom:'1px solid #eee' }}>홍길동(practice01)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ padding:'12px 16px', background:'#fff', borderTop:'1px solid #eee', marginTop:8 }}>
+          <button onClick={()=>navTo('doc-history')} style={{ height:32, padding:'0 20px', background:'#fff', border:'1px solid #8899bb', borderRadius:3, fontSize:12, cursor:'pointer', color:'#333', fontFamily:'inherit' }}>이전으로 가기</button>
+        </div>
+      </div>
+    )
+  }
+
   function renderContent() {
     switch (activePage) {
       case 'status': return <StatusContent />
@@ -1406,6 +1714,9 @@ export default function MyPage() {
       case 'all-delivery': return <AllDeliveryContent />
       case 'unread-delivery': return <UnreadDeliveryContent />
       case 'alert-service': return <AlertServiceContent />
+      case 'doc-history': return <DocHistoryContent />
+      case 'delivery-detail': return <DeliveryDetailContent />
+      case 'submit-detail': return <SubmitDetailContent />
       case 'myinfo-user': return <MyInfoContent type="user" />
       case 'myinfo-pw': return <MyInfoContent type="pw" />
       default: return <GenericContent title={genericTitle || activePage} />
@@ -1425,12 +1736,12 @@ export default function MyPage() {
       {/* Layout */}
       <div style={{ flex: 1, maxWidth: 1200, margin: '20px auto', width: '100%', padding: '0 20px', display: 'flex', gap: 20, alignItems: 'flex-start', boxSizing: 'border-box' }}>
         {/* Sidebar */}
-        <aside style={{ width: 190, flexShrink: 0, background: '#fff', border: '1px solid #d0d8e8', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
-          <div style={{ background: 'linear-gradient(135deg,#1a3a6b,#2952a3)', color: '#fff', padding: '12px 16px', fontSize: 13, fontWeight: 700 }}>
-            📁 나의전자소송
+        <aside style={{ width: 200, flexShrink: 0, background: '#fff', border: '1px solid #d8dce8', borderRadius: 4, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>
+          <div style={{ background: '#1e3a6e', color: '#fff', padding: '12px 16px', fontSize: 13, fontWeight: 700, letterSpacing: 0.3 }}>
+            나의전자소송
           </div>
           {/* 나의사건현황 */}
-          <div onClick={() => navTo('status')} style={{ padding: '10px 16px', fontSize: 13, cursor: 'pointer', background: activePage === 'status' ? '#1a3a6b' : '#eef2fb', color: activePage === 'status' ? '#fff' : '#1a3a6b', fontWeight: 700, borderBottom: '1px solid #d0d8e8' }}>
+          <div onClick={() => navTo('status')} style={{ padding: '10px 16px', fontSize: 13, cursor: 'pointer', background: activePage === 'status' ? '#eef4ff' : '#fff', color: activePage === 'status' ? '#0067c2' : '#222', fontWeight: 700, borderBottom: '1px solid #dde0ea', borderLeft: activePage === 'status' ? '3px solid #0067c2' : '3px solid transparent' }}>
             나의사건현황
           </div>
 
