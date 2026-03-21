@@ -1153,7 +1153,7 @@ export default function AdminPage() {
     const [scoreReveal, setScoreReveal] = useState('immediate')
     const [submitLimit, setSubmitLimit] = useState('unlimited')
     // ── 3. 채점 기준
-    const [weights, setWeights] = useState({ parties: 20, purpose: 30, reason: 30, evidence: 20 })
+    const [weights, setWeights] = useState({ plaintiff: 10, defendant: 10, purpose: 25, reason: 35, evidence: 20 })
     // ── 4. 공지사항
     const [notices, setNotices] = useState<{ id: string; text: string; date: string }[]>([])
     const [newNotice, setNewNotice] = useState('')
@@ -1180,9 +1180,9 @@ export default function AdminPage() {
       } catch { /* ignore */ }
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-    const weightsTotal = weights.parties + weights.purpose + weights.reason + weights.evidence
+    const weightsTotal = Math.round((weights.plaintiff + weights.defendant + weights.purpose + weights.reason + weights.evidence) * 10) / 10
 
-    function changeWeight(key: 'parties' | 'purpose' | 'reason' | 'evidence', val: number) {
+    function changeWeight(key: keyof typeof weights, val: number) {
       setWeights(prev => ({ ...prev, [key]: val }))
     }
 
@@ -1201,7 +1201,7 @@ export default function AdminPage() {
     }
 
     function saveSection3() {
-      if (weightsTotal !== 100) { alert(`합계가 ${weightsTotal}점입니다. 100점이 되도록 조정해주세요.`); return }
+      if (weightsTotal !== 100) { alert(`합계가 ${weightsTotal}점입니다. 합산이 100점이 되도록 조정해주세요.`); return }
       localStorage.setItem('scoring_weights', JSON.stringify(weights))
       showToast('채점 기준이 저장되었습니다.')
     }
@@ -1335,26 +1335,37 @@ export default function AdminPage() {
           <div style={secTitle}>
             📊 채점 기준
             <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 700, color: weightsTotal === 100 ? '#16a34a' : '#dc2626' }}>
-              합계: {weightsTotal}점
+              합계: {weightsTotal}점 {weightsTotal !== 100 && <span style={{ fontSize: 11, fontWeight: 400 }}>(100점이 되어야 합니다)</span>}
             </span>
           </div>
-          {([
-            { key: 'parties', label: '당사자정보' },
-            { key: 'purpose', label: '청구취지' },
-            { key: 'reason', label: '청구원인' },
-            { key: 'evidence', label: '입증서류' },
-          ] as const).map(({ key, label }) => (
-            <div key={key} style={{ marginBottom: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                <label style={{ ...lbl, marginBottom: 0 }}>{label}</label>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#1a3a6b', minWidth: 36, textAlign: 'right' }}>{weights[key]}점</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14, marginBottom: 18 }}>
+            {([
+              { key: 'plaintiff', label: '원고' },
+              { key: 'defendant', label: '피고' },
+              { key: 'purpose', label: '청구취지' },
+              { key: 'reason', label: '청구원인' },
+              { key: 'evidence', label: '입증서류' },
+            ] as const).map(({ key, label }) => (
+              <div key={key} style={{ border: '1px solid #d0d8e8', borderRadius: 8, padding: '14px 16px', background: '#fafbfe' }}>
+                <label style={{ ...lbl, marginBottom: 8, fontSize: 13 }}>{label}</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.5}
+                    value={weights[key]}
+                    onChange={e => changeWeight(key, parseFloat(e.target.value) || 0)}
+                    style={{ width: '100%', padding: '7px 10px', border: '1px solid #c8d8f0', borderRadius: 5, fontSize: 16, fontWeight: 700, color: '#1a3a6b', textAlign: 'right', boxSizing: 'border-box' }}
+                  />
+                  <span style={{ fontSize: 13, color: '#555', whiteSpace: 'nowrap' }}>점</span>
+                </div>
               </div>
-              <input type="range" min={0} max={100} value={weights[key]} onChange={e => changeWeight(key, Number(e.target.value))} style={{ width: '100%', accentColor: '#1a3a6b' }} />
-            </div>
-          ))}
+            ))}
+          </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <button onClick={saveSection3} style={{ ...saveBtn, marginTop: 0, opacity: weightsTotal !== 100 ? 0.5 : 1 }}>저장</button>
-            <button onClick={() => setWeights({ parties: 25, purpose: 25, reason: 25, evidence: 25 })} style={{ marginTop: 0, padding: '8px 14px', background: '#f0f4fc', color: '#1a3a6b', border: '1px solid #c8d8f0', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>균등 분배 (25점)</button>
+            <button onClick={() => setWeights({ plaintiff: 10, defendant: 10, purpose: 25, reason: 35, evidence: 20 })} style={{ marginTop: 0, padding: '8px 14px', background: '#f0f4fc', color: '#1a3a6b', border: '1px solid #c8d8f0', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>기본값 복원</button>
           </div>
         </div>
 
