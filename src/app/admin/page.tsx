@@ -185,7 +185,9 @@ export default function AdminPage() {
     const [form, setForm] = useState({ login_id: '', password: '', name: '', org: '', email: '', role: 'student' })
     const fileRef = useRef<HTMLInputElement>(null)
 
-    // DEFAULT_ACC 순서 고정 (student01~10, admin)
+    // admin만 삭제 불가 기본 계정
+    const PROTECTED_IDS = new Set(['admin'])
+
     const DEFAULT_IDS = [
       'student01','student02','student03','student04','student05',
       'student06','student07','student08','student09','student10','admin',
@@ -193,10 +195,10 @@ export default function AdminPage() {
 
     function loadRows() {
       const localAccs = getLocalAccounts()
-      // 1) DEFAULT_ACC 먼저
+      // 1) DEFAULT_ACC 먼저 (student01~10은 isHardcoded:false → 삭제 가능)
       const defaultRows: AccountRow[] = DEFAULT_IDS.map(id => {
         const a = HARDCODED_ACCOUNTS[id]
-        return { login_id: id, name: a.name, org: a.org, role: a.role, cohort: '', bar_num: a.barNum, email: a.email, isHardcoded: true }
+        return { login_id: id, name: a.name, org: a.org, role: a.role, cohort: '', bar_num: a.barNum, email: a.email, isHardcoded: PROTECTED_IDS.has(id) }
       })
       // 2) localStorage에만 있는 계정 (DEFAULT 아닌 것)
       const extraRows: AccountRow[] = Object.entries(localAccs)
@@ -229,7 +231,7 @@ export default function AdminPage() {
     }
 
     function handleDeleteSingle(id: string) {
-      if (HARDCODED_ACCOUNTS[id]) { alert('기본 계정은 삭제할 수 없습니다.'); return }
+      if (PROTECTED_IDS.has(id)) { alert('기본 계정은 삭제할 수 없습니다.'); return }
       if (confirmDeleteId === id) {
         // second click → actually delete
         const stored = getLocalAccounts()
@@ -245,7 +247,7 @@ export default function AdminPage() {
     }
 
     function handleDeleteSelected() {
-      const toDelete = Array.from(selectedIds).filter(id => !HARDCODED_ACCOUNTS[id])
+      const toDelete = Array.from(selectedIds).filter(id => !PROTECTED_IDS.has(id))
       if (toDelete.length === 0) { alert('기본 계정은 삭제할 수 없습니다.'); return }
       if (confirmBulk) {
         // second click → actually delete
@@ -260,6 +262,18 @@ export default function AdminPage() {
         setConfirmBulk(true)
         setConfirmDeleteId(null)
       }
+    }
+
+    async function handleSampleDownload() {
+      const xlsx = await import('xlsx')
+      const sample = [
+        { login_id: 'student11', password: 'court1234', name: '홍길동', org: '바른법률사무소', email: 'hong@example.com', role: 'student' },
+        { login_id: 'student12', password: 'court1234', name: '김법무', org: '한결법률사무소', email: 'kim@example.com', role: 'student' },
+      ]
+      const ws = xlsx.utils.json_to_sheet(sample)
+      const wb = xlsx.utils.book_new()
+      xlsx.utils.book_append_sheet(wb, ws, '계정목록')
+      xlsx.writeFile(wb, '계정_단체추가_샘플.xlsx')
     }
 
     async function handleExcelImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -298,7 +312,7 @@ export default function AdminPage() {
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', margin: 0 }}>👥 계정 관리</h2>
-          <span style={{ fontSize: 13, color: '#888' }}>기본 {DEFAULT_IDS.length}명 + 추가 {extraCount}명 = 총 {filtered.length}명</span>
+          <span style={{ fontSize: 13, color: '#888' }}>총 {filtered.length}명</span>
         </div>
 
         {/* Toolbar */}
@@ -311,6 +325,9 @@ export default function AdminPage() {
             📂 단체 추가 (Excel)
             <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleExcelImport} style={{ display: 'none' }} />
           </label>
+          <button onClick={handleSampleDownload} style={{ padding: '7px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            ⬇ 샘플 양식
+          </button>
             {confirmBulk ? (
             <button onClick={handleDeleteSelected} style={{ padding: '7px 14px', background: '#7f1d1d', color: '#fff', border: '2px solid #dc2626', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               확인? 정말 삭제
