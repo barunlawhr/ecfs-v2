@@ -110,7 +110,7 @@ export default function MyPage() {
 
   useEffect(() => {
     if (!user) return
-    if (activePage === 'active-cases') fetchAllCases()
+    if (activePage === 'active-cases' || activePage === 'status') fetchAllCases()
     if (activePage === 'assigned-cases' || activePage === 'status') fetchAssignments()
     if (activePage === 'practice-records' || activePage === 'submitted-docs') fetchPracticeRecords()
   }, [activePage, user])
@@ -272,7 +272,7 @@ export default function MyPage() {
           <div style={{ background: '#1a3a6b', color: '#fff', padding: '9px 14px', fontSize: 13, fontWeight: 700 }}>나의 사건관리</div>
           <div style={{ padding: '14px 16px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, textAlign: 'center' }}>
             {[
-              { n: allCases.length || assignments.length, l: '진행중사건', c: '#006699' },
+              { n: allCases.length, l: '진행중사건', c: '#006699' },
               { n: 0, l: '미확인송달', c: '#555' },
               { n: 0, l: '관심사건', c: '#555' },
             ].map(({ n, l, c }) => (
