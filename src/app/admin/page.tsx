@@ -180,6 +180,8 @@ export default function AdminPage() {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [showAddForm, setShowAddForm] = useState(false)
     const [saving, setSaving] = useState(false)
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+    const [confirmBulk, setConfirmBulk] = useState(false)
     const [form, setForm] = useState({ login_id: '', password: '', name: '', org: '', email: '', role: 'student' })
     const fileRef = useRef<HTMLInputElement>(null)
 
@@ -228,24 +230,36 @@ export default function AdminPage() {
 
     function handleDeleteSingle(id: string) {
       if (HARDCODED_ACCOUNTS[id]) { alert('기본 계정은 삭제할 수 없습니다.'); return }
-      if (!confirm(`'${id}' 계정을 삭제하시겠습니까?`)) return
-      const stored = getLocalAccounts()
-      delete stored[id]
-      localStorage.setItem(ACC_KEY, JSON.stringify(stored))
-      loadRows()
-      showToast('계정이 삭제되었습니다.')
+      if (confirmDeleteId === id) {
+        // second click → actually delete
+        const stored = getLocalAccounts()
+        delete stored[id]
+        localStorage.setItem(ACC_KEY, JSON.stringify(stored))
+        setConfirmDeleteId(null)
+        loadRows()
+        showToast('계정이 삭제되었습니다.')
+      } else {
+        setConfirmDeleteId(id)
+        setConfirmBulk(false)
+      }
     }
 
     function handleDeleteSelected() {
       const toDelete = Array.from(selectedIds).filter(id => !HARDCODED_ACCOUNTS[id])
       if (toDelete.length === 0) { alert('기본 계정은 삭제할 수 없습니다.'); return }
-      if (!confirm(`${toDelete.length}개 계정을 삭제하시겠습니까?`)) return
-      const stored = getLocalAccounts()
-      toDelete.forEach(id => delete stored[id])
-      localStorage.setItem(ACC_KEY, JSON.stringify(stored))
-      setSelectedIds(new Set())
-      loadRows()
-      showToast(`${toDelete.length}개 계정이 삭제되었습니다.`)
+      if (confirmBulk) {
+        // second click → actually delete
+        const stored = getLocalAccounts()
+        toDelete.forEach(id => delete stored[id])
+        localStorage.setItem(ACC_KEY, JSON.stringify(stored))
+        setSelectedIds(new Set())
+        setConfirmBulk(false)
+        loadRows()
+        showToast(`${toDelete.length}개 계정이 삭제되었습니다.`)
+      } else {
+        setConfirmBulk(true)
+        setConfirmDeleteId(null)
+      }
     }
 
     async function handleExcelImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -254,7 +268,8 @@ export default function AdminPage() {
       try {
         const xlsx = await import('xlsx')
         const buf = await file.arrayBuffer()
-        const ws = xlsx.read(buf).Sheets[xlsx.read(buf).SheetNames[0]]
+        const wb = xlsx.read(buf)
+        const ws = wb.Sheets[wb.SheetNames[0]]
         const jsonRows: Record<string, string>[] = xlsx.utils.sheet_to_json(ws)
         if (!jsonRows.length) { alert('데이터가 없습니다.'); return }
         setSaving(true)
@@ -296,9 +311,15 @@ export default function AdminPage() {
             📂 단체 추가 (Excel)
             <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleExcelImport} style={{ display: 'none' }} />
           </label>
-          <button onClick={handleDeleteSelected} disabled={selectedIds.size === 0} style={{ padding: '7px 14px', background: selectedIds.size > 0 ? '#dc2626' : '#e5e7eb', color: selectedIds.size > 0 ? '#fff' : '#999', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: selectedIds.size > 0 ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}>
-            🗑 선택 삭제 ({selectedIds.size})
-          </button>
+            {confirmBulk ? (
+            <button onClick={handleDeleteSelected} style={{ padding: '7px 14px', background: '#7f1d1d', color: '#fff', border: '2px solid #dc2626', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              확인? 정말 삭제
+            </button>
+          ) : (
+            <button onClick={handleDeleteSelected} disabled={selectedIds.size === 0} style={{ padding: '7px 14px', background: selectedIds.size > 0 ? '#dc2626' : '#e5e7eb', color: selectedIds.size > 0 ? '#fff' : '#999', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: selectedIds.size > 0 ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}>
+              🗑 선택 삭제 ({selectedIds.size})
+            </button>
+          )}
         </div>
 
         {/* 개별 추가 폼 */}
@@ -382,7 +403,9 @@ export default function AdminPage() {
                 <td style={{ padding: '7px 12px' }}>
                   {acc.isHardcoded
                     ? <span style={{ fontSize: 11, color: '#c0c0c0' }}>–</span>
-                    : <button onClick={() => handleDeleteSingle(acc.login_id)} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>삭제</button>
+                    : confirmDeleteId === acc.login_id
+                      ? <button onClick={() => handleDeleteSingle(acc.login_id)} style={{ background: '#7f1d1d', color: '#fff', border: '2px solid #dc2626', borderRadius: 4, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>확인?</button>
+                      : <button onClick={() => handleDeleteSingle(acc.login_id)} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>삭제</button>
                   }
                 </td>
               </tr>
