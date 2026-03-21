@@ -19,10 +19,13 @@ export interface SampleCase {
   claim_amount?: number
   plaintiff: string
   defendant: string
-  description?: string
-  facts?: string
-  expected_cause?: string
+  background?: string
+  key_facts?: string
+  evidence_hint?: string
+  claim_purpose?: string
+  claim_reason?: string
   difficulty?: string
+  is_active?: boolean
   created_at: string
 }
 

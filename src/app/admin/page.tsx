@@ -205,7 +205,8 @@ export default function AdminPage() {
     const [form, setForm] = useState({
       title: '', case_type: '대여금', court: '서울중앙지방법원',
       plaintiff: '', defendant: '', claim_amount: '',
-      description: '', facts: '', difficulty: '보통',
+      background: '', key_facts: '', evidence_hint: '',
+      claim_purpose: '', claim_reason: '', difficulty: '보통',
     })
 
     const fetchCases = useCallback(async () => {
@@ -230,15 +231,18 @@ export default function AdminPage() {
         plaintiff: form.plaintiff,
         defendant: form.defendant,
         claim_amount: form.claim_amount ? Number(form.claim_amount) : null,
-        description: form.description || null,
-        facts: form.facts || null,
+        background: form.background || null,
+        key_facts: form.key_facts || null,
+        evidence_hint: form.evidence_hint || null,
+        claim_purpose: form.claim_purpose || null,
+        claim_reason: form.claim_reason || null,
         difficulty: form.difficulty,
-        created_at: new Date().toISOString(),
+        is_active: true,
       })
       setSaving(false)
       if (error) { alert('저장 실패: ' + error.message); return }
       setShowModal(false)
-      setForm({ title: '', case_type: '대여금', court: '서울중앙지방법원', plaintiff: '', defendant: '', claim_amount: '', description: '', facts: '', difficulty: '보통' })
+      setForm({ title: '', case_type: '대여금', court: '서울중앙지방법원', plaintiff: '', defendant: '', claim_amount: '', background: '', key_facts: '', evidence_hint: '', claim_purpose: '', claim_reason: '', difficulty: '보통' })
       fetchCases()
       showToast('사건이 추가되었습니다.')
     }
@@ -304,6 +308,7 @@ export default function AdminPage() {
                   { label: '원고 *', key: 'plaintiff', type: 'text' },
                   { label: '피고 *', key: 'defendant', type: 'text' },
                   { label: '청구금액 (원)', key: 'claim_amount', type: 'number' },
+                  { label: '청구취지', key: 'claim_purpose', type: 'text' },
                 ].map(f => (
                   <div key={f.key}>
                     <label style={{ fontSize: 12, color: '#555', fontWeight: 600, display: 'block', marginBottom: 4 }}>{f.label}</label>
@@ -334,20 +339,38 @@ export default function AdminPage() {
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, color: '#555', fontWeight: 600, display: 'block', marginBottom: 4 }}>사건개요</label>
+                  <label style={{ fontSize: 12, color: '#555', fontWeight: 600, display: 'block', marginBottom: 4 }}>사건배경</label>
                   <textarea
-                    value={form.description}
-                    onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
+                    value={form.background}
+                    onChange={e => setForm(prev => ({ ...prev, background: e.target.value }))}
                     rows={3}
                     style={{ width: '100%', padding: '8px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, color: '#555', fontWeight: 600, display: 'block', marginBottom: 4 }}>사실관계</label>
+                  <label style={{ fontSize: 12, color: '#555', fontWeight: 600, display: 'block', marginBottom: 4 }}>주요 사실관계</label>
                   <textarea
-                    value={form.facts}
-                    onChange={e => setForm(prev => ({ ...prev, facts: e.target.value }))}
+                    value={form.key_facts}
+                    onChange={e => setForm(prev => ({ ...prev, key_facts: e.target.value }))}
                     rows={4}
+                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#555', fontWeight: 600, display: 'block', marginBottom: 4 }}>입증서류 힌트</label>
+                  <textarea
+                    value={form.evidence_hint}
+                    onChange={e => setForm(prev => ({ ...prev, evidence_hint: e.target.value }))}
+                    rows={2}
+                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: '#555', fontWeight: 600, display: 'block', marginBottom: 4 }}>청구원인</label>
+                  <textarea
+                    value={form.claim_reason}
+                    onChange={e => setForm(prev => ({ ...prev, claim_reason: e.target.value }))}
+                    rows={3}
                     style={{ width: '100%', padding: '8px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }}
                   />
                 </div>

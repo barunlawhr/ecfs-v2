@@ -188,7 +188,7 @@ export default function Step3WriteAnswer({ data, onChange, onNext, onBack, assig
             `}</style>
 
             {/* Reference: complaint facts */}
-            {assignedCase?.facts && (
+            {assignedCase?.key_facts && (
               <div style={{ marginTop: 16, border: '1px solid #d1d5db', borderRadius: 6, overflow: 'hidden' }}>
                 <div
                   style={{
@@ -205,7 +205,7 @@ export default function Step3WriteAnswer({ data, onChange, onNext, onBack, assig
                     padding: '14px', fontSize: 13, lineHeight: 1.8,
                     color: '#374151', backgroundColor: '#fafafa', whiteSpace: 'pre-wrap',
                   }}>
-                    {assignedCase.facts}
+                    {assignedCase.key_facts}
                   </div>
                 )}
               </div>

@@ -294,7 +294,7 @@ export default function Step3Write({ data, onChange, onNext, onBack, assignedCas
             `}</style>
 
             {/* Reference facts box */}
-            {assignedCase?.facts && (
+            {assignedCase?.key_facts && (
               <div
                 style={{
                   marginTop: 16,
@@ -331,7 +331,7 @@ export default function Step3Write({ data, onChange, onNext, onBack, assignedCas
                       whiteSpace: 'pre-wrap',
                     }}
                   >
-                    {assignedCase.facts}
+                    {assignedCase.key_facts}
                   </div>
                 )}
               </div>

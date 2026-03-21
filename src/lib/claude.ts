@@ -16,8 +16,8 @@ export function buildAnswerGradingPrompt(formData: ComplaintFormData, sampleCase
 법원: ${sampleCase.court}
 원고: ${sampleCase.plaintiff}
 피고(답변인): ${sampleCase.defendant}
-${sampleCase.description ? `사건개요: ${sampleCase.description}` : ''}
-${sampleCase.facts ? `원고 주장 사실관계: ${sampleCase.facts}` : ''}
+${sampleCase.background ? `사건개요: ${sampleCase.background}` : ''}
+${sampleCase.key_facts ? `원고 주장 사실관계: ${sampleCase.key_facts}` : ''}
 
 === 학생 제출 답변서 ===
 【사건기본정보】
@@ -100,8 +100,8 @@ export function buildGradingPrompt(formData: ComplaintFormData, sampleCase: Samp
 원고: ${sampleCase.plaintiff}
 피고: ${sampleCase.defendant}
 ${sampleCase.claim_amount ? `청구금액: ${sampleCase.claim_amount.toLocaleString()}원` : ''}
-${sampleCase.description ? `사건개요: ${sampleCase.description}` : ''}
-${sampleCase.expected_cause ? `모범 청구원인: ${sampleCase.expected_cause}` : ''}
+${sampleCase.background ? `사건개요: ${sampleCase.background}` : ''}
+${sampleCase.claim_reason ? `모범 청구원인: ${sampleCase.claim_reason}` : ''}
 
 === 학생 제출 소장 ===
 【사건기본정보】

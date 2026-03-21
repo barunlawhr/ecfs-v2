@@ -406,14 +406,14 @@ export default function MyPage() {
                       </div>
                     )}
                   </div>
-                  {sc?.description && (
+                  {sc?.background && (
                     <div style={{ fontSize: 13, color: '#444', background: '#f8f9fb', padding: '8px 12px', borderRadius: 6, marginBottom: 8, lineHeight: 1.6 }}>
-                      {sc.description}
+                      {sc.background}
                     </div>
                   )}
-                  {sc?.facts && (
+                  {sc?.key_facts && (
                     <div style={{ fontSize: 12, color: '#555', background: '#fffbf0', border: '1px solid #f0e0b0', padding: '8px 12px', borderRadius: 6, marginBottom: 12, lineHeight: 1.6 }}>
-                      <strong style={{ color: '#7c5800' }}>사실관계: </strong>{sc.facts}
+                      <strong style={{ color: '#7c5800' }}>사실관계: </strong>{sc.key_facts}
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 8 }}>
