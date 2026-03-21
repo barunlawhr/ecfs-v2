@@ -1610,7 +1610,7 @@ export default function MyPage() {
       const record = {
         id: String(Date.now()),
         registeredAt: new Date().toISOString(),
-        userId: user?.id || user?.login_id || '알 수 없음',
+        userId: user?.id || '알 수 없음',
         userName: user?.name || '알 수 없음',
         sosongType,
         court: selCourt,
