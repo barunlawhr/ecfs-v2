@@ -197,6 +197,7 @@ export default function AdminPage() {
     const [saving, setSaving] = useState(false)
     const [deleteModal, setDeleteModal] = useState<{ ids: string[]; label: string } | null>(null)
     const [form, setForm] = useState({ login_id: '', password: '', name: '', org: '', email: '', role: 'student' })
+    const [editModal, setEditModal] = useState<{ login_id: string; name: string; org: string; email: string; password: string } | null>(null)
     const fileRef = useRef<HTMLInputElement>(null)
 
     // admin만 삭제 불가
@@ -269,6 +270,38 @@ export default function AdminPage() {
       setDeleteModal(null)
       loadRows()
       showToast(`${ids.length}개 계정이 삭제되었습니다.`)
+    }
+
+    function handleEditOpen(acc: AccountRow) {
+      const stored = getLocalAccounts()
+      const override = stored[acc.login_id]
+      setEditModal({
+        login_id: acc.login_id,
+        name: override?.name || acc.name || '',
+        org: override?.org || acc.org || '',
+        email: override?.email || acc.email || '',
+        password: override?.password || '',
+      })
+    }
+
+    function saveEdit() {
+      if (!editModal) return
+      if (!editModal.name.trim()) { alert('이름은 필수입니다.'); return }
+      const stored = getLocalAccounts()
+      const prev = stored[editModal.login_id] || {}
+      stored[editModal.login_id] = {
+        ...prev,
+        login_id: editModal.login_id,
+        name: editModal.name.trim(),
+        org: editModal.org.trim(),
+        email: editModal.email.trim(),
+        ...(editModal.password.trim() ? { password: editModal.password.trim() } : {}),
+        role: prev.role || (HARDCODED_ACCOUNTS[editModal.login_id]?.role ?? 'student'),
+      }
+      localStorage.setItem(ACC_KEY, JSON.stringify(stored))
+      setEditModal(null)
+      loadRows()
+      showToast('계정이 수정되었습니다.')
     }
 
     function handleDeleteSingle(id: string) {
@@ -405,7 +438,7 @@ export default function AdminPage() {
                   }}
                 />
               </th>
-              {['아이디', '이름', '소속', '역할', '이메일', '삭제'].map(h => (
+              {['아이디', '이름', '소속', '역할', '이메일', '수정', '삭제'].map(h => (
                 <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
@@ -431,6 +464,13 @@ export default function AdminPage() {
                 </td>
                 <td style={{ padding: '7px 12px', color: '#666' }}>{acc.email || '-'}</td>
                 <td style={{ padding: '7px 12px' }}>
+                  {/* 수정: 새로 추가한 관리자(role=admin, !isHardcoded)는 불가 */}
+                  {!(acc.role === 'admin' && !acc.isHardcoded)
+                    ? <button onClick={() => handleEditOpen(acc)} style={{ background: '#0067c2', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>수정</button>
+                    : <span style={{ fontSize: 11, color: '#c0c0c0' }}>–</span>
+                  }
+                </td>
+                <td style={{ padding: '7px 12px' }}>
                   {acc.isHardcoded
                     ? <span style={{ fontSize: 11, color: '#c0c0c0' }}>–</span>
                     : <button onClick={() => handleDeleteSingle(acc.login_id)} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>삭제</button>
@@ -440,6 +480,42 @@ export default function AdminPage() {
             ))}
           </tbody>
         </table>
+
+        {/* 수정 모달 */}
+        {editModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: '#fff', borderRadius: 10, width: 420, boxShadow: '0 8px 32px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+              <div style={{ background: '#0067c2', color: '#fff', padding: '14px 20px', fontWeight: 700, fontSize: 15 }}>✏️ 계정 수정 — {editModal.login_id}</div>
+              <div style={{ padding: '20px' }}>
+                {[
+                  { label: '이름 *', key: 'name', type: 'text' },
+                  { label: '소속', key: 'org', type: 'text' },
+                  { label: '이메일', key: 'email', type: 'text' },
+                  { label: '새 비밀번호 (변경 시만 입력)', key: 'password', type: 'password' },
+                ].map(f => (
+                  <div key={f.key} style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#555', display: 'block', marginBottom: 4 }}>{f.label}</label>
+                    <input
+                      type={f.type}
+                      value={(editModal as Record<string, string>)[f.key]}
+                      onChange={e => setEditModal(p => p ? { ...p, [f.key]: e.target.value } : p)}
+                      style={{ width: '100%', padding: '8px 10px', border: '1px solid #d0d8e8', borderRadius: 4, fontSize: 13, boxSizing: 'border-box' }}
+                    />
+                  </div>
+                ))}
+                {editModal.login_id === 'admin' && (
+                  <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 4, padding: '8px 12px', fontSize: 11, color: '#9a3412', marginBottom: 12 }}>
+                    ⚠️ 관리자 비밀번호 변경 시 기존 admin1234로는 로그인할 수 없습니다.
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 10, padding: '0 20px 20px' }}>
+                <button onClick={() => setEditModal(null)} style={{ flex: 1, padding: '10px', border: '1px solid #ccc', background: '#f5f5f5', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>취소</button>
+                <button onClick={saveEdit} style={{ flex: 1, padding: '10px', background: '#0067c2', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>저장</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 삭제 확인 모달 */}
         {deleteModal && (
