@@ -235,28 +235,84 @@ export default function MyPage() {
   async function fetchPracticeRecords() {
     if (!user) return
     setPracticeLoading(true)
+
+    // localStorage에 있는 미동기화 레코드를 Supabase에 업로드
+    async function syncLocalToSupabase(local: PracticeRecord[]) {
+      if (local.length === 0) return
+      for (const r of local) {
+        try {
+          // id 제외 (Supabase 자동 생성), submitted_at → created_at 매핑
+          const payload: Record<string, unknown> = {
+            student_id: r.student_id || user!.id,
+            user_name: r.user_name || user!.name,
+            case_type: r.case_type,
+            court: r.court,
+            plaintiff: r.plaintiff,
+            defendant: r.defendant,
+            has_agent: r.has_agent,
+            evidence_count: r.evidence_count,
+            score: r.score,
+            feedback: r.feedback,
+            case_id: r.case_id,
+            submitted_at: (r as PracticeRecord & { submitted_at?: string }).submitted_at || r.created_at,
+          }
+          // complaint_data, grade_breakdown 컬럼이 있으면 포함
+          if (r.complaint_data) payload.complaint_data = r.complaint_data
+          const rAny = r as Record<string, unknown>
+          if (rAny.grade_breakdown) payload.grade_breakdown = rAny.grade_breakdown
+          if (r.doc_type) payload.doc_type = r.doc_type
+
+          const { error } = await supabase.from('practice_records').insert(payload)
+          if (!error) {
+            // 동기화 성공 시 localStorage에서 제거
+            const localKey = 'ecfs_practice_records'
+            const all = JSON.parse(localStorage.getItem(localKey) || '[]')
+            localStorage.setItem(localKey, JSON.stringify(all.filter((x: { id: string }) => x.id !== r.id)))
+          } else {
+            console.warn('[sync] insert failed:', error.message)
+          }
+        } catch { /* 동기화 실패 무시 */ }
+      }
+    }
+
     try {
-      const res = await fetch(
-        `${SB_URL}/rest/v1/practice_records?student_id=eq.${encodeURIComponent(user.id)}&order=created_at.desc&limit=50`,
-        { headers: SB_HDR }
-      )
-      const data = await res.json()
-      // localStorage 폴백 (apply 페이지와 동일한 키 사용)
       const localKey = 'ecfs_practice_records'
       let local: PracticeRecord[] = []
       try {
         const all = JSON.parse(localStorage.getItem(localKey) || '[]')
         local = all.filter((r: PracticeRecord & { student_id?: string }) => r.student_id === user.id)
       } catch { /* ignore */ }
-      const rows: PracticeRecord[] = Array.isArray(data) && data.length > 0 && !data[0]?.code ? data : local
-      setPracticeRecords(rows)
+
+      // localStorage 데이터 Supabase 동기화 시도
+      if (local.length > 0) {
+        await syncLocalToSupabase(local)
+      }
+
+      // Supabase에서 최신 데이터 조회
+      const { data, error } = await supabase
+        .from('practice_records')
+        .select('*')
+        .eq('student_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+      if (error) throw error
+
+      if (data && data.length > 0) {
+        setPracticeRecords(data)
+      } else {
+        // Supabase에 없으면 localStorage 사용
+        const localKey2 = 'ecfs_practice_records'
+        const all2 = JSON.parse(localStorage.getItem(localKey2) || '[]')
+        const local2 = all2.filter((r: PracticeRecord & { student_id?: string }) => r.student_id === user.id)
+        setPracticeRecords(local2)
+      }
     } catch {
-      // Supabase 실패 시 localStorage만 사용
+      // 전체 실패 시 localStorage 표시
       try {
         const localKey = 'ecfs_practice_records'
         const all = JSON.parse(localStorage.getItem(localKey) || '[]')
-        const local = all.filter((r: PracticeRecord & { student_id?: string }) => r.student_id === user.id)
-        setPracticeRecords(local)
+        setPracticeRecords(all.filter((r: PracticeRecord & { student_id?: string }) => r.student_id === user.id))
       } catch { setPracticeRecords([]) }
     }
     setPracticeLoading(false)
