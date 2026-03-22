@@ -121,6 +121,7 @@ export default function MyPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [assignmentsLoading, setAssignmentsLoading] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
+  const [assignDebug, setAssignDebug] = useState<string>('')
   const [allCases, setAllCases] = useState<Assignment[]>([])  // B방식: 전체 sample_cases
   const [allCasesLoading, setAllCasesLoading] = useState(false)
   const [practiceRecords, setPracticeRecords] = useState<PracticeRecord[]>([])
@@ -168,32 +169,35 @@ export default function MyPage() {
     if (!user) return
     setAssignmentsLoading(true)
     setAssignError(null)
+    const debugLines: string[] = [`user.id = ${user.id}`]
     try {
-      // 1단계: Supabase에서 조회 (실패하면 빈 배열)
+      // 1단계: Supabase user_id 조회
       let sbRows: Record<string, unknown>[] = []
-      try {
-        const res = await fetch(
-          `${SB_URL}/rest/v1/assignments?user_id=eq.${encodeURIComponent(user.id)}&select=*`,
+      const res = await fetch(
+        `${SB_URL}/rest/v1/assignments?user_id=eq.${encodeURIComponent(user.id)}&select=*`,
+        { headers: SB_HDR }
+      )
+      const d = await res.json()
+      debugLines.push(`Supabase user_id 응답: ${JSON.stringify(d).slice(0, 200)}`)
+
+      if (Array.isArray(d) && d.length > 0 && !(d[0]?.code)) {
+        sbRows = d
+      } else {
+        // student_id 컬럼으로도 시도
+        const res2 = await fetch(
+          `${SB_URL}/rest/v1/assignments?student_id=eq.${encodeURIComponent(user.id)}&select=*`,
           { headers: SB_HDR }
         )
-        const d = await res.json()
-        if (Array.isArray(d) && d.length > 0 && !(d[0]?.code)) sbRows = d
-        else {
-          // student_id 컬럼으로도 시도
-          const res2 = await fetch(
-            `${SB_URL}/rest/v1/assignments?student_id=eq.${encodeURIComponent(user.id)}&select=*`,
-            { headers: SB_HDR }
-          )
-          const d2 = await res2.json()
-          if (Array.isArray(d2) && d2.length > 0 && !(d2[0]?.code)) sbRows = d2
-        }
-      } catch { /* Supabase 실패 무시 */ }
+        const d2 = await res2.json()
+        debugLines.push(`Supabase student_id 응답: ${JSON.stringify(d2).slice(0, 200)}`)
+        if (Array.isArray(d2) && d2.length > 0 && !(d2[0]?.code)) sbRows = d2
+      }
 
-      // 2단계: localStorage에서 해당 학생 assignments 읽기
+      // 2단계: localStorage
       const localAll: Record<string, unknown>[] = JSON.parse(localStorage.getItem('ec_assignments') || '[]')
       const localRows = localAll.filter(r => r.user_id === user.id || r.student_id === user.id)
+      debugLines.push(`localStorage 건수: ${localRows.length}`)
 
-      // 합치기 (Supabase 우선, 중복 제거)
       const seen = new Set<string>()
       const combined = [...sbRows, ...localRows].filter(r => {
         const key = `${r.user_id || r.student_id}-${r.case_id}`
@@ -201,6 +205,8 @@ export default function MyPage() {
         seen.add(key)
         return true
       })
+      debugLines.push(`합계: ${combined.length}건`)
+      setAssignDebug(debugLines.join('\n'))
 
       // 3단계: case_id로 sample_cases 별도 조회
       const caseIds = [...new Set(combined.map(r => r.case_id).filter(Boolean))]
@@ -229,7 +235,8 @@ export default function MyPage() {
 
       setAssignments(result)
     } catch (err) {
-      console.error('fetchAssignments exception:', err)
+      debugLines.push(`예외: ${String(err)}`)
+      setAssignDebug(debugLines.join('\n'))
       setAssignments([])
     }
     setAssignmentsLoading(false)
@@ -524,6 +531,11 @@ export default function MyPage() {
       <div style={{ padding: '8px 14px', background: '#e8f4fb', border: '1px solid #c8ddf5', borderBottom: '2px solid #006699', fontSize: 12, color: '#1a4a6b' }}>
         💡 배정된 사건의 사실관계를 읽고 <strong>소장 작성하기</strong> 버튼을 클릭해 소장을 작성하세요.
       </div>
+      {assignDebug && (
+        <div style={{ margin: '8px 0', padding: '10px 14px', background: '#f5f5f5', border: '1px solid #ccc', fontSize: 11, fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#333' }}>
+          🔍 디버그 정보 (확인 후 개발자에게 전달)\n{assignDebug}
+        </div>
+      )}
       {assignmentsLoading ? (
         <div style={{ textAlign: 'center', padding: 60, color: '#999' }}>⏳ 배정된 사건을 불러오는 중...</div>
       ) : assignError ? (
