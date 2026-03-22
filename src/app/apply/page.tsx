@@ -459,22 +459,37 @@ export default function ApplyPage() {
       };
       const effectiveCase = assignedCase || mockCase;
 
+      // 1) Supabase insert 시도 (테이블 없으면 localStorage 폴백)
+      let recordId: string = crypto.randomUUID();
+      const payload = {
+        student_id: user!.id, user_name: user!.name,
+        case_type: data.caseCategory || data.caseName, court: data.court,
+        plaintiff: data.parties.find(p => p.role === '원고')?.name || '',
+        defendant: data.parties.find(p => p.role === '피고')?.name || '',
+        has_agent: data.hasAgent, evidence_count: data.evidences.length,
+        score: 0, feedback: '채점 중...', complaint_data: data,
+        case_id: assignedCase?.id || null,
+        submitted_at: new Date().toISOString(),
+      };
+
+      let useLocal = false;
       const { data: inserted, error: insertError } = await supabase
         .from('practice_records')
-        .insert({
-          student_id: user!.id, user_name: user!.name,
-          case_type: data.caseCategory || data.caseName, court: data.court,
-          plaintiff: data.parties.find(p => p.role === '원고')?.name || '',
-          defendant: data.parties.find(p => p.role === '피고')?.name || '',
-          has_agent: data.hasAgent, evidence_count: data.evidences.length,
-          score: 0, feedback: '채점 중...', complaint_data: data,
-          case_id: assignedCase?.id || null,
-        })
+        .insert(payload)
         .select('id').single();
 
-      if (insertError) throw new Error(insertError.message);
-      const recordId: string = inserted.id;
+      if (insertError) {
+        // 테이블이 없거나 권한 오류 → localStorage 폴백
+        useLocal = true;
+        const localKey = 'ecfs_practice_records';
+        const existing = JSON.parse(localStorage.getItem(localKey) || '[]');
+        existing.push({ id: recordId, ...payload });
+        localStorage.setItem(localKey, JSON.stringify(existing));
+      } else {
+        recordId = inserted.id;
+      }
 
+      // 2) 채점 API 호출
       const gradeRes = await fetch('/api/grade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -483,9 +498,20 @@ export default function ApplyPage() {
 
       if (gradeRes.ok) {
         const g = await gradeRes.json();
-        await supabase.from('practice_records').update({
-          score: g.score ?? 0, feedback: g.feedback ?? '', grade_breakdown: g.breakdown ?? null, graded_at: new Date().toISOString(),
-        }).eq('id', recordId);
+        if (!useLocal) {
+          await supabase.from('practice_records').update({
+            score: g.score ?? 0, feedback: g.feedback ?? '', grade_breakdown: g.breakdown ?? null, graded_at: new Date().toISOString(),
+          }).eq('id', recordId);
+        } else {
+          // localStorage에 채점 결과 업데이트
+          const localKey = 'ecfs_practice_records';
+          const existing = JSON.parse(localStorage.getItem(localKey) || '[]');
+          const idx = existing.findIndex((r: { id: string }) => r.id === recordId);
+          if (idx >= 0) {
+            existing[idx] = { ...existing[idx], score: g.score ?? 0, feedback: g.feedback ?? '', grade_breakdown: g.breakdown ?? null };
+            localStorage.setItem(localKey, JSON.stringify(existing));
+          }
+        }
       }
 
       setSubmittedId(recordId);
