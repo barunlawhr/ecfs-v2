@@ -6,6 +6,7 @@ import MockBar from '@/components/layout/MockBar'
 import GnbNav from '@/components/layout/GnbNav'
 import Footer from '@/components/layout/Footer'
 import { useAuth } from '@/context/AuthContext'
+import { supabase } from '@/lib/supabase'
 
 const SB_URL = 'https://knpvayujykoqjncctxrr.supabase.co'
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHZheXVqeWtvcWpuY2N0eHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NzA3NDUsImV4cCI6MjA4OTE0Njc0NX0.rXlo5IsOW6FS5N1X3vgqNM1RvzB84TYPqVhnYyc6FSg'
@@ -119,6 +120,7 @@ export default function MyPage() {
 
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [assignmentsLoading, setAssignmentsLoading] = useState(false)
+  const [assignError, setAssignError] = useState<string | null>(null)
   const [allCases, setAllCases] = useState<Assignment[]>([])  // B방식: 전체 sample_cases
   const [allCasesLoading, setAllCasesLoading] = useState(false)
   const [practiceRecords, setPracticeRecords] = useState<PracticeRecord[]>([])
@@ -165,14 +167,38 @@ export default function MyPage() {
   async function fetchAssignments() {
     if (!user) return
     setAssignmentsLoading(true)
+    setAssignError(null)
     try {
-      const res = await fetch(
-        `${SB_URL}/rest/v1/assignments?select=*,sample_cases(*)&user_id=eq.${encodeURIComponent(user.id)}&order=assigned_at.desc`,
-        { headers: SB_HDR }
-      )
-      const data = await res.json()
-      setAssignments(Array.isArray(data) ? data : [])
-    } catch {
+      // user_id 컬럼으로 먼저 시도 (admin이 user_id로 저장)
+      const { data: d1, error: e1 } = await supabase
+        .from('assignments')
+        .select('*, sample_cases(*)')
+        .eq('user_id', user.id)
+        .order('assigned_at', { ascending: false })
+
+      if (!e1 && Array.isArray(d1) && d1.length > 0) {
+        setAssignments(d1 as unknown as Assignment[])
+        setAssignmentsLoading(false)
+        return
+      }
+
+      // student_id 컬럼으로 재시도
+      const { data: d2, error: e2 } = await supabase
+        .from('assignments')
+        .select('*, sample_cases(*)')
+        .eq('student_id', user.id)
+        .order('assigned_at', { ascending: false })
+
+      if (!e2 && Array.isArray(d2)) {
+        setAssignments(d2 as unknown as Assignment[])
+      } else {
+        const errMsg = (e1?.message || '') + ' / ' + (e2?.message || '')
+        console.error('assignments fetch error:', e1, e2)
+        setAssignError(errMsg)
+        setAssignments([])
+      }
+    } catch (err) {
+      console.error('fetchAssignments exception:', err)
       setAssignments([])
     }
     setAssignmentsLoading(false)
@@ -469,6 +495,16 @@ export default function MyPage() {
       </div>
       {assignmentsLoading ? (
         <div style={{ textAlign: 'center', padding: 60, color: '#999' }}>⏳ 배정된 사건을 불러오는 중...</div>
+      ) : assignError ? (
+        <div style={{ textAlign: 'center', padding: 40, background: '#fff3f3', border: '1px solid #f5c6c6', borderTop: 'none' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#c00', marginBottom: 8 }}>⚠️ 데이터 조회 오류</div>
+          <div style={{ fontSize: 12, color: '#888', whiteSpace: 'pre-wrap' }}>{assignError}</div>
+          <div style={{ fontSize: 12, color: '#555', marginTop: 12 }}>Supabase Dashboard → SQL Editor에서 아래 SQL을 실행해주세요:<br />
+            <code style={{ background: '#f5f5f5', padding: '6px 10px', display: 'block', marginTop: 6, textAlign: 'left', fontSize: 11 }}>
+              {`ALTER TABLE public.assignments ENABLE ROW LEVEL SECURITY;\nCREATE POLICY "allow_all" ON public.assignments FOR ALL USING (true) WITH CHECK (true);`}
+            </code>
+          </div>
+        </div>
       ) : assignments.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 60, background: '#fff', border: '1px solid #dde0e8', borderTop: 'none' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
