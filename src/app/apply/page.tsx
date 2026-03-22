@@ -287,6 +287,15 @@ export default function ApplyPage() {
   const [분리방법, set분리방법] = useState('서류개수');
   const [분리개수, set분리개수] = useState('');
   const [showRegModal, setShowRegModal] = useState(false);
+  // 첨부서류 상태
+  const attachFileInputRef = useRef<HTMLInputElement>(null);
+  const [attachDocType, setAttachDocType] = useState('직접입력');
+  const [attachDocName, setAttachDocName] = useState('');
+  const [attachSameAsFile, setAttachSameAsFile] = useState(false);
+  const [attachUploadedFiles, setAttachUploadedFiles] = useState<{id:string;name:string;size:number;checked:boolean}[]>([]);
+  const [attachRows, setAttachRows] = useState<{id:string;번호:number;서류명:string;파일명:string;파일크기:number;등록일:string}[]>([]);
+  const [attachAllChecked, setAttachAllChecked] = useState(false);
+  const [showAttachRegModal, setShowAttachRegModal] = useState(false);
 
   useEffect(() => { if (!loading && !user) router.push('/'); }, [user, loading, router]);
 
@@ -1658,23 +1667,206 @@ export default function ApplyPage() {
           <div id="sec-s7" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
             <SecHd label="⑦ 첨부서류" open={open.s7} toggle={() => toggle('s7')} />
             {open.s7 && (
-              <div style={{ padding: '10px 14px 14px' }}>
-                <div style={{ fontSize: 11, color: '#555', lineHeight: 1.8, marginBottom: 10, background: '#f8f9fb', border: '1px solid #e0e6ee', borderRadius: 2, padding: '7px 12px' }}>
-                  * 첨부서류는 소장 제출 시 함께 제출하는 서류입니다. (위임장, 인감증명서 등)<br />
-                  * 파일형식: PDF, HWP, DOC, DOCX, JPG, PNG (파일당 최대 20MB)
+              <div style={{ padding: '12px 14px 16px' }}>
+                {/* 안내문 */}
+                <div style={{ fontSize: 11, color: '#333', lineHeight: 2, marginBottom: 10 }}>
+                  <div>• 첨부서류로 제출한 문서는 증거로 사용될 수 없으며, 판결(결정) 등에 효력이 없습니다.</div>
+                  <div>• 소송대리허가신청서 및 기타 신청서는 소장과 별도의 서류로 제출하여야 하므로 첨부서류에 포함되지 않도록 유의하여 주시기 바랍니다.</div>
                 </div>
-                <label htmlFor="attach-file" style={{ display: 'block' }}>
-                  <div style={{ border: '2px dashed #c8cdd6', borderRadius: 3, padding: '22px', textAlign: 'center', background: '#fafbfd', cursor: 'pointer' }}>
-                    <div style={{ fontSize: 26, marginBottom: 6 }}>📎</div>
-                    <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>파일을 드래그하거나 아래 버튼을 클릭하세요</div>
-                    <span style={{ display: 'inline-block', height: 28, padding: '0 14px', lineHeight: '28px', border: `1px solid ${TEAL}`, borderRadius: 2, background: '#fff', color: TEAL, fontSize: 12, fontWeight: 700 }}>파일 선택</span>
-                  </div>
-                </label>
-                <input type="file" id="attach-file" multiple accept=".pdf,.hwp,.doc,.docx,.jpg,.jpeg,.png" style={{ display: 'none' }} />
-                <div style={{ marginTop: 6, fontSize: 11, color: '#aaa' }}>※ 실습 환경에서는 파일이 실제로 저장되지 않습니다.</div>
+
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4' }}>
+                  <tbody>
+                    {/* 서류명 row */}
+                    <tr style={{ borderBottom: '1px solid #d0d8e4' }}>
+                      <th style={{ ...TH, width: 100 }}>서류명 <span style={{ color: '#e53e3e' }}>*</span> <span style={{ fontSize: 10, color: '#888' }}>ⓘ</span></th>
+                      <td style={TD}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <select
+                            value={attachDocType}
+                            onChange={e => {
+                              const v = e.target.value;
+                              setAttachDocType(v);
+                              if (v !== '직접입력') setAttachDocName(`${v} (입력 가능)`);
+                              else setAttachDocName('');
+                            }}
+                            style={{ ...SEL, width: 200 }}
+                          >
+                            {['직접입력','법인등기사항증명서','주민등록등본','소송위임장','담당변호사지정서','소가계산서','토지대장등본','건축물대장등본'].map(v => (
+                              <option key={v}>{v}</option>
+                            ))}
+                          </select>
+                          <input
+                            value={attachDocName}
+                            onChange={e => setAttachDocName(e.target.value)}
+                            placeholder={attachDocType === '직접입력' ? '서류명 직접 입력' : ''}
+                            style={{ ...INP, width: 220 }}
+                          />
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            <input type="checkbox" checked={attachSameAsFile} onChange={e => {
+                              setAttachSameAsFile(e.target.checked);
+                              if (e.target.checked && attachUploadedFiles.length > 0) {
+                                setAttachDocName(attachUploadedFiles[0].name.replace(/\.[^.]+$/, ''));
+                              }
+                            }} style={{ accentColor: TEAL }} />
+                            파일명과 동일
+                          </label>
+                        </div>
+                      </td>
+                    </tr>
+                    {/* 파일첨부 row */}
+                    <tr>
+                      <th style={{ ...TH, width: 100, verticalAlign: 'top', paddingTop: 10 }}>파일첨부 <span style={{ color: '#e53e3e' }}>*</span> <span style={{ fontSize: 10, color: '#888' }}>ⓘ</span></th>
+                      <td style={{ padding: '8px 10px', verticalAlign: 'top' }}>
+                        {/* 파일찾기/삭제 */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 5, marginBottom: 5 }}>
+                          <button onClick={() => attachFileInputRef.current?.click()} style={{ height: 26, padding: '0 10px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: 4 }}>📋 파일찾기</button>
+                          <button onClick={() => setAttachUploadedFiles(p => p.filter(f => !f.checked))} style={{ height: 26, padding: '0 10px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: 4 }}>🗑 삭제</button>
+                          <input ref={attachFileInputRef} type="file" multiple style={{ display: 'none' }} onChange={e => {
+                            if (!e.target.files) return;
+                            const arr = Array.from(e.target.files).map(f => ({ id: crypto.randomUUID(), name: f.name, size: f.size, checked: false }));
+                            setAttachUploadedFiles(p => {
+                              const next = [...p, ...arr];
+                              if (attachSameAsFile && next.length > 0) setAttachDocName(next[0].name.replace(/\.[^.]+$/, ''));
+                              return next;
+                            });
+                          }} />
+                        </div>
+                        {/* 파일 목록 */}
+                        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4', marginBottom: 0 }}>
+                          <thead>
+                            <tr style={{ background: '#f5f7fb' }}>
+                              <th style={{ width: 28, padding: '5px', borderBottom: '1px solid #d0d8e4', borderRight: '1px solid #e0e6ee', textAlign: 'center' }}>
+                                <input type="checkbox" checked={attachAllChecked} onChange={e => { setAttachAllChecked(e.target.checked); setAttachUploadedFiles(p => p.map(f => ({ ...f, checked: e.target.checked }))); }} style={{ accentColor: TEAL }} />
+                              </th>
+                              <th style={{ padding: '5px 8px', fontSize: 11, fontWeight: 700, borderBottom: '1px solid #d0d8e4', borderRight: '1px solid #e0e6ee', textAlign: 'center' }}>파일명</th>
+                              <th style={{ width: 80, padding: '5px 8px', fontSize: 11, fontWeight: 700, borderBottom: '1px solid #d0d8e4', borderRight: '1px solid #e0e6ee', textAlign: 'center' }}>파일크기</th>
+                              <th style={{ width: 70, padding: '5px 8px', fontSize: 11, fontWeight: 700, borderBottom: '1px solid #d0d8e4', borderRight: '1px solid #e0e6ee', textAlign: 'center' }}>순서변경</th>
+                              <th style={{ width: 40, padding: '5px 8px', fontSize: 11, fontWeight: 700, borderBottom: '1px solid #d0d8e4', textAlign: 'center' }}>삭제</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {attachUploadedFiles.length === 0 ? (
+                              <tr><td colSpan={5} style={{ padding: '14px', textAlign: 'center', fontSize: 12, color: '#aaa' }}>조회된 결과가 없습니다.</td></tr>
+                            ) : attachUploadedFiles.map((f, i) => (
+                              <tr key={f.id} style={{ borderBottom: '1px solid #eaecf4' }}>
+                                <td style={{ textAlign: 'center', padding: '5px', borderRight: '1px solid #eaecf4' }}>
+                                  <input type="checkbox" checked={f.checked} onChange={e => setAttachUploadedFiles(p => p.map(x => x.id === f.id ? { ...x, checked: e.target.checked } : x))} style={{ accentColor: TEAL }} />
+                                </td>
+                                <td style={{ padding: '5px 8px', fontSize: 12, borderRight: '1px solid #eaecf4' }}>{f.name}</td>
+                                <td style={{ padding: '5px 8px', fontSize: 12, borderRight: '1px solid #eaecf4', textAlign: 'right', color: '#555' }}>{f.size < 1024 ? `${f.size} Bytes` : `${(f.size/1024).toFixed(0)} KB`}</td>
+                                <td style={{ padding: '5px', borderRight: '1px solid #eaecf4', textAlign: 'center' }}>
+                                  <button onClick={() => setAttachUploadedFiles(p => { const a=[...p]; if(i>0)[a[i],a[i-1]]=[a[i-1],a[i]]; return a; })} style={{ height: 20, width: 22, border: '1px solid #aaa', background: '#f5f5f5', cursor: 'pointer', fontSize: 10, marginRight: 2 }}>▲</button>
+                                  <button onClick={() => setAttachUploadedFiles(p => { const a=[...p]; if(i<a.length-1)[a[i],a[i+1]]=[a[i+1],a[i]]; return a; })} style={{ height: 20, width: 22, border: '1px solid #aaa', background: '#f5f5f5', cursor: 'pointer', fontSize: 10 }}>▼</button>
+                                </td>
+                                <td style={{ padding: '5px', textAlign: 'center' }}>
+                                  <button onClick={() => setAttachUploadedFiles(p => p.filter(x => x.id !== f.id))} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#888' }}>✕</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {/* DRAG & DROP */}
+                        <div
+                          onDragOver={e => e.preventDefault()}
+                          onDrop={e => {
+                            e.preventDefault();
+                            if (!e.dataTransfer.files) return;
+                            const arr = Array.from(e.dataTransfer.files).map(f => ({ id: crypto.randomUUID(), name: f.name, size: f.size, checked: false }));
+                            setAttachUploadedFiles(p => [...p, ...arr]);
+                          }}
+                          style={{ border: '1px solid #d0d8e4', borderTop: 'none', padding: '20px', textAlign: 'center', background: '#fafbfd', cursor: 'pointer' }}
+                          onClick={() => attachFileInputRef.current?.click()}
+                        >
+                          <div style={{ fontSize: 28, color: '#8fa0b8', marginBottom: 4, letterSpacing: 6 }}>🎵 🖼 📄 ▶ ⚙</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#6a80a0', letterSpacing: 2 }}>DRAG &amp; DROP</div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div style={{ fontSize: 11, color: '#555', marginTop: 6, marginBottom: 4 }}>※ 첨부할 파일을 등록 후 반드시 [목록에 추가]버튼을 눌러 첨부서류 목록에 추가하시기 바랍니다.</div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                  <button onClick={() => {
+                    if (attachUploadedFiles.length === 0) { alert('첨부된 파일이 없습니다.'); return; }
+                    if (!attachDocName.trim()) { alert('서류명을 입력해주세요.'); return; }
+                    const today = new Date().toISOString().slice(0,10).replace(/-/g,'.');
+                    const newRows = attachUploadedFiles.map((f, i) => ({
+                      id: crypto.randomUUID(),
+                      번호: attachRows.length + i + 1,
+                      서류명: attachDocName.trim(),
+                      파일명: f.name,
+                      파일크기: f.size,
+                      등록일: today,
+                    }));
+                    setAttachRows(p => [...p, ...newRows]);
+                    setAttachUploadedFiles([]);
+                  }} style={{ height: 30, padding: '0 14px', border: '1px solid #1a3a6b', borderRadius: 2, background: '#1a3a6b', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>목록에 추가</button>
+                </div>
+
+                {/* 첨부서류목록 */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>• 첨부서류목록</span>
+                  <button style={{ height: 26, padding: '0 10px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: 4 }}>📋 전자발급 서류 첨부하기</button>
+                </div>
+
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4' }}>
+                  <thead>
+                    <tr style={{ background: '#f5f7fb' }}>
+                      {['번호','서류명*','파일명','등록일','순서변경','삭제'].map(h => (
+                        <th key={h} style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, borderBottom: '1px solid #d0d8e4', borderRight: '1px solid #e0e6ee', textAlign: 'center', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {attachRows.length === 0 ? (
+                      <tr><td colSpan={6} style={{ padding: '14px', textAlign: 'center', fontSize: 12, color: '#e53e3e' }}>조회된 결과가 없습니다.</td></tr>
+                    ) : attachRows.map((row, i) => (
+                      <tr key={row.id} style={{ borderBottom: '1px solid #eaecf4' }}>
+                        <td style={{ padding: '5px 8px', fontSize: 12, textAlign: 'center', borderRight: '1px solid #eaecf4', width: 40 }}>{row.번호}</td>
+                        <td style={{ padding: '5px 8px', borderRight: '1px solid #eaecf4' }}>
+                          <input value={row.서류명} onChange={e => setAttachRows(p => p.map(r => r.id === row.id ? { ...r, 서류명: e.target.value } : r))} style={{ ...INP, width: '100%' }} />
+                        </td>
+                        <td style={{ padding: '5px 8px', fontSize: 12, borderRight: '1px solid #eaecf4', textAlign: 'center' }}>
+                          <span style={{ color: TEAL, textDecoration: 'underline', cursor: 'pointer' }}>{row.파일명}</span>
+                          <span style={{ color: '#888', fontSize: 11, marginLeft: 4 }}>({row.파일크기 < 1024 ? `${row.파일크기} Bytes` : `${(row.파일크기/1024).toFixed(0)} KB`})</span>
+                        </td>
+                        <td style={{ padding: '5px 8px', fontSize: 12, textAlign: 'center', borderRight: '1px solid #eaecf4', whiteSpace: 'nowrap' }}>{row.등록일}</td>
+                        <td style={{ padding: '5px', borderRight: '1px solid #eaecf4', textAlign: 'center' }}>
+                          <button onClick={() => setAttachRows(p => { const a=[...p]; if(i>0)[a[i],a[i-1]]=[a[i-1],a[i]]; return a.map((r,j) => ({...r, 번호: j+1})); })} style={{ height: 20, width: 22, border: '1px solid #aaa', background: '#f5f5f5', cursor: 'pointer', fontSize: 10, marginRight: 2 }}>▲</button>
+                          <button onClick={() => setAttachRows(p => { const a=[...p]; if(i<a.length-1)[a[i],a[i+1]]=[a[i+1],a[i]]; return a.map((r,j) => ({...r, 번호: j+1})); })} style={{ height: 20, width: 22, border: '1px solid #aaa', background: '#f5f5f5', cursor: 'pointer', fontSize: 10 }}>▼</button>
+                        </td>
+                        <td style={{ padding: '5px', textAlign: 'center' }}>
+                          <button onClick={() => setAttachRows(p => p.filter(r => r.id !== row.id).map((r,j) => ({...r, 번호: j+1})))} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#888' }}>✕</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{ fontSize: 12, marginTop: 6, marginBottom: 10 }}>총 <strong>{attachRows.length}</strong> 건</div>
+
+                {/* 등록 버튼 */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setShowAttachRegModal(true)} style={{ height: 32, padding: '0 20px', border: 'none', borderRadius: 2, background: '#1a3a6b', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    ✎ 등록
+                  </button>
+                </div>
               </div>
             )}
           </div>
+
+          {/* 첨부서류 등록 완료 모달 */}
+          {showAttachRegModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 6000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ background: '#fff', width: 340, borderRadius: 4, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,.3)' }}>
+                <div style={{ background: '#1a3a6b', color: '#fff', padding: '10px 16px', fontSize: 13, fontWeight: 700 }}>설명</div>
+                <div style={{ padding: '30px 20px', textAlign: 'center', fontSize: 13, color: '#333' }}>등록되었습니다.</div>
+                <div style={{ padding: '0 20px 16px', textAlign: 'center' }}>
+                  <button onClick={() => setShowAttachRegModal(false)} style={{ height: 32, padding: '0 32px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>확인</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Notice */}
           <div style={{ border: '1px solid #d8dce8', background: '#f8f9fb', borderRadius: 2, padding: '8px 12px', marginBottom: 10 }}>
