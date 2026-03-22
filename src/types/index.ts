@@ -5,10 +5,16 @@ export interface User {
   name: string
   org: string
   role: UserRole
-  barNum?: string
-  addr?: string
-  tel?: string
+  barNum?: string       // 수임등록번호 앞자리
+  barNum2?: string      // 수임등록번호 뒷자리
+  zipCode?: string      // 우편번호
+  addr?: string         // 도로명 주소
+  addrDetail?: string   // 상세주소
+  mobile?: string       // 휴대전화 (010-0000-0000)
+  tel?: string          // 전화번호 (02-000-0000)
+  fax?: string          // 팩스 (02-000-0000)
   email?: string
+  subEmail?: string     // 보조이메일
 }
 
 export interface SampleCase {

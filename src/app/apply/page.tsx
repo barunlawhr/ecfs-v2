@@ -291,6 +291,8 @@ export default function ApplyPage() {
   const [분리방법, set분리방법] = useState('서류개수');
   const [분리개수, set분리개수] = useState('');
   const [showRegModal, setShowRegModal] = useState(false);
+  const [showPurposeRegModal, setShowPurposeRegModal] = useState(false);
+  const [showCauseRegModal, setShowCauseRegModal] = useState(false);
   // 첨부서류 상태
   const attachFileInputRef = useRef<HTMLInputElement>(null);
   const [attachDocType, setAttachDocType] = useState('직접입력');
@@ -1119,31 +1121,40 @@ export default function ApplyPage() {
                           </select>
                           <button onClick={() => {
                             if (!user) return;
-                            // 전화번호 파싱: "010-2111-3077" → pre/mid/last
+                            // 휴대전화 파싱: "010-2111-3077"
+                            const mobParts = (user.mobile || user.tel || '').split('-');
+                            const mobilePre = mobParts[0] || '010';
+                            const mobile1 = mobParts[1] || '';
+                            const mobile2 = mobParts[2] || '';
+                            // 전화번호 파싱
                             const telParts = (user.tel || '').split('-');
-                            const mobilePre = telParts[0] || '010';
-                            const mobile1 = telParts[1] || '';
-                            const mobile2 = telParts[2] || '';
-                            // 이메일 파싱: "abc@domain.com" → account / domain
+                            const telPre = telParts[0] || '02';
+                            const tel1 = telParts[1] || '';
+                            const tel2 = telParts[2] || '';
+                            // 팩스 파싱
+                            const faxParts = (user.fax || '').split('-');
+                            const faxPre = faxParts[0] || '02';
+                            const fax1 = faxParts[1] || '';
+                            const fax2 = faxParts[2] || '';
+                            // 이메일 파싱
                             const emailParts = (user.email || '').split('@');
-                            // 주소: 우편번호 없이 도로명만 입력
                             setAgentForm(p => ({
                               ...p,
                               agentType: '변호사',
                               name: user.name,
                               regNum1: user.barNum || '',
-                              regNum2: '',
+                              regNum2: user.barNum2 || '',
+                              zipCode: user.zipCode || '',
                               addrRoad: user.addr || '',
-                              addrDetail: '',
-                              zipCode: '',
-                              mobilePre,
-                              mobile1,
-                              mobile2,
-                              mobileShow: false,
+                              addrDetail: user.addrDetail || '',
+                              mobilePre, mobile1, mobile2, mobileShow: false,
+                              telPre, tel1, tel2, telShow: false,
+                              faxPre, fax1, fax2, faxShow: false,
                               email: user.email || '',
                               emailShow: false,
                               subEmail: emailParts[0] || '',
                               subEmailDomain: emailParts[1] || '',
+                              subEmailSelect: '선택',
                             }));
                             upd({ hasAgent: true, agentName: user.name, agentType: '변호사' });
                           }} style={{ height: 28, padding: '0 10px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>내정보가져오기</button>
@@ -1376,7 +1387,7 @@ export default function ApplyPage() {
                   </tbody>
                 </table>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
-                  <button onClick={() => upd({ claimPurpose: data.claimPurpose })} style={{ height: 32, padding: '0 20px', border: 'none', borderRadius: 2, background: '#1a3a6b', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <button onClick={() => { upd({ claimPurpose: data.claimPurpose }); setShowPurposeRegModal(true); }} style={{ height: 32, padding: '0 20px', border: 'none', borderRadius: 2, background: '#1a3a6b', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
                     ✎ 등록
                   </button>
                 </div>
@@ -1489,7 +1500,7 @@ export default function ApplyPage() {
                   </tbody>
                 </table>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
-                  <button onClick={() => upd({ claimCause: data.claimCause })} style={{ height: 32, padding: '0 20px', border: 'none', borderRadius: 2, background: '#1a3a6b', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <button onClick={() => { upd({ claimCause: data.claimCause }); setShowCauseRegModal(true); }} style={{ height: 32, padding: '0 20px', border: 'none', borderRadius: 2, background: '#1a3a6b', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
                     ✎ 등록
                   </button>
                 </div>
@@ -1697,6 +1708,32 @@ export default function ApplyPage() {
                 <div style={{ padding: '30px 20px', textAlign: 'center', fontSize: 13, color: '#333' }}>등록되었습니다.</div>
                 <div style={{ padding: '0 20px 16px', textAlign: 'center' }}>
                   <button onClick={() => setShowRegModal(false)} style={{ height: 32, padding: '0 32px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>확인</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 청구취지 등록 모달 */}
+          {showPurposeRegModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 6000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ background: '#fff', width: 340, borderRadius: 4, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,.3)' }}>
+                <div style={{ background: '#1a3a6b', color: '#fff', padding: '10px 16px', fontSize: 13, fontWeight: 700 }}>설명</div>
+                <div style={{ padding: '30px 20px', textAlign: 'center', fontSize: 13, color: '#333' }}>등록되었습니다.</div>
+                <div style={{ padding: '0 20px 16px', textAlign: 'center' }}>
+                  <button onClick={() => setShowPurposeRegModal(false)} style={{ height: 32, padding: '0 32px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>확인</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 청구원인 등록 모달 */}
+          {showCauseRegModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 6000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ background: '#fff', width: 340, borderRadius: 4, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,.3)' }}>
+                <div style={{ background: '#1a3a6b', color: '#fff', padding: '10px 16px', fontSize: 13, fontWeight: 700 }}>설명</div>
+                <div style={{ padding: '30px 20px', textAlign: 'center', fontSize: 13, color: '#333' }}>등록되었습니다.</div>
+                <div style={{ padding: '0 20px 16px', textAlign: 'center' }}>
+                  <button onClick={() => setShowCauseRegModal(false)} style={{ height: 32, padding: '0 32px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>확인</button>
                 </div>
               </div>
             </div>

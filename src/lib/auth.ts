@@ -9,23 +9,29 @@ export interface AccountRecord {
   org: string
   role: 'student' | 'admin'
   barNum: string
+  barNum2: string
+  zipCode: string
   addr: string
+  addrDetail: string
+  mobile: string
   tel: string
+  fax: string
   email: string
+  subEmail: string
 }
 
 export const HARDCODED_ACCOUNTS: Record<string, AccountRecord> = {
-  student01: { pw: 'court1234', name: '김바른', org: '바른법률사무소', role: 'student', barNum: '서울20113', addr: '서울 서초구 서초대로 107', tel: '010-2111-3077', email: 'student01@barun.law' },
-  student02: { pw: 'court1234', name: '이바른', org: '한결법률사무소', role: 'student', barNum: '서울20226', addr: '서울 서초구 서초대로 114', tel: '010-2222-3154', email: 'student02@barun.law' },
-  student03: { pw: 'court1234', name: '박바른', org: '정직법률사무소', role: 'student', barNum: '서울20339', addr: '서울 서초구 서초대로 121', tel: '010-2333-3231', email: 'student03@barun.law' },
-  student04: { pw: 'court1234', name: '최바른', org: '신뢰법률사무소', role: 'student', barNum: '서울20452', addr: '서울 서초구 서초대로 128', tel: '010-2444-3308', email: 'student04@barun.law' },
-  student05: { pw: 'court1234', name: '정바른', org: '공정법률사무소', role: 'student', barNum: '서울20565', addr: '서울 서초구 서초대로 135', tel: '010-2555-3385', email: 'student05@barun.law' },
-  student06: { pw: 'court1234', name: '강바른', org: '진실법률사무소', role: 'student', barNum: '서울20678', addr: '서울 서초구 서초대로 142', tel: '010-2666-3462', email: 'student06@barun.law' },
-  student07: { pw: 'court1234', name: '조바른', org: '바른법률사무소', role: 'student', barNum: '서울20791', addr: '서울 서초구 서초대로 149', tel: '010-2777-3539', email: 'student07@barun.law' },
-  student08: { pw: 'court1234', name: '윤바른', org: '한결법률사무소', role: 'student', barNum: '서울20904', addr: '서울 서초구 서초대로 156', tel: '010-2888-3616', email: 'student08@barun.law' },
-  student09: { pw: 'court1234', name: '장바른', org: '정직법률사무소', role: 'student', barNum: '서울21017', addr: '서울 서초구 서초대로 163', tel: '010-2999-3693', email: 'student09@barun.law' },
-  student10: { pw: 'court1234', name: '임바른', org: '신뢰법률사무소', role: 'student', barNum: '서울21130', addr: '서울 서초구 서초대로 170', tel: '010-3110-3770', email: 'student10@barun.law' },
-  admin: { pw: 'admin1234', name: '관리자', org: '운영팀', role: 'admin', barNum: '', addr: '', tel: '', email: 'admin@ecourt.kr' },
+  student01: { pw: 'court1234', name: '김바른', org: '바른법률사무소', role: 'student', barNum: '880101', barNum2: '123456', zipCode: '06594', addr: '서울특별시 서초구 서초대로 107', addrDetail: '바른법률사무소 3층', mobile: '010-2111-3077', tel: '02-3476-3077', fax: '02-3476-3078', email: 'k.barun@barun.law', subEmail: '' },
+  student02: { pw: 'court1234', name: '이바른', org: '한결법률사무소', role: 'student', barNum: '880202', barNum2: '234567', zipCode: '06596', addr: '서울특별시 서초구 서초대로 114', addrDetail: '한결법률사무소 5층', mobile: '010-2222-3154', tel: '02-3476-3154', fax: '02-3476-3155', email: 'l.barun@hangyeol.law', subEmail: '' },
+  student03: { pw: 'court1234', name: '박바른', org: '정직법률사무소', role: 'student', barNum: '880303', barNum2: '345678', zipCode: '06598', addr: '서울특별시 서초구 서초대로 121', addrDetail: '정직법률사무소 2층', mobile: '010-2333-3231', tel: '02-3476-3231', fax: '02-3476-3232', email: 'p.barun@jeongjik.law', subEmail: '' },
+  student04: { pw: 'court1234', name: '최바른', org: '신뢰법률사무소', role: 'student', barNum: '880404', barNum2: '456789', zipCode: '06600', addr: '서울특별시 서초구 서초대로 128', addrDetail: '신뢰법률사무소 4층', mobile: '010-2444-3308', tel: '02-3476-3308', fax: '02-3476-3309', email: 'c.barun@sinroe.law', subEmail: '' },
+  student05: { pw: 'court1234', name: '정바른', org: '공정법률사무소', role: 'student', barNum: '880505', barNum2: '567890', zipCode: '06602', addr: '서울특별시 서초구 서초대로 135', addrDetail: '공정법률사무소 6층', mobile: '010-2555-3385', tel: '02-3476-3385', fax: '02-3476-3386', email: 'j.barun@gongjung.law', subEmail: '' },
+  student06: { pw: 'court1234', name: '강바른', org: '진실법률사무소', role: 'student', barNum: '880606', barNum2: '678901', zipCode: '06604', addr: '서울특별시 서초구 서초대로 142', addrDetail: '진실법률사무소 7층', mobile: '010-2666-3462', tel: '02-3476-3462', fax: '02-3476-3463', email: 'k.barun@jinsil.law', subEmail: '' },
+  student07: { pw: 'court1234', name: '조바른', org: '바른법률사무소', role: 'student', barNum: '880707', barNum2: '789012', zipCode: '06594', addr: '서울특별시 서초구 서초대로 149', addrDetail: '바른법률사무소 8층', mobile: '010-2777-3539', tel: '02-3476-3539', fax: '02-3476-3540', email: 'cho.barun@barun.law', subEmail: '' },
+  student08: { pw: 'court1234', name: '윤바른', org: '한결법률사무소', role: 'student', barNum: '880808', barNum2: '890123', zipCode: '06596', addr: '서울특별시 서초구 서초대로 156', addrDetail: '한결법률사무소 9층', mobile: '010-2888-3616', tel: '02-3476-3616', fax: '02-3476-3617', email: 'y.barun@hangyeol.law', subEmail: '' },
+  student09: { pw: 'court1234', name: '장바른', org: '정직법률사무소', role: 'student', barNum: '880909', barNum2: '901234', zipCode: '06598', addr: '서울특별시 서초구 서초대로 163', addrDetail: '정직법률사무소 10층', mobile: '010-2999-3693', tel: '02-3476-3693', fax: '02-3476-3694', email: 'jang.barun@jeongjik.law', subEmail: '' },
+  student10: { pw: 'court1234', name: '임바른', org: '신뢰법률사무소', role: 'student', barNum: '881010', barNum2: '012345', zipCode: '06600', addr: '서울특별시 서초구 서초대로 170', addrDetail: '신뢰법률사무소 11층', mobile: '010-3110-3770', tel: '02-3476-3770', fax: '02-3476-3771', email: 'lim.barun@sinroe.law', subEmail: '' },
+  admin: { pw: 'admin1234', name: '관리자', org: '운영팀', role: 'admin', barNum: '', barNum2: '', zipCode: '', addr: '', addrDetail: '', mobile: '', tel: '', fax: '', email: 'admin@ecourt.kr', subEmail: '' },
 }
 
 // Checks Supabase accounts table first, falls back to HARDCODED_ACCOUNTS
@@ -46,9 +52,15 @@ export async function validateWithSupabase(id: string, pw: string): Promise<User
           org: acc.org || '',
           role: acc.role || 'student',
           barNum: acc.bar_num || '',
-          addr: '',
-          tel: '',
+          barNum2: acc.bar_num2 || '',
+          zipCode: acc.zip_code || '',
+          addr: acc.addr || '',
+          addrDetail: acc.addr_detail || '',
+          mobile: acc.mobile || '',
+          tel: acc.tel || '',
+          fax: acc.fax || '',
           email: acc.email || '',
+          subEmail: acc.sub_email || '',
         }
       }
     }
@@ -73,9 +85,15 @@ export function validateCredentials(id: string, pw: string): User | null {
           org: la.org || '',
           role: (la.role as 'student' | 'admin') || 'student',
           barNum: la.bar_num || '',
+          barNum2: '',
+          zipCode: '',
           addr: '',
+          addrDetail: '',
+          mobile: '',
           tel: '',
+          fax: '',
           email: la.email || '',
+          subEmail: '',
         }
       }
     } catch { /* ignore */ }
@@ -89,9 +107,15 @@ export function validateCredentials(id: string, pw: string): User | null {
     org: acc.org,
     role: acc.role,
     barNum: acc.barNum,
+    barNum2: acc.barNum2,
+    zipCode: acc.zipCode,
     addr: acc.addr,
+    addrDetail: acc.addrDetail,
+    mobile: acc.mobile,
     tel: acc.tel,
+    fax: acc.fax,
     email: acc.email,
+    subEmail: acc.subEmail,
   }
 }
 
