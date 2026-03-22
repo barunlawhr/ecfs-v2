@@ -169,59 +169,65 @@ export default function MyPage() {
     setAssignmentsLoading(true)
     setAssignError(null)
     try {
-      // 1단계: join 없이 assignments만 가져오기 (user_id 시도)
-      let rows: Record<string, unknown>[] = []
-
-      const res1 = await fetch(
-        `${SB_URL}/rest/v1/assignments?user_id=eq.${encodeURIComponent(user.id)}&select=*`,
-        { headers: SB_HDR }
-      )
-      const d1 = await res1.json()
-      if (Array.isArray(d1) && d1.length > 0) {
-        rows = d1
-      } else {
-        // student_id 컬럼으로 재시도
-        const res2 = await fetch(
-          `${SB_URL}/rest/v1/assignments?student_id=eq.${encodeURIComponent(user.id)}&select=*`,
+      // 1단계: Supabase에서 조회 (실패하면 빈 배열)
+      let sbRows: Record<string, unknown>[] = []
+      try {
+        const res = await fetch(
+          `${SB_URL}/rest/v1/assignments?user_id=eq.${encodeURIComponent(user.id)}&select=*`,
           { headers: SB_HDR }
         )
-        const d2 = await res2.json()
-        if (Array.isArray(d2) && d2.length > 0) {
-          rows = d2
-        } else if (!Array.isArray(d1) || !Array.isArray(d2)) {
-          // 둘 다 오류 객체
-          const errMsg = JSON.stringify(d1) + ' / ' + JSON.stringify(d2)
-          setAssignError(errMsg)
-          setAssignments([])
-          setAssignmentsLoading(false)
-          return
+        const d = await res.json()
+        if (Array.isArray(d) && d.length > 0 && !(d[0]?.code)) sbRows = d
+        else {
+          // student_id 컬럼으로도 시도
+          const res2 = await fetch(
+            `${SB_URL}/rest/v1/assignments?student_id=eq.${encodeURIComponent(user.id)}&select=*`,
+            { headers: SB_HDR }
+          )
+          const d2 = await res2.json()
+          if (Array.isArray(d2) && d2.length > 0 && !(d2[0]?.code)) sbRows = d2
         }
-      }
+      } catch { /* Supabase 실패 무시 */ }
 
-      // 2단계: case_id로 sample_cases 별도 조회
-      const caseIds = [...new Set(rows.map(r => r.case_id).filter(Boolean))]
+      // 2단계: localStorage에서 해당 학생 assignments 읽기
+      const localAll: Record<string, unknown>[] = JSON.parse(localStorage.getItem('ec_assignments') || '[]')
+      const localRows = localAll.filter(r => r.user_id === user.id || r.student_id === user.id)
+
+      // 합치기 (Supabase 우선, 중복 제거)
+      const seen = new Set<string>()
+      const combined = [...sbRows, ...localRows].filter(r => {
+        const key = `${r.user_id || r.student_id}-${r.case_id}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+
+      // 3단계: case_id로 sample_cases 별도 조회
+      const caseIds = [...new Set(combined.map(r => r.case_id).filter(Boolean))]
       let caseMap: Record<string | number, unknown> = {}
       if (caseIds.length > 0) {
-        const caseRes = await fetch(
-          `${SB_URL}/rest/v1/sample_cases?id=in.(${caseIds.join(',')})&select=*`,
-          { headers: SB_HDR }
-        )
-        const cases = await caseRes.json()
-        if (Array.isArray(cases)) {
-          cases.forEach((c: Record<string, unknown>) => { caseMap[c.id as string] = c })
-        }
+        try {
+          const caseRes = await fetch(
+            `${SB_URL}/rest/v1/sample_cases?id=in.(${caseIds.join(',')})&select=*`,
+            { headers: SB_HDR }
+          )
+          const cases = await caseRes.json()
+          if (Array.isArray(cases)) {
+            cases.forEach((c: Record<string, unknown>) => { caseMap[c.id as string | number] = c })
+          }
+        } catch { /* ignore */ }
       }
 
-      const merged: Assignment[] = rows.map(r => ({
+      const result: Assignment[] = combined.map(r => ({
         id: r.id as number,
         student_id: (r.user_id || r.student_id || '') as string,
         status: (r.status || '미제출') as string,
         assigned_at: (r.assigned_at || r.created_at || new Date().toISOString()) as string,
         case_id: r.case_id as string,
-        sample_cases: (caseMap[r.case_id as string] || {}) as Assignment['sample_cases'],
+        sample_cases: (caseMap[r.case_id as string | number] || {}) as Assignment['sample_cases'],
       }))
 
-      setAssignments(merged)
+      setAssignments(result)
     } catch (err) {
       console.error('fetchAssignments exception:', err)
       setAssignments([])

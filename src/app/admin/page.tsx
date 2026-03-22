@@ -788,15 +788,34 @@ export default function AdminPage() {
 
     const [dueDate, setDueDate] = useState('')
 
-    async function assignCase(userId: string, caseId: number, due: string) {
-      const res = await fetch(`${SB_URL}/rest/v1/assignments`, {
-        method: 'POST',
-        headers: { ...SB_HDR, Prefer: 'return=minimal' },
-        body: JSON.stringify({ user_id: userId, case_id: caseId, due_date: due || null, status: '미제출' }),
+    function saveAssignmentLocal(userId: string, caseId: number, due: string) {
+      const key = 'ec_assignments'
+      const all = JSON.parse(localStorage.getItem(key) || '[]')
+      all.push({
+        id: Date.now(),
+        user_id: userId,
+        case_id: caseId,
+        due_date: due || null,
+        status: '미제출',
+        assigned_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
       })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(JSON.stringify(err))
+      localStorage.setItem(key, JSON.stringify(all))
+    }
+
+    async function assignCase(userId: string, caseId: number, due: string) {
+      try {
+        const res = await fetch(`${SB_URL}/rest/v1/assignments`, {
+          method: 'POST',
+          headers: { ...SB_HDR, Prefer: 'return=minimal' },
+          body: JSON.stringify({ user_id: userId, case_id: caseId, due_date: due || null, status: '미제출' }),
+        })
+        if (!res.ok) {
+          // Supabase 실패 시 localStorage에 저장
+          saveAssignmentLocal(userId, caseId, due)
+        }
+      } catch {
+        saveAssignmentLocal(userId, caseId, due)
       }
       return true
     }
@@ -805,12 +824,24 @@ export default function AdminPage() {
       setAssignLoading(true)
       const [casesData, assignData] = await Promise.all([
         supabase.from('sample_cases').select('*').order('created_at', { ascending: false }).then(r => r.data || []),
-        fetch(`${SB_URL}/rest/v1/assignments?select=*,sample_cases(*)&order=id.desc`, {
+        fetch(`${SB_URL}/rest/v1/assignments?select=*&order=id.desc`, {
           headers: SB_HDR,
-        }).then(r => r.json()),
+        }).then(r => r.json()).catch(() => []),
       ])
+      // localStorage 데이터와 합치기
+      const localAssign: unknown[] = JSON.parse(localStorage.getItem('ec_assignments') || '[]')
+      const sbRows: unknown[] = Array.isArray(assignData) && !((assignData as {code?:string}[])[0]?.code) ? assignData : []
+      const merged = [...sbRows, ...localAssign]
+      // 중복 제거 (case_id + user_id 기준)
+      const seen = new Set<string>()
+      const deduped = merged.filter((a) => {
+        const key = `${(a as {user_id?:string}).user_id}-${(a as {case_id?:number}).case_id}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
       setCases(casesData)
-      setCurrentAssignments(Array.isArray(assignData) ? assignData : [])
+      setCurrentAssignments(deduped as typeof currentAssignments)
       setAssignLoading(false)
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
