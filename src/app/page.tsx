@@ -10,7 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 
 const quickIcons = [
   { label: '나의사건관리', icon: '📁', href: '/mypage' },
-  { label: '작성중서류', icon: '📝', href: '/apply' },
+  { label: '작성중서류', icon: '📝', href: '/apply?new=true' },
   { label: '미확인송달문서', icon: '📬', href: '/mypage' },
   { label: '제증명발급', icon: '📜', href: '#' },
   { label: '소송비용납부', icon: '💰', href: '#' },
@@ -20,7 +20,7 @@ const quickIcons = [
 const docTabs = ['민사 서류', '형사 서류', '가사 서류', '보호 서류', '행정 서류', '특허 서류', '회생·파산 서류', '민사집행 서류', '비송·과태료 서류'];
 
 const civilDocs = [
-  { name: '소장', href: '/apply' },
+  { name: '소장', href: '/apply?new=true' },
   { name: '답변서(청구취지/원인)', href: '/answer' },
   { name: '준비서면', href: '#' },
   { name: '서증', href: '#' },
@@ -308,7 +308,7 @@ export default function HomePage() {
                   <span style={{ fontSize: 12, color: '#888', background: '#f3f4f6', padding: '2px 8px', borderRadius: 3 }}>로그인 후 서류작성이 가능합니다.</span>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={() => go('/apply')} style={{ fontSize: 12, padding: '4px 12px', border: '1px solid #aaa', borderRadius: 3, background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>전체서류 ›</button>
+                  <button onClick={() => go('/apply?new=true')} style={{ fontSize: 12, padding: '4px 12px', border: '1px solid #aaa', borderRadius: 3, background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>전체서류 ›</button>
                   <button onClick={() => alert('실습 모드')} style={{ fontSize: 12, padding: '4px 12px', border: '1px solid #aaa', borderRadius: 3, background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>서류검색 ›</button>
                 </div>
               </div>
@@ -466,7 +466,7 @@ export default function HomePage() {
                   나홀로 소송에서 제공하는 서증, 서류작성에서 간편한 공정증수소관 및 내용증명로 제공하고 있습니다.
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => go('/apply')} style={{
+                  <button onClick={() => go('/apply?new=true')} style={{
                     background: '#fff', color: '#1a3a6b', border: 'none', borderRadius: 4,
                     padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
                   }}>소장 작성하기</button>

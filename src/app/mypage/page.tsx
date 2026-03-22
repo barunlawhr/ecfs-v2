@@ -266,7 +266,7 @@ export default function MyPage() {
 
   function goToApply(sc: Assignment['sample_cases']) {
     sessionStorage.setItem('assigned_case', JSON.stringify(sc))
-    router.push('/apply')
+    router.push('/apply?new=true')
   }
 
   function navTo(page: ActivePage, title = '') {
@@ -427,7 +427,7 @@ export default function MyPage() {
               <div style={{ width: 62, height: 62, borderRadius: '50%', border: '2px dashed #c8cdd6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, flexShrink: 0, color: '#8899bb' }}>📋</div>
             </div>
             <div style={{ marginTop: 14, textAlign: 'center' }}>
-              <button onClick={() => router.push('/apply')} style={{ padding: '7px 32px', background: TC, color: '#fff', border: 'none', borderRadius: 4, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <button onClick={() => router.push('/apply?new=true')} style={{ padding: '7px 32px', background: TC, color: '#fff', border: 'none', borderRadius: 4, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                 사건등록
               </button>
             </div>
@@ -593,13 +593,83 @@ export default function MyPage() {
     </div>
   )
 
+  // ── DRAFT DOCS ───────────────────────────────────────────────
+  interface DraftItem {
+    id: string
+    savedAt: string
+    userId: string
+    title: string
+    formData: unknown
+  }
+
+  const DraftDocsContent = () => {
+    const [drafts, setDrafts] = useState<DraftItem[]>([])
+
+    useEffect(() => {
+      loadDrafts()
+    }, [])
+
+    function loadDrafts() {
+      try {
+        const all: DraftItem[] = JSON.parse(localStorage.getItem('ecfs_drafts') || '[]')
+        setDrafts(all.filter(d => d.userId === user?.id))
+      } catch { setDrafts([]) }
+    }
+
+    function deleteDraft(id: string) {
+      if (!confirm('삭제하시겠습니까?')) return
+      try {
+        const all: DraftItem[] = JSON.parse(localStorage.getItem('ecfs_drafts') || '[]')
+        localStorage.setItem('ecfs_drafts', JSON.stringify(all.filter(d => d.id !== id)))
+        loadDrafts()
+      } catch { /* ignore */ }
+    }
+
+    return (
+      <div>
+        <PageHd title="작성중서류" actions={<ActBtn label="📋 새 소장 작성" onClick={() => router.push('/apply?new=true')} primary />} />
+        {drafts.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 60, background: '#fff', border: '1px solid #dde0e8', borderTop: 'none' }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>📝</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#003366', marginBottom: 8 }}>임시저장된 서류가 없습니다</div>
+            <div style={{ fontSize: 12, color: '#888' }}>소장 작성 중 [임시저장] 버튼을 클릭하면 여기에 저장됩니다.</div>
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', border: '1px solid #dde0e8', borderTop: 'none' }}>
+            <thead>
+              <tr style={{ background: '#f0f2f6', borderBottom: '2px solid #c8d0dc' }}>
+                <th style={{ padding: '10px 14px', fontSize: 12, fontWeight: 700, textAlign: 'left', color: '#333' }}>제목</th>
+                <th style={{ padding: '10px 14px', fontSize: 12, fontWeight: 700, textAlign: 'center', color: '#333', width: 160 }}>저장일시</th>
+                <th style={{ padding: '10px 14px', fontSize: 12, fontWeight: 700, textAlign: 'center', color: '#333', width: 160 }}>관리</th>
+              </tr>
+            </thead>
+            <tbody>
+              {drafts.map(d => (
+                <tr key={d.id} style={{ borderBottom: '1px solid #eee' }}>
+                  <td style={{ padding: '11px 14px', fontSize: 13 }}>📄 {d.title}</td>
+                  <td style={{ padding: '11px 14px', fontSize: 12, color: '#666', textAlign: 'center' }}>
+                    {new Date(d.savedAt).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  </td>
+                  <td style={{ padding: '11px 14px', textAlign: 'center' }}>
+                    <button onClick={() => router.push(`/apply?draftId=${d.id}`)} style={{ height: 30, padding: '0 14px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 3, fontSize: 12, fontWeight: 700, cursor: 'pointer', marginRight: 6, fontFamily: 'inherit' }}>이어쓰기</button>
+                    <button onClick={() => deleteDraft(d.id)} style={{ height: 30, padding: '0 14px', background: '#fff', color: '#c00', border: '1px solid #fca5a5', borderRadius: 3, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>삭제</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    )
+  }
+
   // ── PRACTICE RECORDS ─────────────────────────────────────────
   const PracticeRecordsContent = () => {
     const avgScore = practiceRecords.length ? Math.round(practiceRecords.reduce((s, r) => s + r.score, 0) / practiceRecords.length) : 0
     const best = practiceRecords.length ? Math.max(...practiceRecords.map(r => r.score)) : 0
     return (
       <div>
-        <PageHd title="나의 실습기록" actions={<><ActBtn label="🖨 출력" primary /><ActBtn label="📋 소장 작성하기" onClick={() => router.push('/apply')} primary /></>} />
+        <PageHd title="나의 실습기록" actions={<><ActBtn label="🖨 출력" primary /><ActBtn label="📋 소장 작성하기" onClick={() => router.push('/apply?new=true')} primary /></>} />
         <div style={{ padding: '16px 20px', background: '#fff', borderBottom: '1px solid #dde0e8', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
           {[
             { n: practiceRecords.length, l: '총 실습 횟수', c: '#003366' },
@@ -620,7 +690,7 @@ export default function MyPage() {
             <div style={{ fontSize: 48, marginBottom: 14 }}>📋</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#888', marginBottom: 8 }}>아직 실습 기록이 없습니다</div>
             <div style={{ fontSize: 12, color: '#aaa', marginBottom: 20 }}>소장 작성 실습을 완료하면 기록이 저장됩니다.</div>
-            <button onClick={() => router.push('/apply')} style={{ background: '#006699', color: '#fff', border: 'none', height: 38, padding: '0 20px', fontSize: 13, fontWeight: 700, borderRadius: 3, cursor: 'pointer', fontFamily: 'inherit' }}>📋 지금 실습 시작하기</button>
+            <button onClick={() => router.push('/apply?new=true')} style={{ background: '#006699', color: '#fff', border: 'none', height: 38, padding: '0 20px', fontSize: 13, fontWeight: 700, borderRadius: 3, cursor: 'pointer', fontFamily: 'inherit' }}>📋 지금 실습 시작하기</button>
           </div>
         ) : (
           <div style={{ borderTop: '1px solid #eee' }}>
@@ -667,7 +737,7 @@ export default function MyPage() {
   // ── SUBMITTED DOCS ───────────────────────────────────────────
   const SubmittedDocsContent = () => (
     <div>
-      <PageHd title="제출서류" actions={<><ActBtn label="🖨 출력" /><ActBtn label="📋 새 소장 작성" onClick={() => router.push('/apply')} primary /></>} />
+      <PageHd title="제출서류" actions={<><ActBtn label="🖨 출력" /><ActBtn label="📋 새 소장 작성" onClick={() => router.push('/apply?new=true')} primary /></>} />
       <div style={{ padding: '10px 14px', background: '#fff', borderBottom: '1px solid #eee', fontSize: 12, color: '#555', lineHeight: 1.8 }}>
         ※ 소장 작성 실습 후 <strong>문서제출</strong>을 완료한 서류 목록입니다.
       </div>
@@ -682,7 +752,7 @@ export default function MyPage() {
             <div style={{ fontSize: 48, marginBottom: 14 }}>📭</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#888', marginBottom: 8 }}>제출된 서류가 없습니다</div>
             <div style={{ fontSize: 12, color: '#aaa', marginBottom: 20 }}>소장 작성 후 문서제출까지 완료하면 이곳에 기록됩니다.</div>
-            <button onClick={() => router.push('/apply')} style={{ height: 38, padding: '0 20px', background: '#006699', color: '#fff', border: 'none', borderRadius: 3, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>📋 소장 작성하기</button>
+            <button onClick={() => router.push('/apply?new=true')} style={{ height: 38, padding: '0 20px', background: '#006699', color: '#fff', border: 'none', borderRadius: 3, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>📋 소장 작성하기</button>
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
@@ -2262,6 +2332,7 @@ export default function MyPage() {
       case 'status': return <StatusContent />
       case 'active-cases': return <ActiveCasesContent />
       case 'assigned-cases': return <AssignedCasesContent />
+      case 'draft-docs': return <DraftDocsContent />
       case 'practice-records': return <PracticeRecordsContent />
       case 'submitted-docs': return <SubmittedDocsContent />
       case 'schedule': return <ScheduleContent />
@@ -2346,7 +2417,7 @@ export default function MyPage() {
           <GrpHd label="나의문서함" gKey="나의문서함" />
           {openGroups['나의문서함'] && (
             <>
-              <SbItem label="작성중서류" page="generic" title="작성중서류" />
+              <SbItem label="작성중서류" page="draft-docs" />
               <SbItem label="제출서류" page="submitted-docs" />
               <SbItem label="미확인송달문서" page="unread-delivery" />
               <SbItem label="전체송달문서" page="all-delivery" />

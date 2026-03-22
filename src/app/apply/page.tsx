@@ -303,6 +303,7 @@ export default function ApplyPage() {
   const [attachRows, setAttachRows] = useState<{id:string;번호:number;서류명:string;파일명:string;파일크기:number;등록일:string}[]>([]);
   const [attachAllChecked, setAttachAllChecked] = useState(false);
   const [showAttachRegModal, setShowAttachRegModal] = useState(false);
+  const [draftToast, setDraftToast] = useState(false);
 
   useEffect(() => { if (!loading && !user) router.push('/'); }, [user, loading, router]);
 
@@ -310,6 +311,23 @@ export default function ApplyPage() {
     if (!user) return;
 
     function loadAssignedCase() {
+      // ?draftId=xxx → 임시저장 불러오기
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const draftId = params.get('draftId');
+        if (draftId) {
+          const drafts: {id:string;userId:string;formData:ComplaintFormData}[] = JSON.parse(localStorage.getItem('ecfs_drafts') || '[]');
+          const draft = drafts.find(d => d.id === draftId && d.userId === user!.id);
+          if (draft?.formData) {
+            setData(draft.formData);
+            if (draft.formData.claimCause && causeRef.current) {
+              causeRef.current.innerText = draft.formData.claimCause;
+            }
+            return;
+          }
+        }
+      } catch { /* ignore */ }
+
       // sessionStorage에 배정사건이 있을 때만 폼에 적용 (mypage에서 "소장 작성하기" 클릭 시)
       try {
         const raw = sessionStorage.getItem('assigned_case');
@@ -422,9 +440,20 @@ export default function ApplyPage() {
   }
 
   function saveDraft() {
+    if (!user) return;
     try {
-      localStorage.setItem('ecfs_apply_draft', JSON.stringify(data));
-      alert('임시저장 되었습니다.');
+      const drafts: unknown[] = JSON.parse(localStorage.getItem('ecfs_drafts') || '[]');
+      const title = data.caseName || data.caseCategory || '민사서류 - 소장';
+      const draft = {
+        id: Date.now().toString(),
+        savedAt: new Date().toISOString(),
+        userId: user.id,
+        title,
+        formData: data,
+      };
+      localStorage.setItem('ecfs_drafts', JSON.stringify([draft, ...drafts]));
+      setDraftToast(true);
+      setTimeout(() => setDraftToast(false), 2500);
     } catch { alert('임시저장에 실패했습니다.'); }
   }
 
@@ -1996,6 +2025,11 @@ export default function ApplyPage() {
         </div>
       </div>
 
+      {draftToast && (
+        <div style={{ position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)', background: '#1a3a6b', color: '#fff', padding: '11px 28px', borderRadius: 8, fontSize: 13, fontWeight: 700, zIndex: 9999, boxShadow: '0 4px 16px rgba(0,0,0,.25)' }}>
+          ✅ 임시저장 완료
+        </div>
+      )}
       <Footer />
     </div>
   );
