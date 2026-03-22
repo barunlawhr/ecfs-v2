@@ -131,12 +131,12 @@ export default function AdminPage() {
         monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
         monday.setHours(0, 0, 0, 0)
 
-        const [prRes, assignRes] = await Promise.all([
-          supabase.from('practice_records').select('score, created_at'),
+        const [prJson, assignRes] = await Promise.all([
+          fetch('/api/admin/records').then(r => r.json()).catch(() => ({ data: [] })),
           fetch(`${SB_URL}/rest/v1/assignments?select=id`, { headers: SB_HDR }).then(r => r.json()),
         ])
 
-        const records = prRes.data || []
+        const records = prJson.data || []
         const total = records.length
         const avg = total > 0 ? Math.round(records.reduce((s: number, r: { score: number }) => s + r.score, 0) / total) : 0
         const week = records.filter((r: { created_at: string }) => new Date(r.created_at) >= monday).length
@@ -1024,8 +1024,22 @@ export default function AdminPage() {
 
     async function load() {
       setRecLoading(true)
-      const { data } = await supabase.from('practice_records').select('*').order('created_at', { ascending: false })
-      setRecords(data || [])
+      try {
+        const res = await fetch('/api/admin/records')
+        const json = await res.json()
+        if (!res.ok) {
+          console.error('[RecordsPanel] API error:', json)
+          // fallback: try direct supabase
+          const { data, error } = await supabase.from('practice_records').select('*').order('created_at', { ascending: false })
+          if (error) console.error('[RecordsPanel] Supabase fallback error:', error)
+          setRecords(data || [])
+        } else {
+          console.log('[RecordsPanel] loaded', json.data?.length, 'records, serviceKey:', json.usingServiceKey)
+          setRecords(json.data || [])
+        }
+      } catch (e) {
+        console.error('[RecordsPanel] load error:', e)
+      }
       setRecLoading(false)
     }
 
