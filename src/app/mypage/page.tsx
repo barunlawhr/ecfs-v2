@@ -66,7 +66,8 @@ interface DocItem {
 
 interface PracticeRecord {
   id: string
-  user_id: string
+  student_id?: string
+  user_id?: string
   user_name?: string
   score: number
   feedback?: string
@@ -166,7 +167,7 @@ export default function MyPage() {
     setAssignmentsLoading(true)
     try {
       const res = await fetch(
-        `${SB_URL}/rest/v1/assignments?select=*,sample_cases(*)&student_id=eq.${encodeURIComponent(user.id)}&order=assigned_at.desc`,
+        `${SB_URL}/rest/v1/assignments?select=*,sample_cases(*)&user_id=eq.${encodeURIComponent(user.id)}&order=assigned_at.desc`,
         { headers: SB_HDR }
       )
       const data = await res.json()
@@ -182,18 +183,27 @@ export default function MyPage() {
     setPracticeLoading(true)
     try {
       const res = await fetch(
-        `${SB_URL}/rest/v1/practice_records?user_id=eq.${encodeURIComponent(user.id)}&order=created_at.desc&limit=50`,
+        `${SB_URL}/rest/v1/practice_records?student_id=eq.${encodeURIComponent(user.id)}&order=created_at.desc&limit=50`,
         { headers: SB_HDR }
       )
       const data = await res.json()
-      // also merge localStorage backup
-      const localKey = 'ec_records_' + user.id
+      // localStorage 폴백 (apply 페이지와 동일한 키 사용)
+      const localKey = 'ecfs_practice_records'
       let local: PracticeRecord[] = []
-      try { local = JSON.parse(localStorage.getItem(localKey) || '[]') } catch { /* ignore */ }
-      const rows: PracticeRecord[] = Array.isArray(data) ? data : []
-      setPracticeRecords(rows.length > 0 ? rows : local)
+      try {
+        const all = JSON.parse(localStorage.getItem(localKey) || '[]')
+        local = all.filter((r: PracticeRecord & { student_id?: string }) => r.student_id === user.id)
+      } catch { /* ignore */ }
+      const rows: PracticeRecord[] = Array.isArray(data) && data.length > 0 && !data[0]?.code ? data : local
+      setPracticeRecords(rows)
     } catch {
-      setPracticeRecords([])
+      // Supabase 실패 시 localStorage만 사용
+      try {
+        const localKey = 'ecfs_practice_records'
+        const all = JSON.parse(localStorage.getItem(localKey) || '[]')
+        const local = all.filter((r: PracticeRecord & { student_id?: string }) => r.student_id === user.id)
+        setPracticeRecords(local)
+      } catch { setPracticeRecords([]) }
     }
     setPracticeLoading(false)
   }
