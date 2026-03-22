@@ -128,8 +128,9 @@ export default function MyPage() {
   const [allCases, setAllCases] = useState<Assignment[]>([])  // B방식: 전체 sample_cases
   const [allCasesLoading, setAllCasesLoading] = useState(false)
   const [practiceRecords, setPracticeRecords] = useState<PracticeRecord[]>([])
+  const [localRecords, setLocalRecords] = useState<PracticeRecord[]>([])
   const [practiceLoading, setPracticeLoading] = useState(false)
-  const [syncing, setSyncing] = useState(false)
+  const [submittingId, setSubmittingId] = useState<string | null>(null)
   const [syncToast, setSyncToast] = useState('')
   const [expandedFeedback, setExpandedFeedback] = useState<Record<string, boolean>>({})
   const [viewDocCase, setViewDocCase] = useState<ViewDocCase | null>(null)
@@ -235,147 +236,84 @@ export default function MyPage() {
     setAssignmentsLoading(false)
   }
 
+  function loadLocalRecords() {
+    if (!user) return
+    try {
+      const all = JSON.parse(localStorage.getItem('ecfs_practice_records') || '[]')
+      setLocalRecords(all.filter((r: PracticeRecord & { student_id?: string }) => r.student_id === user.id))
+    } catch { setLocalRecords([]) }
+  }
+
   async function fetchPracticeRecords() {
     if (!user) return
     setPracticeLoading(true)
-
-    // localStorage에 있는 미동기화 레코드를 Supabase에 업로드
-    async function syncLocalToSupabase(local: PracticeRecord[]) {
-      if (local.length === 0) return
-      for (const r of local) {
-        try {
-          // id 제외 (Supabase 자동 생성), submitted_at → created_at 매핑
-          const payload: Record<string, unknown> = {
-            student_id: r.student_id || user!.id,
-            user_name: r.user_name || user!.name,
-            case_type: r.case_type,
-            court: r.court,
-            plaintiff: r.plaintiff,
-            defendant: r.defendant,
-            has_agent: r.has_agent,
-            evidence_count: r.evidence_count,
-            score: r.score,
-            feedback: r.feedback,
-            case_id: r.case_id,
-            submitted_at: (r as PracticeRecord & { submitted_at?: string }).submitted_at || r.created_at,
-          }
-          // complaint_data, grade_breakdown 컬럼이 있으면 포함
-          if (r.complaint_data) payload.complaint_data = r.complaint_data
-          const rAny = r as unknown as Record<string, unknown>
-          if (rAny.grade_breakdown) payload.grade_breakdown = rAny.grade_breakdown
-          if (r.doc_type) payload.doc_type = r.doc_type
-
-          console.log('[sync] inserting record:', r.id, payload)
-          const { error } = await supabase.from('practice_records').insert(payload)
-          if (!error) {
-            console.log('[sync] success:', r.id)
-            // 동기화 성공 시 localStorage에서 제거
-            const localKey = 'ecfs_practice_records'
-            const all = JSON.parse(localStorage.getItem(localKey) || '[]')
-            localStorage.setItem(localKey, JSON.stringify(all.filter((x: { id: string }) => x.id !== r.id)))
-          } else {
-            console.error('[sync] insert failed:', error.code, error.message, error.details)
-          }
-        } catch { /* 동기화 실패 무시 */ }
-      }
-    }
-
+    // Supabase에서 이미 제출된 기록
     try {
-      const localKey = 'ecfs_practice_records'
-      let local: PracticeRecord[] = []
-      try {
-        const all = JSON.parse(localStorage.getItem(localKey) || '[]')
-        local = all.filter((r: PracticeRecord & { student_id?: string }) => r.student_id === user.id)
-      } catch { /* ignore */ }
-
-      // localStorage 데이터 Supabase 동기화 시도
-      if (local.length > 0) {
-        await syncLocalToSupabase(local)
-      }
-
-      // Supabase에서 최신 데이터 조회
-      const { data, error } = await supabase
-        .from('practice_records')
-        .select('*')
-        .eq('student_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(50)
-
-      if (error) throw error
-
-      if (data && data.length > 0) {
-        setPracticeRecords(data)
-      } else {
-        // Supabase에 없으면 localStorage 사용
-        const localKey2 = 'ecfs_practice_records'
-        const all2 = JSON.parse(localStorage.getItem(localKey2) || '[]')
-        const local2 = all2.filter((r: PracticeRecord & { student_id?: string }) => r.student_id === user.id)
-        setPracticeRecords(local2)
-      }
-    } catch {
-      // 전체 실패 시 localStorage 표시
-      try {
-        const localKey = 'ecfs_practice_records'
-        const all = JSON.parse(localStorage.getItem(localKey) || '[]')
-        setPracticeRecords(all.filter((r: PracticeRecord & { student_id?: string }) => r.student_id === user.id))
-      } catch { setPracticeRecords([]) }
-    }
+      const res = await fetch(`${SB_URL}/rest/v1/practice_records?student_id=eq.${encodeURIComponent(user.id)}&order=created_at.desc&limit=50`, {
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+      })
+      const data = await res.json()
+      setPracticeRecords(Array.isArray(data) && !data[0]?.code ? data : [])
+    } catch { setPracticeRecords([]) }
+    // localStorage에서 미제출 기록
+    loadLocalRecords()
     setPracticeLoading(false)
   }
 
-  async function syncRecords() {
+  async function submitRecord(r: PracticeRecord) {
     if (!user) return
-    setSyncing(true)
+    setSubmittingId(r.id)
     try {
-      const localKey = 'ecfs_practice_records'
-      const all: (PracticeRecord & { student_id?: string; submitted_at?: string })[] = JSON.parse(localStorage.getItem(localKey) || '[]')
-      const mine = all.filter(r => r.student_id === user.id)
-      if (mine.length === 0) { setSyncToast('동기화할 기록이 없습니다.'); setTimeout(() => setSyncToast(''), 3000); setSyncing(false); return }
-
-      let ok = 0
-      for (const r of mine) {
-        // score 0이면 재채점
-        let { score, feedback } = r as { score: number; feedback?: string }
-        let breakdown = (r as unknown as Record<string, unknown>).grade_breakdown as { parties: number; claim: number; cause: number; evidence: number } | undefined
-        if (!score || score === 0) {
-          const res = calculateScore(r.complaint_data || r)
-          score = res.score
-          breakdown = res.breakdown
-          feedback = generateFeedback(score, res.breakdown)
-        }
-        const payload = {
-          id: r.id,
-          student_id: r.student_id || user.id,
-          user_name: r.user_name || user.name,
-          case_type: r.case_type,
-          court: r.court,
-          plaintiff: r.plaintiff,
-          defendant: r.defendant,
-          has_agent: r.has_agent,
-          evidence_count: r.evidence_count,
-          score,
-          feedback,
-          grade_breakdown: breakdown,
-          complaint_data: r.complaint_data,
-          case_id: (r as unknown as Record<string, unknown>).case_id,
-          submitted_at: r.submitted_at || r.created_at,
-        }
-        const res = await fetch(`${SB_URL}/rest/v1/practice_records`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'resolution=merge-duplicates,return=minimal' },
-          body: JSON.stringify(payload),
-        })
-        if (res.ok || res.status === 201) ok++
-        else console.error('[sync]', r.id, await res.text())
+      // score 0이면 재채점
+      let score = r.score || 0
+      let feedback = r.feedback || ''
+      let breakdown = (r as unknown as Record<string, unknown>).grade_breakdown
+      if (!score || score === 0) {
+        const res = calculateScore(r.complaint_data || r)
+        score = res.score
+        breakdown = res.breakdown
+        feedback = generateFeedback(score, res.breakdown)
       }
-      setSyncToast(`동기화 완료! ${ok}/${mine.length}건 업로드. admin에서 확인 가능합니다.`)
-      setTimeout(() => setSyncToast(''), 4000)
-      await fetchPracticeRecords()
+      const payload = {
+        id: r.id,
+        student_id: r.student_id || user.id,
+        user_name: r.user_name || user.name,
+        case_type: r.case_type,
+        court: r.court,
+        plaintiff: r.plaintiff,
+        defendant: r.defendant,
+        has_agent: r.has_agent,
+        evidence_count: r.evidence_count,
+        score,
+        feedback,
+        grade_breakdown: breakdown,
+        complaint_data: r.complaint_data,
+        case_id: (r as unknown as Record<string, unknown>).case_id || null,
+        submitted_at: (r as unknown as Record<string, unknown>).submitted_at || r.created_at,
+      }
+      const sbRes = await fetch(`${SB_URL}/rest/v1/practice_records`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(payload),
+      })
+      if (sbRes.ok || sbRes.status === 201) {
+        // localStorage에서 제거
+        const all = JSON.parse(localStorage.getItem('ecfs_practice_records') || '[]')
+        localStorage.setItem('ecfs_practice_records', JSON.stringify(all.filter((x: { id: string }) => x.id !== r.id)))
+        setSyncToast('제출 완료! admin에서 확인 가능합니다.')
+        setTimeout(() => setSyncToast(''), 3000)
+        await fetchPracticeRecords()
+      } else {
+        const errText = await sbRes.text()
+        console.error('[submitRecord] failed:', sbRes.status, errText)
+        setSyncToast('제출 실패: ' + sbRes.status)
+        setTimeout(() => setSyncToast(''), 3000)
+      }
     } catch (e) {
-      setSyncToast('동기화 실패: ' + String(e))
+      setSyncToast('제출 오류: ' + String(e))
       setTimeout(() => setSyncToast(''), 3000)
     }
-    setSyncing(false)
+    setSubmittingId(null)
   }
 
   function toggleGroup(g: string) {
@@ -782,15 +720,58 @@ export default function MyPage() {
   }
 
   // ── PRACTICE RECORDS ─────────────────────────────────────────
+  const RecordCard = ({ r, isLocal }: { r: PracticeRecord; isLocal?: boolean }) => (
+    <div style={{ borderBottom: '1px solid #eaecf4', padding: '16px 20px', background: isLocal ? '#fffbeb' : '#fff' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+        <div style={{ background: bgFn(r.score), borderRadius: 8, padding: '12px 16px', textAlign: 'center', minWidth: 76, flexShrink: 0 }}>
+          <div style={{ fontSize: 26, fontWeight: 700, color: colorFn(r.score), lineHeight: 1 }}>{r.score}</div>
+          <div style={{ fontSize: 10, color: colorFn(r.score), marginTop: 2 }}>/ 100점</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: colorFn(r.score), marginTop: 4 }}>{gradeFn(r.score).split(' ')[1]}</div>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#003366' }}>{r.case_type || '소장 실습'}</span>
+            <span style={{ fontSize: 11, color: '#888' }}>{r.court || ''}</span>
+            {isLocal && <span style={{ fontSize: 10, background: '#fef3c7', color: '#92400e', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>미제출</span>}
+            <span style={{ fontSize: 11, color: '#aaa', marginLeft: 'auto' }}>{r.created_at?.slice(0, 10) || ''}</span>
+          </div>
+          <div style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>
+            원고: {r.plaintiff || '–'} | 피고: {r.defendant || '–'} | 입증서류: {r.evidence_count || 0}건
+          </div>
+          {r.feedback && (
+            <div style={{ background: '#f8f9fc', border: '1px solid #e0e6ee', borderRadius: 4, padding: '10px 12px', marginBottom: isLocal ? 8 : 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#003366', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                📋 채점 피드백
+                <button onClick={() => setExpandedFeedback(prev => ({ ...prev, [r.id]: !prev[r.id] }))} style={{ background: 'none', border: '1px solid #c8cdd6', borderRadius: 3, fontSize: 10, padding: '1px 6px', cursor: 'pointer', color: '#555', marginLeft: 'auto', fontFamily: 'inherit' }}>
+                  {expandedFeedback[r.id] ? '접기' : '펼치기'}
+                </button>
+              </div>
+              {expandedFeedback[r.id] && (
+                <div style={{ fontSize: 11, color: '#444', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{r.feedback}</div>
+              )}
+            </div>
+          )}
+          {isLocal && (
+            <button
+              onClick={() => submitRecord(r)}
+              disabled={submittingId === r.id}
+              style={{ height: 32, padding: '0 16px', background: submittingId === r.id ? '#ccc' : '#0067c2', color: '#fff', border: 'none', borderRadius: 4, fontSize: 12, fontWeight: 700, cursor: submittingId === r.id ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+            >
+              {submittingId === r.id ? '제출 중…' : '☁ admin에 제출'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+
   const PracticeRecordsContent = () => {
-    const avgScore = practiceRecords.length ? Math.round(practiceRecords.reduce((s, r) => s + r.score, 0) / practiceRecords.length) : 0
-    const best = practiceRecords.length ? Math.max(...practiceRecords.map(r => r.score)) : 0
+    const allRecords = [...practiceRecords]
+    const avgScore = allRecords.length ? Math.round(allRecords.reduce((s, r) => s + r.score, 0) / allRecords.length) : 0
+    const best = allRecords.length ? Math.max(...allRecords.map(r => r.score)) : 0
     return (
       <div>
-        <PageHd title="나의 실습기록" actions={<>
-          <ActBtn label={syncing ? '동기화 중…' : '☁ 기록 동기화'} onClick={syncRecords} primary={false} />
-          <ActBtn label="📋 소장 작성하기" onClick={() => router.push('/apply?new=true')} primary />
-        </>} />
+        <PageHd title="나의 실습기록" actions={<ActBtn label="📋 소장 작성하기" onClick={() => router.push('/apply?new=true')} primary />} />
         {syncToast && (
           <div style={{ margin: '8px 20px', padding: '10px 16px', background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 8, fontSize: 13, color: '#065f46', fontWeight: 600 }}>
             {syncToast}
@@ -798,10 +779,10 @@ export default function MyPage() {
         )}
         <div style={{ padding: '16px 20px', background: '#fff', borderBottom: '1px solid #dde0e8', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
           {[
-            { n: practiceRecords.length, l: '총 실습 횟수', c: '#003366' },
-            { n: avgScore, l: '평균 점수', c: '#006699' },
-            { n: best, l: '최고 점수', c: '#15803d' },
-            { n: practiceRecords.length ? gradeFn(avgScore).split(' ')[1] : '–', l: '평균 등급', c: colorFn(avgScore) },
+            { n: allRecords.length + localRecords.length, l: '총 실습 횟수', c: '#003366' },
+            { n: avgScore || 0, l: '평균 점수', c: '#006699' },
+            { n: best || 0, l: '최고 점수', c: '#15803d' },
+            { n: localRecords.length, l: '미제출', c: localRecords.length > 0 ? '#d97706' : '#888' },
           ].map(({ n, l, c }) => (
             <div key={l} style={{ background: '#f0f4f8', borderRadius: 6, padding: 16, textAlign: 'center' }}>
               <div style={{ fontSize: 26, fontWeight: 700, color: c }}>{practiceLoading ? '…' : n}</div>
@@ -811,49 +792,31 @@ export default function MyPage() {
         </div>
         {practiceLoading ? (
           <div style={{ textAlign: 'center', padding: 40, color: '#aaa' }}>⏳ 기록을 불러오는 중...</div>
-        ) : practiceRecords.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 48, color: '#aaa' }}>
-            <div style={{ fontSize: 48, marginBottom: 14 }}>📋</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#888', marginBottom: 8 }}>아직 실습 기록이 없습니다</div>
-            <div style={{ fontSize: 12, color: '#aaa', marginBottom: 20 }}>소장 작성 실습을 완료하면 기록이 저장됩니다.</div>
-            <button onClick={() => router.push('/apply?new=true')} style={{ background: '#006699', color: '#fff', border: 'none', height: 38, padding: '0 20px', fontSize: 13, fontWeight: 700, borderRadius: 3, cursor: 'pointer', fontFamily: 'inherit' }}>📋 지금 실습 시작하기</button>
-          </div>
         ) : (
           <div style={{ borderTop: '1px solid #eee' }}>
-            {practiceRecords.map((r, i) => (
-              <div key={r.id || i} style={{ borderBottom: '1px solid #eaecf4', padding: '16px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                  <div style={{ background: bgFn(r.score), borderRadius: 8, padding: '12px 16px', textAlign: 'center', minWidth: 76, flexShrink: 0 }}>
-                    <div style={{ fontSize: 26, fontWeight: 700, color: colorFn(r.score), lineHeight: 1 }}>{r.score}</div>
-                    <div style={{ fontSize: 10, color: colorFn(r.score), marginTop: 2 }}>/ 100점</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: colorFn(r.score), marginTop: 4 }}>{gradeFn(r.score).split(' ')[1]}</div>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#003366' }}>{r.case_type || '소장 실습'}</span>
-                      <span style={{ fontSize: 11, color: '#888' }}>{r.court || ''}</span>
-                      <span style={{ fontSize: 11, color: '#aaa', marginLeft: 'auto' }}>{r.date_str || r.created_at?.slice(0, 10) || ''}</span>
-                    </div>
-                    <div style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>
-                      원고: {r.plaintiff || '–'} | 피고: {r.defendant || '–'} | 입증서류: {r.evidence_count || 0}건
-                    </div>
-                    {r.feedback && (
-                      <div style={{ background: '#f8f9fc', border: '1px solid #e0e6ee', borderRadius: 4, padding: '10px 12px' }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#003366', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          🤖 AI 피드백
-                          <button onClick={() => setExpandedFeedback(prev => ({ ...prev, [r.id]: !prev[r.id] }))} style={{ background: 'none', border: '1px solid #c8cdd6', borderRadius: 3, fontSize: 10, padding: '1px 6px', cursor: 'pointer', color: '#555', marginLeft: 'auto', fontFamily: 'inherit' }}>
-                            {expandedFeedback[r.id] ? '접기' : '펼치기'}
-                          </button>
-                        </div>
-                        {expandedFeedback[r.id] && (
-                          <div style={{ fontSize: 11, color: '#444', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{r.feedback}</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+            {localRecords.length > 0 && (
+              <>
+                <div style={{ padding: '10px 20px', background: '#fffbeb', borderBottom: '1px solid #fcd34d', fontSize: 12, color: '#92400e', fontWeight: 600 }}>
+                  📤 미제출 기록 ({localRecords.length}건) — admin에 제출하면 실습 현황에 반영됩니다
                 </div>
+                {localRecords.map((r, i) => <RecordCard key={r.id || i} r={r} isLocal />)}
+              </>
+            )}
+            {practiceRecords.length > 0 && (
+              <>
+                <div style={{ padding: '10px 20px', background: '#f0f4f8', borderBottom: '1px solid #dde0e8', fontSize: 12, color: '#003366', fontWeight: 600 }}>
+                  ✅ 제출 완료 ({practiceRecords.length}건)
+                </div>
+                {practiceRecords.map((r, i) => <RecordCard key={r.id || i} r={r} />)}
+              </>
+            )}
+            {localRecords.length === 0 && practiceRecords.length === 0 && (
+              <div style={{ textAlign: 'center', padding: 48, color: '#aaa' }}>
+                <div style={{ fontSize: 48, marginBottom: 14 }}>📋</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#888', marginBottom: 8 }}>아직 실습 기록이 없습니다</div>
+                <button onClick={() => router.push('/apply?new=true')} style={{ background: '#006699', color: '#fff', border: 'none', height: 38, padding: '0 20px', fontSize: 13, fontWeight: 700, borderRadius: 3, cursor: 'pointer', fontFamily: 'inherit' }}>📋 지금 실습 시작하기</button>
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>
