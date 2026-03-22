@@ -495,6 +495,7 @@ export default function ApplyPage() {
         .select('id').single();
 
       if (insertError) {
+        console.error('[apply] practice_records insert failed:', insertError.code, insertError.message)
         // 테이블이 없거나 권한 오류 → localStorage 폴백
         useLocal = true;
         const localKey = 'ecfs_practice_records';

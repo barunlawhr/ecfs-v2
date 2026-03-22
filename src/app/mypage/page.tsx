@@ -262,14 +262,16 @@ export default function MyPage() {
           if (rAny.grade_breakdown) payload.grade_breakdown = rAny.grade_breakdown
           if (r.doc_type) payload.doc_type = r.doc_type
 
+          console.log('[sync] inserting record:', r.id, payload)
           const { error } = await supabase.from('practice_records').insert(payload)
           if (!error) {
+            console.log('[sync] success:', r.id)
             // 동기화 성공 시 localStorage에서 제거
             const localKey = 'ecfs_practice_records'
             const all = JSON.parse(localStorage.getItem(localKey) || '[]')
             localStorage.setItem(localKey, JSON.stringify(all.filter((x: { id: string }) => x.id !== r.id)))
           } else {
-            console.warn('[sync] insert failed:', error.message)
+            console.error('[sync] insert failed:', error.code, error.message, error.details)
           }
         } catch { /* 동기화 실패 무시 */ }
       }
