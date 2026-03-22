@@ -30,20 +30,38 @@ const EMPTY: ComplaintFormData = {
 
 interface PartyLocal {
   role: '원고' | '피고';
-  personType: 'individual' | 'corporation';
-  name: string; regNum1: string; regNum2: string;
-  corpName: string; corpRegNum: string; repName: string;
-  zipCode: string; addrRoad: string; addrDetail: string; addrDelivery: string;
-  tel1: string; mobile: string; fax: string;
-  email: string; emailDomain: string;
+  personType: 'individual' | 'corporation' | 'unincorporated' | 'state' | 'local';
+  selectedParty: 'none' | 'selected' | 'selector';
+  name: string; nameQualifier: boolean;
+  regNum1: string; regNum2: string; regNumShow: boolean;
+  bizRegNum: string; bizRegNumShow: boolean;
+  corpName: string;
+  corpRegNum: string; corpRegNumShow: boolean;
+  repTitle: string; repName: string;
+  ministry: string;
+  zipCode: string; addrRoad: string; addrDetail: string;
+  deliverySameAsAddr: boolean; addrDelivery: string;
+  mobilePre: string; mobile1: string; mobile2: string; mobileShow: boolean;
+  telPre: string; tel1: string; tel2: string; telShow: boolean;
+  faxPre: string; fax1: string; fax2: string; faxShow: boolean;
+  email: string; emailDomain: string; emailShow: boolean;
   smsAlert: boolean; emailAlert: boolean;
 }
 const EMPTY_PARTY: PartyLocal = {
-  role: '원고', personType: 'individual',
-  name: '', regNum1: '', regNum2: '',
-  corpName: '', corpRegNum: '', repName: '',
-  zipCode: '', addrRoad: '', addrDetail: '', addrDelivery: '',
-  tel1: '', mobile: '', fax: '', email: '', emailDomain: 'naver.com',
+  role: '원고', personType: 'individual', selectedParty: 'none',
+  name: '', nameQualifier: false,
+  regNum1: '', regNum2: '', regNumShow: false,
+  bizRegNum: '', bizRegNumShow: false,
+  corpName: '',
+  corpRegNum: '', corpRegNumShow: false,
+  repTitle: '대표이사', repName: '',
+  ministry: '',
+  zipCode: '', addrRoad: '', addrDetail: '',
+  deliverySameAsAddr: false, addrDelivery: '',
+  mobilePre: '010', mobile1: '', mobile2: '', mobileShow: false,
+  telPre: '02', tel1: '', tel2: '', telShow: false,
+  faxPre: '02', fax1: '', fax2: '', faxShow: false,
+  email: '', emailDomain: 'naver.com', emailShow: false,
   smsAlert: false, emailAlert: false,
 };
 
@@ -257,7 +275,10 @@ export default function ApplyPage() {
     const addr = [partyForm.addrRoad, partyForm.addrDetail].filter(Boolean).join(' ');
     if (!name) { alert('성명(법인명)을 입력해주세요.'); return; }
     if (!addr) { alert('주소를 입력해주세요.'); return; }
-    upd({ parties: [...data.parties, { id: crypto.randomUUID(), role: partyForm.role, name, addr, tel: partyForm.mobile || partyForm.tel1, isCompany: partyForm.personType === 'corporation' }] });
+    const telStr = partyForm.mobile1
+      ? `${partyForm.mobilePre}-${partyForm.mobile1}-${partyForm.mobile2}`
+      : partyForm.tel1 ? `${partyForm.telPre}-${partyForm.tel1}-${partyForm.tel2}` : '';
+    upd({ parties: [...data.parties, { id: crypto.randomUUID(), role: partyForm.role, name, addr, tel: telStr, isCompany: partyForm.personType !== 'individual' }] });
     setPartyForm(EMPTY_PARTY);
   }
 
@@ -403,23 +424,28 @@ export default function ApplyPage() {
         <div style={{ width: 172, flexShrink: 0 }}>
           <div style={{ background: TEAL, color: '#fff', padding: '9px 14px', fontWeight: 700, fontSize: 13, borderRadius: '3px 3px 0 0' }}>서류작성</div>
           <div style={{ border: '1px solid #c8d4dc', borderTop: 'none', background: '#fff', borderRadius: '0 0 3px 3px', overflow: 'hidden' }}>
-            {['문서작성','첨부서류','미리보기','전자서명','제출하기'].map((step, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', background: i === 0 ? '#f0f7f8' : '#fff', borderBottom: '1px solid #e8ecf0' }}>
-                <div style={{ width: 20, height: 20, borderRadius: '50%', background: i === 0 ? TEAL : '#c8d4dc', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{i + 1}</div>
-                <span style={{ fontSize: 12, color: i === 0 ? TEAL : '#999', fontWeight: i === 0 ? 700 : 400 }}>{step}</span>
+            {/* 1.문서작성 (활성) */}
+            <div style={{ background: '#e6f7f8', borderBottom: '1px solid #c8dde0', padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 7 }}>
+              <div style={{ width: 18, height: 18, borderRadius: '50%', background: TEAL, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>1</div>
+              <span style={{ fontSize: 12, fontWeight: 700, color: TEAL }}>문서작성</span>
+            </div>
+            {/* Sub-items */}
+            {sideItems.map(item => (
+              <div key={item.key} onClick={() => scrollTo(item.key)}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px 5px 26px', cursor: 'pointer', background: activeNav === item.key ? '#f0fafa' : '#fff', color: activeNav === item.key ? TEAL : '#555', fontSize: 11, borderBottom: '1px solid #edf0f3' }}
+                onMouseEnter={e => { if (activeNav !== item.key) e.currentTarget.style.background = '#f8fafb'; }}
+                onMouseLeave={e => { if (activeNav !== item.key) e.currentTarget.style.background = '#fff'; }}>
+                <span style={{ color: activeNav === item.key ? TEAL : '#bbb', fontSize: 9 }}>▸</span>
+                {item.label}
               </div>
             ))}
-            <div style={{ borderTop: '1px solid #d8e0e8' }}>
-              {sideItems.map(item => (
-                <div key={item.key} onClick={() => scrollTo(item.key)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px 6px 18px', cursor: 'pointer', background: activeNav === item.key ? '#e6f7f8' : '#fff', color: activeNav === item.key ? TEAL : '#444', fontSize: 12, borderBottom: '1px solid #edf0f3' }}
-                  onMouseEnter={e => { if (activeNav !== item.key) e.currentTarget.style.background = '#f5f5f5'; }}
-                  onMouseLeave={e => { if (activeNav !== item.key) e.currentTarget.style.background = '#fff'; }}>
-                  <span style={{ color: activeNav === item.key ? TEAL : '#bbb', fontSize: 10 }}>▸</span>
-                  {item.label}
-                </div>
-              ))}
-            </div>
+            {/* 2~5 비활성 단계 */}
+            {[['2','최종문서확인'],['3','전자서명'],['4','소송비용납부'],['5','전자제출']].map(([num, label]) => (
+              <div key={num} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderBottom: '1px solid #e8ecf0', background: '#fff' }}>
+                <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#c8d4dc', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{num}</div>
+                <span style={{ fontSize: 12, color: '#999' }}>{label}</span>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -552,69 +578,143 @@ export default function ApplyPage() {
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#333', marginBottom: 8 }}>▸ 당사자기본정보 입력</div>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <tbody>
-                      <tr style={{ borderBottom: '1px solid #e8edf4' }}>
-                        <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>인격구분</th>
-                        <td style={TD}>
-                          <div style={{ display: 'flex', gap: 18 }}>
-                            {(['individual', 'corporation'] as const).map(v => (
-                              <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
-                                <input type="radio" name="personType" checked={partyForm.personType === v} onChange={() => setPartyForm(p => ({ ...p, personType: v }))} style={{ accentColor: TEAL }} />
-                                {v === 'individual' ? '개인' : '법인·단체'}
-                              </label>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
+                      {/* 당사자 구분 */}
                       <tr style={{ borderBottom: '1px solid #e8edf4' }}>
                         <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>당사자구분<span style={{ color: '#e53e3e' }}>*</span></th>
                         <td style={TD}>
-                          <div style={{ display: 'flex', gap: 18 }}>
-                            {(['원고', '피고'] as const).map(r => (
-                              <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
-                                <input type="radio" name="prole" checked={partyForm.role === r} onChange={() => setPartyForm(p => ({ ...p, role: r }))} style={{ accentColor: TEAL }} />
-                                {r}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', gap: 14 }}>
+                              {(['원고', '피고'] as const).map(r => (
+                                <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 12 }}>
+                                  <input type="radio" name="prole" checked={partyForm.role === r} onChange={() => setPartyForm(p => ({ ...p, role: r }))} style={{ accentColor: TEAL }} />
+                                  {r}
+                                </label>
+                              ))}
+                            </div>
+                            <button type="button" style={{ height: 24, padding: '0 9px', border: '1px solid #c8cdd6', background: '#fff', color: '#444', fontSize: 11, cursor: 'pointer', borderRadius: 2 }}>내사건당사자조회</button>
+                            <button type="button" style={{ height: 24, padding: '0 9px', border: '1px solid #c8cdd6', background: '#fff', color: '#444', fontSize: 11, cursor: 'pointer', borderRadius: 2 }}>자주쓰는 당사자</button>
+                          </div>
+                        </td>
+                      </tr>
+                      {/* 인격 구분 */}
+                      <tr style={{ borderBottom: '1px solid #e8edf4' }}>
+                        <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>인격구분<span style={{ color: '#e53e3e' }}>*</span></th>
+                        <td style={TD}>
+                          <select value={partyForm.personType} onChange={e => setPartyForm(p => ({ ...p, personType: e.target.value as PartyLocal['personType'] }))} style={{ ...SEL, width: 220 }}>
+                            <option value="individual">자연인</option>
+                            <option value="corporation">법인</option>
+                            <option value="unincorporated">권리능력없는법인(비법인)</option>
+                            <option value="state">국가</option>
+                            <option value="local">지방자치단체</option>
+                          </select>
+                        </td>
+                      </tr>
+                      {/* 선정당사자 */}
+                      <tr style={{ borderBottom: '1px solid #e8edf4' }}>
+                        <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>선정당사자</th>
+                        <td style={TD}>
+                          <div style={{ display: 'flex', gap: 14 }}>
+                            {[['none','해당없음'],['selected','선정당사자'],['selector','선정자']].map(([v, lbl]) => (
+                              <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 12 }}>
+                                <input type="radio" name="selParty" checked={partyForm.selectedParty === v} onChange={() => setPartyForm(p => ({ ...p, selectedParty: v as PartyLocal['selectedParty'] }))} style={{ accentColor: TEAL }} />
+                                {lbl}
                               </label>
                             ))}
                           </div>
                         </td>
                       </tr>
-
-                      {partyForm.personType === 'individual' ? (<>
-                        <tr style={{ borderBottom: '1px solid #e8edf4' }}>
-                          <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>성명<span style={{ color: '#e53e3e' }}>*</span></th>
-                          <td style={TD}><input value={partyForm.name} onChange={e => setPartyForm(p => ({ ...p, name: e.target.value }))} style={{ ...INP, width: 160 }} placeholder="성명 입력" /></td>
-                        </tr>
+                      {/* 성명 / 법인명 */}
+                      <tr style={{ borderBottom: '1px solid #e8edf4' }}>
+                        <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>
+                          {partyForm.personType === 'individual' ? '성명' : '법인·단체명'}<span style={{ color: '#e53e3e' }}>*</span>
+                        </th>
+                        <td style={TD}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <input
+                              value={partyForm.personType === 'individual' ? partyForm.name : partyForm.corpName}
+                              onChange={e => { const val = e.target.value; setPartyForm(p => p.personType === 'individual' ? { ...p, name: val } : { ...p, corpName: val }); }}
+                              style={{ ...INP, width: 160 }}
+                              placeholder={partyForm.personType === 'individual' ? '성명 입력' : '법인명 입력'} />
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 11, color: '#555' }}>
+                              <input type="checkbox" checked={partyForm.nameQualifier} onChange={e => setPartyForm(p => ({ ...p, nameQualifier: e.target.checked }))} style={{ accentColor: TEAL }} />
+                              소장의 당사자자격 표시문구 추가
+                            </label>
+                          </div>
+                        </td>
+                      </tr>
+                      {/* 주민등록번호 (자연인) */}
+                      {partyForm.personType === 'individual' && (
                         <tr style={{ borderBottom: '1px solid #e8edf4' }}>
                           <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>주민등록번호</th>
                           <td style={TD}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
                               <input value={partyForm.regNum1} onChange={e => setPartyForm(p => ({ ...p, regNum1: e.target.value.replace(/\D/g,'').slice(0,6) }))} style={{ ...INP, width: 76 }} placeholder="생년월일" maxLength={6} />
                               <span style={{ color: '#888' }}>-</span>
                               <input value={partyForm.regNum2} onChange={e => setPartyForm(p => ({ ...p, regNum2: e.target.value.replace(/\D/g,'').slice(0,7) }))} style={{ ...INP, width: 88 }} type="password" placeholder="●●●●●●●" maxLength={7} />
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 11, color: '#555', marginLeft: 4 }}>
+                                <input type="checkbox" checked={partyForm.regNumShow} onChange={e => setPartyForm(p => ({ ...p, regNumShow: e.target.checked }))} style={{ accentColor: TEAL }} />
+                                제출문서에 보임
+                              </label>
                             </div>
                           </td>
                         </tr>
-                      </>) : (<>
+                      )}
+                      {/* 사업자등록번호 (비법인) */}
+                      {partyForm.personType === 'unincorporated' && (
                         <tr style={{ borderBottom: '1px solid #e8edf4' }}>
-                          <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>법인·단체명<span style={{ color: '#e53e3e' }}>*</span></th>
-                          <td style={TD}><input value={partyForm.corpName} onChange={e => setPartyForm(p => ({ ...p, corpName: e.target.value }))} style={{ ...INP, width: 220 }} placeholder="법인명 입력" /></td>
+                          <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>사업자등록번호</th>
+                          <td style={TD}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <input value={partyForm.bizRegNum} onChange={e => setPartyForm(p => ({ ...p, bizRegNum: e.target.value.replace(/\D/g,'').slice(0,10) }))} style={{ ...INP, width: 150 }} placeholder="사업자등록번호 10자리" maxLength={10} />
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 11, color: '#555' }}>
+                                <input type="checkbox" checked={partyForm.bizRegNumShow} onChange={e => setPartyForm(p => ({ ...p, bizRegNumShow: e.target.checked }))} style={{ accentColor: TEAL }} />
+                                제출문서에 보임
+                              </label>
+                            </div>
+                          </td>
                         </tr>
+                      )}
+                      {/* 법인등록번호 (법인/지방자치단체) */}
+                      {(partyForm.personType === 'corporation' || partyForm.personType === 'local') && (
                         <tr style={{ borderBottom: '1px solid #e8edf4' }}>
                           <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>법인등록번호</th>
                           <td style={TD}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                               <input value={partyForm.corpRegNum.slice(0,6)} onChange={e => setPartyForm(p => ({ ...p, corpRegNum: e.target.value.replace(/\D/g,'').slice(0,6) + p.corpRegNum.slice(6) }))} style={{ ...INP, width: 76 }} maxLength={6} />
                               <span style={{ color: '#888' }}>-</span>
                               <input value={partyForm.corpRegNum.slice(6)} onChange={e => setPartyForm(p => ({ ...p, corpRegNum: p.corpRegNum.slice(0,6) + e.target.value.replace(/\D/g,'').slice(0,7) }))} style={{ ...INP, width: 88 }} maxLength={7} />
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 11, color: '#555', marginLeft: 4 }}>
+                                <input type="checkbox" checked={partyForm.corpRegNumShow} onChange={e => setPartyForm(p => ({ ...p, corpRegNumShow: e.target.checked }))} style={{ accentColor: TEAL }} />
+                                제출문서에 보임
+                              </label>
                             </div>
                           </td>
                         </tr>
+                      )}
+                      {/* 대표자표시성명 (법인/국가/지방자치단체) */}
+                      {(partyForm.personType === 'corporation' || partyForm.personType === 'state' || partyForm.personType === 'local') && (
                         <tr style={{ borderBottom: '1px solid #e8edf4' }}>
-                          <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>대표자 성명</th>
-                          <td style={TD}><input value={partyForm.repName} onChange={e => setPartyForm(p => ({ ...p, repName: e.target.value }))} style={{ ...INP, width: 160 }} placeholder="대표자명" /></td>
+                          <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>대표자표시성명</th>
+                          <td style={TD}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <select value={partyForm.repTitle} onChange={e => setPartyForm(p => ({ ...p, repTitle: e.target.value }))} style={{ ...SEL, width: 110 }}>
+                                {['대표이사','대표자','이사장','원장','장관','청장','단체장','시장','도지사','구청장'].map(t => <option key={t}>{t}</option>)}
+                              </select>
+                              <input value={partyForm.repName} onChange={e => setPartyForm(p => ({ ...p, repName: e.target.value }))} style={{ ...INP, width: 130 }} placeholder="성명 입력" />
+                            </div>
+                          </td>
                         </tr>
-                      </>)}
-
+                      )}
+                      {/* 소관청 (국가/지방자치단체) */}
+                      {(partyForm.personType === 'state' || partyForm.personType === 'local') && (
+                        <tr style={{ borderBottom: '1px solid #e8edf4' }}>
+                          <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>소관청</th>
+                          <td style={TD}>
+                            <input value={partyForm.ministry} onChange={e => setPartyForm(p => ({ ...p, ministry: e.target.value }))} style={{ ...INP, width: 220 }} placeholder="소관청 입력" />
+                          </td>
+                        </tr>
+                      )}
+                      {/* 주소 */}
                       <tr style={{ borderBottom: '1px solid #e8edf4' }}>
                         <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>주소<span style={{ color: '#e53e3e' }}>*</span></th>
                         <td style={TD}>
@@ -628,32 +728,86 @@ export default function ApplyPage() {
                           <input value={partyForm.addrDetail} onChange={e => setPartyForm(p => ({ ...p, addrDetail: e.target.value }))} placeholder="상세주소 입력" style={{ ...INP, width: '100%', maxWidth: 340 }} />
                         </td>
                       </tr>
+                      {/* 송달장소 */}
                       <tr style={{ borderBottom: '1px solid #e8edf4' }}>
                         <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>송달장소</th>
                         <td style={TD}>
-                          <input value={partyForm.addrDelivery} onChange={e => setPartyForm(p => ({ ...p, addrDelivery: e.target.value }))} placeholder="주소와 다른 경우 입력" style={{ ...INP, width: '100%', maxWidth: 340 }} />
-                          <div style={{ fontSize: 11, color: '#aaa', marginTop: 3 }}>※ 주소와 동일한 경우 입력하지 않아도 됩니다.</div>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12, marginBottom: 6 }}>
+                            <input type="checkbox" checked={partyForm.deliverySameAsAddr} onChange={e => setPartyForm(p => ({ ...p, deliverySameAsAddr: e.target.checked, addrDelivery: e.target.checked ? '' : p.addrDelivery }))} style={{ accentColor: TEAL }} />
+                            위 주소와 동일
+                          </label>
+                          {!partyForm.deliverySameAsAddr && (
+                            <input value={partyForm.addrDelivery} onChange={e => setPartyForm(p => ({ ...p, addrDelivery: e.target.value }))} placeholder="주소와 다른 경우 입력" style={{ ...INP, width: '100%', maxWidth: 340 }} />
+                          )}
                         </td>
                       </tr>
+                      {/* 연락처 - 휴대전화 */}
                       <tr style={{ borderBottom: '1px solid #e8edf4' }}>
-                        <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>{partyForm.personType === 'individual' ? '전화번호(자택)' : '전화번호(대표)'}</th>
-                        <td style={TD}><input value={partyForm.tel1} onChange={e => setPartyForm(p => ({ ...p, tel1: e.target.value }))} style={{ ...INP, width: 180 }} placeholder="02-0000-0000" /></td>
+                        <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>휴대전화</th>
+                        <td style={TD}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#555', cursor: 'pointer', marginRight: 4 }}>
+                              <input type="checkbox" checked={partyForm.mobileShow} onChange={e => setPartyForm(p => ({ ...p, mobileShow: e.target.checked }))} style={{ accentColor: TEAL }} />
+                              제출문서에 보임
+                            </label>
+                            <select value={partyForm.mobilePre} onChange={e => setPartyForm(p => ({ ...p, mobilePre: e.target.value }))} style={{ ...SEL, width: 60 }}>
+                              {['010','011','016','017','018','019'].map(v => <option key={v}>{v}</option>)}
+                            </select>
+                            <span style={{ fontSize: 12, color: '#888' }}>-</span>
+                            <input value={partyForm.mobile1} onChange={e => setPartyForm(p => ({ ...p, mobile1: e.target.value.replace(/\D/g,'').slice(0,4) }))} style={{ ...INP, width: 56 }} maxLength={4} placeholder="0000" />
+                            <span style={{ fontSize: 12, color: '#888' }}>-</span>
+                            <input value={partyForm.mobile2} onChange={e => setPartyForm(p => ({ ...p, mobile2: e.target.value.replace(/\D/g,'').slice(0,4) }))} style={{ ...INP, width: 56 }} maxLength={4} placeholder="0000" />
+                          </div>
+                        </td>
                       </tr>
-                      {partyForm.personType === 'individual' && (
-                        <tr style={{ borderBottom: '1px solid #e8edf4' }}>
-                          <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>휴대폰</th>
-                          <td style={TD}><input value={partyForm.mobile} onChange={e => setPartyForm(p => ({ ...p, mobile: e.target.value }))} style={{ ...INP, width: 180 }} placeholder="010-0000-0000" /></td>
-                        </tr>
-                      )}
+                      {/* 연락처 - 전화 */}
+                      <tr style={{ borderBottom: '1px solid #e8edf4' }}>
+                        <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>전화</th>
+                        <td style={TD}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#555', cursor: 'pointer', marginRight: 4 }}>
+                              <input type="checkbox" checked={partyForm.telShow} onChange={e => setPartyForm(p => ({ ...p, telShow: e.target.checked }))} style={{ accentColor: TEAL }} />
+                              제출문서에 보임
+                            </label>
+                            <select value={partyForm.telPre} onChange={e => setPartyForm(p => ({ ...p, telPre: e.target.value }))} style={{ ...SEL, width: 60 }}>
+                              {['02','031','032','033','041','042','043','044','051','052','053','054','055','061','062','063','064'].map(v => <option key={v}>{v}</option>)}
+                            </select>
+                            <span style={{ fontSize: 12, color: '#888' }}>-</span>
+                            <input value={partyForm.tel1} onChange={e => setPartyForm(p => ({ ...p, tel1: e.target.value.replace(/\D/g,'').slice(0,4) }))} style={{ ...INP, width: 56 }} maxLength={4} placeholder="0000" />
+                            <span style={{ fontSize: 12, color: '#888' }}>-</span>
+                            <input value={partyForm.tel2} onChange={e => setPartyForm(p => ({ ...p, tel2: e.target.value.replace(/\D/g,'').slice(0,4) }))} style={{ ...INP, width: 56 }} maxLength={4} placeholder="0000" />
+                          </div>
+                        </td>
+                      </tr>
+                      {/* 연락처 - 팩스 */}
                       <tr style={{ borderBottom: '1px solid #e8edf4' }}>
                         <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>팩스</th>
-                        <td style={TD}><input value={partyForm.fax} onChange={e => setPartyForm(p => ({ ...p, fax: e.target.value }))} style={{ ...INP, width: 180 }} placeholder="02-0000-0000" /></td>
+                        <td style={TD}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#555', cursor: 'pointer', marginRight: 4 }}>
+                              <input type="checkbox" checked={partyForm.faxShow} onChange={e => setPartyForm(p => ({ ...p, faxShow: e.target.checked }))} style={{ accentColor: TEAL }} />
+                              제출문서에 보임
+                            </label>
+                            <select value={partyForm.faxPre} onChange={e => setPartyForm(p => ({ ...p, faxPre: e.target.value }))} style={{ ...SEL, width: 60 }}>
+                              {['02','031','032','033','041','042','043','044','051','052','053','054','055','061','062','063','064'].map(v => <option key={v}>{v}</option>)}
+                            </select>
+                            <span style={{ fontSize: 12, color: '#888' }}>-</span>
+                            <input value={partyForm.fax1} onChange={e => setPartyForm(p => ({ ...p, fax1: e.target.value.replace(/\D/g,'').slice(0,4) }))} style={{ ...INP, width: 56 }} maxLength={4} placeholder="0000" />
+                            <span style={{ fontSize: 12, color: '#888' }}>-</span>
+                            <input value={partyForm.fax2} onChange={e => setPartyForm(p => ({ ...p, fax2: e.target.value.replace(/\D/g,'').slice(0,4) }))} style={{ ...INP, width: 56 }} maxLength={4} placeholder="0000" />
+                          </div>
+                        </td>
                       </tr>
+                      {/* 이메일 */}
                       <tr style={{ borderBottom: '1px solid #e8edf4' }}>
                         <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>이메일</th>
                         <td style={TD}>
-                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                            <input value={partyForm.email} onChange={e => setPartyForm(p => ({ ...p, email: e.target.value }))} style={{ ...INP, width: 120 }} placeholder="계정" />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#555', cursor: 'pointer', marginRight: 4 }}>
+                              <input type="checkbox" checked={partyForm.emailShow} onChange={e => setPartyForm(p => ({ ...p, emailShow: e.target.checked }))} style={{ accentColor: TEAL }} />
+                              제출문서에 보임
+                            </label>
+                            <input value={partyForm.email} onChange={e => setPartyForm(p => ({ ...p, email: e.target.value }))} style={{ ...INP, width: 110 }} placeholder="계정" />
                             <span style={{ fontSize: 12 }}>@</span>
                             <select value={partyForm.emailDomain} onChange={e => setPartyForm(p => ({ ...p, emailDomain: e.target.value }))} style={{ ...SEL, width: 120 }}>
                               {EMAIL_DOMAINS.map(d => <option key={d}>{d}</option>)}
@@ -661,6 +815,7 @@ export default function ApplyPage() {
                           </div>
                         </td>
                       </tr>
+                      {/* 알림서비스 */}
                       <tr>
                         <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>알림서비스</th>
                         <td style={TD}>
