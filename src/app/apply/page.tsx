@@ -141,13 +141,6 @@ const EMPTY_AGENT: AgentLocal = {
   tel: '', mobile: '', email: '', emailDomain: 'naver.com',
 };
 
-const SAMPLE_ADDRS = [
-  { zip: '06236', road: '서울특별시 강남구 테헤란로 152', jibun: '서울 강남구 역삼동 737' },
-  { zip: '03172', road: '서울특별시 종로구 세종대로 209', jibun: '서울 종로구 세종로 1' },
-  { zip: '16499', road: '경기도 수원시 영통구 삼성로 129', jibun: '경기 수원시 영통구 매탄동 416' },
-  { zip: '21565', road: '인천광역시 남동구 인하로 100', jibun: '인천 남동구 간석동 253-5' },
-  { zip: '35235', road: '대전광역시 서구 청사로 189', jibun: '대전 서구 둔산동 1000' },
-];
 
 // ── Shared styles ──────────────────────────────────────────────
 const INP: React.CSSProperties = { height: 28, padding: '0 7px', border: '1px solid #c8cdd6', borderRadius: 2, fontSize: 12, fontFamily: 'inherit', color: '#222', background: '#fff', outline: 'none', boxSizing: 'border-box' };
@@ -170,44 +163,40 @@ function SecHd({ label, open, toggle }: { label: string; open: boolean; toggle: 
 }
 
 function ZipModal({ onSelect, onClose }: { onSelect: (zip: string, road: string) => void; onClose: () => void }) {
-  const [q, setQ] = useState('');
-  const list = q.trim() ? SAMPLE_ADDRS.filter(a => a.road.includes(q) || a.zip.includes(q) || a.jibun.includes(q)) : SAMPLE_ADDRS;
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function initPostcode() {
+      if (!containerRef.current) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      new (window as any).daum.Postcode({
+        oncomplete(data: { zonecode: string; roadAddress: string; jibunAddress: string }) {
+          onSelect(data.zonecode, data.roadAddress || data.jibunAddress);
+          onClose();
+        },
+        width: '100%',
+        height: '100%',
+      }).embed(containerRef.current);
+    }
+
+    if (typeof window !== 'undefined' && (window as any).daum?.Postcode) {
+      initPostcode();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+      script.onload = initPostcode;
+      document.head.appendChild(script);
+    }
+  }, [onSelect, onClose]);
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#fff', width: 560, borderRadius: 4, boxShadow: '0 4px 24px rgba(0,0,0,.3)', overflow: 'hidden' }}>
-        <div style={{ background: TEAL, color: '#fff', padding: '11px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ background: '#fff', width: 560, borderRadius: 4, boxShadow: '0 4px 24px rgba(0,0,0,.3)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ background: TEAL, color: '#fff', padding: '11px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <span style={{ fontWeight: 700, fontSize: 14 }}>우편번호 / 주소 찾기</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>✕</button>
         </div>
-        <div style={{ padding: '12px 16px 16px' }}>
-          <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>※ 실습용 샘플 주소입니다.</div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="도로명, 건물명, 지번 입력" style={{ ...INP, flex: 1, height: 30 }} />
-            <button style={{ height: 30, padding: '0 12px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>검색</button>
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4' }}>
-            <thead>
-              <tr style={{ background: '#f5f7fb' }}>
-                <th style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, borderBottom: '1px solid #d0d8e4', borderRight: '1px solid #e0e6ee', width: 70 }}>우편번호</th>
-                <th style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, borderBottom: '1px solid #d0d8e4', textAlign: 'left' }}>주소</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((a, i) => (
-                <tr key={i} onClick={() => { onSelect(a.zip, a.road); onClose(); }}
-                  style={{ cursor: 'pointer', borderBottom: '1px solid #eaecf4' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#f0f7f8')}
-                  onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                  <td style={{ padding: '7px 10px', fontSize: 12, borderRight: '1px solid #eaecf4', color: TEAL, fontWeight: 600 }}>{a.zip}</td>
-                  <td style={{ padding: '7px 10px', fontSize: 12 }}>
-                    <div>{a.road}</div>
-                    <div style={{ color: '#888', fontSize: 11 }}>{a.jibun}</div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <div ref={containerRef} style={{ width: '100%', height: 480 }} />
       </div>
     </div>
   );
