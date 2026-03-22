@@ -291,6 +291,7 @@ export default function ApplyPage() {
   const [분리방법, set분리방법] = useState('서류개수');
   const [분리개수, set분리개수] = useState('');
   const [showRegModal, setShowRegModal] = useState(false);
+  const [showCaseRegModal, setShowCaseRegModal] = useState(false);
   const [showAgentRegModal, setShowAgentRegModal] = useState(false);
   const [showPurposeRegModal, setShowPurposeRegModal] = useState(false);
   const [showCauseRegModal, setShowCauseRegModal] = useState(false);
@@ -769,7 +770,7 @@ export default function ApplyPage() {
                 </div>
                 {/* 등록 버튼 */}
                 <div style={{ textAlign: 'right', padding: '0 14px 12px' }}>
-                  <button type="button" style={{ height: 32, padding: '0 18px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  <button type="button" onClick={() => setShowCaseRegModal(true)} style={{ height: 32, padding: '0 18px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                     ✏ 등록
                   </button>
                 </div>
@@ -1749,6 +1750,19 @@ export default function ApplyPage() {
                 <div style={{ padding: '30px 20px', textAlign: 'center', fontSize: 13, color: '#333' }}>등록되었습니다.</div>
                 <div style={{ padding: '0 20px 16px', textAlign: 'center' }}>
                   <button onClick={() => setShowRegModal(false)} style={{ height: 32, padding: '0 32px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>확인</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 사건기본정보 등록 모달 */}
+          {showCaseRegModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 6000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ background: '#fff', width: 340, borderRadius: 4, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,.3)' }}>
+                <div style={{ background: '#1a3a6b', color: '#fff', padding: '10px 16px', fontSize: 13, fontWeight: 700 }}>설명</div>
+                <div style={{ padding: '30px 20px', textAlign: 'center', fontSize: 13, color: '#333' }}>등록되었습니다.</div>
+                <div style={{ padding: '0 20px 16px', textAlign: 'center' }}>
+                  <button onClick={() => setShowCaseRegModal(false)} style={{ height: 32, padding: '0 32px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>확인</button>
                 </div>
               </div>
             </div>
