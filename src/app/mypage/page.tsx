@@ -178,20 +178,8 @@ export default function MyPage() {
         { headers: SB_HDR }
       )
       const d = await res.json()
-      debugLines.push(`Supabase user_id 응답: ${JSON.stringify(d).slice(0, 200)}`)
-
-      if (Array.isArray(d) && d.length > 0 && !(d[0]?.code)) {
-        sbRows = d
-      } else {
-        // student_id 컬럼으로도 시도
-        const res2 = await fetch(
-          `${SB_URL}/rest/v1/assignments?student_id=eq.${encodeURIComponent(user.id)}&select=*`,
-          { headers: SB_HDR }
-        )
-        const d2 = await res2.json()
-        debugLines.push(`Supabase student_id 응답: ${JSON.stringify(d2).slice(0, 200)}`)
-        if (Array.isArray(d2) && d2.length > 0 && !(d2[0]?.code)) sbRows = d2
-      }
+      debugLines.push(`Supabase 응답 (status ${res.status}): ${JSON.stringify(d).slice(0, 300)}`)
+      if (Array.isArray(d) && !(d[0]?.code)) sbRows = d
 
       // 2단계: localStorage
       const localAll: Record<string, unknown>[] = JSON.parse(localStorage.getItem('ec_assignments') || '[]')
