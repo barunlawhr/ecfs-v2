@@ -131,14 +131,31 @@ const EMPTY_PARTY: PartyLocal = {
 };
 
 interface AgentLocal {
-  partyId: string; agentType: string; name: string; regNum: string;
+  partyId: string;
+  agentType: string;
+  litigationStructure: boolean;
+  regNum1: string; regNum2: string;
+  name: string;
+  deliverySameAsParty: boolean;
   zipCode: string; addrRoad: string; addrDetail: string;
-  tel: string; mobile: string; email: string; emailDomain: string;
+  addrDelivery: string;
+  mobilePre: string; mobile1: string; mobile2: string; mobileShow: boolean;
+  telPre: string; tel1: string; tel2: string; telShow: boolean;
+  faxPre: string; fax1: string; fax2: string; faxShow: boolean;
+  email: string; emailShow: boolean;
+  subEmail: string; subEmailDomain: string; subEmailSelect: string;
 }
 const EMPTY_AGENT: AgentLocal = {
-  partyId: '', agentType: '', name: '', regNum: '',
+  partyId: '', agentType: '변호사', litigationStructure: false,
+  regNum1: '', regNum2: '',
+  name: '', deliverySameAsParty: false,
   zipCode: '', addrRoad: '', addrDetail: '',
-  tel: '', mobile: '', email: '', emailDomain: 'naver.com',
+  addrDelivery: '',
+  mobilePre: '010', mobile1: '', mobile2: '', mobileShow: false,
+  telPre: '02', tel1: '', tel2: '', telShow: false,
+  faxPre: '02', fax1: '', fax2: '', faxShow: false,
+  email: '', emailShow: false,
+  subEmail: '', subEmailDomain: '', subEmailSelect: '선택',
 };
 
 
@@ -1003,84 +1020,224 @@ export default function ApplyPage() {
           <div id="sec-s3" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
             <SecHd label="③ 대리인" open={open.s3} toggle={() => toggle('s3')} />
             {open.s3 && (
-              <div style={{ padding: '10px 14px 14px' }}>
-                <div style={{ display: 'flex', gap: 18, marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid #eaecf4' }}>
-                  {[[false,'없음 (본인소송)'],[true,'있음']].map(([v,lbl]) => (
-                    <label key={String(v)} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
-                      <input type="radio" name="hasag" checked={data.hasAgent === v} onChange={() => upd({ hasAgent: v as boolean, agentName: undefined, agentType: undefined })} style={{ accentColor: TEAL }} />
-                      {lbl as string}
-                    </label>
-                  ))}
+              <div style={{ padding: '12px 14px 16px' }}>
+                {/* 대리인 목록 */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#222' }}>• 대리인 목록 <span style={{ fontSize: 11, color: '#888', fontWeight: 400 }}>ⓘ</span></span>
+                  <button style={{ height: 26, padding: '0 10px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', color: '#333' }}>순서저장</button>
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4', marginBottom: 10 }}>
+                  <thead>
+                    <tr style={{ background: '#f5f7fb' }}>
+                      {['대리인구분','이름(사무소이름이다)','대리인성세','당사자구분','당사자','알림서비스','순서변번','삭제'].map(h => (
+                        <th key={h} style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: '#333', borderBottom: '1px solid #d0d8e4', borderRight: '1px solid #e0e6ee', textAlign: 'center', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td colSpan={8} style={{ padding: '12px', textAlign: 'center', fontSize: 12, color: '#888' }}>총 0명</td></tr>
+                  </tbody>
+                </table>
+
+                {/* 대리인 정보 입력 */}
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#222', marginBottom: 8 }}>• 대리인 정보입력</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4' }}>
+                  <tbody>
+                    {/* 당사자 */}
+                    <tr style={{ borderBottom: '1px solid #e8edf4' }}>
+                      <th style={{ ...TH, width: 120 }}>당사자</th>
+                      <td style={TD}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <select value={agentForm.partyId} onChange={e => setAgentForm(p => ({ ...p, partyId: e.target.value }))} style={{ ...SEL, width: 180 }}>
+                            <option value="">당사자선택</option>
+                            {data.parties.map(p => <option key={p.id} value={p.id}>{p.role} - {p.name}</option>)}
+                          </select>
+                          <button style={{ height: 28, padding: '0 10px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>내정보가져오기</button>
+                          <button style={{ height: 28, padding: '0 10px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', color: '#333' }}>비회원</button>
+                        </div>
+                      </td>
+                    </tr>
+                    {/* 대리인구분 */}
+                    <tr style={{ borderBottom: '1px solid #e8edf4' }}>
+                      <th style={TH}>대리인구분 <span style={{ color: '#e53e3e' }}>*</span></th>
+                      <td style={TD}>
+                        <select value={agentForm.agentType} onChange={e => { setAgentForm(p => ({ ...p, agentType: e.target.value })); upd({ agentType: e.target.value }); }} style={{ ...SEL, width: 160 }}>
+                          {['변호사','법무사','국선대리인','법정대리인','임의대리인'].map(v => <option key={v}>{v}</option>)}
+                        </select>
+                        <div style={{ marginTop: 5, fontSize: 11, color: '#555', lineHeight: 1.7 }}>
+                          ※ 전자소송에서 소재대리인은 본인 인증된 법원전자소송으로 등록 인구를 등록 할 수 없습니다. 소재서류에서 개인대리인의 자격 소 소 등의 출력으로는: 선생규범으로 주원할 수 있는: 서류의 (기계관련소시) 건의 등의: 선택서비스 <span style={{ color: '#c00', fontWeight: 700 }}>선생적분 및 소송법인으로 제출하여야 수시가 바랍니다.</span><br />
+                          ※ 대리인의 등록 사용여부가 아닌 경우에는: 비로변명 확인을 클릭하고 입력하시기 바랍니다.
+                        </div>
+                      </td>
+                    </tr>
+                    {/* 소송구조 선정대리인여부 */}
+                    <tr style={{ borderBottom: '1px solid #e8edf4' }}>
+                      <th style={TH}>소송구조<br />선정대리인여부</th>
+                      <td style={TD}>
+                        <div style={{ display: 'flex', gap: 18 }}>
+                          {[['예', true], ['아니오', false]].map(([lbl, val]) => (
+                            <label key={String(val)} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer' }}>
+                              <input type="radio" name="litigationStructure" checked={agentForm.litigationStructure === val} onChange={() => setAgentForm(p => ({ ...p, litigationStructure: val as boolean }))} style={{ accentColor: TEAL }} />
+                              {lbl as string}
+                            </label>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                    {/* 수임등록번호 */}
+                    <tr style={{ borderBottom: '1px solid #e8edf4' }}>
+                      <th style={TH}>수임등록번호</th>
+                      <td style={TD}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+                          <input value={agentForm.regNum1} onChange={e => setAgentForm(p => ({ ...p, regNum1: e.target.value }))} style={{ ...INP, width: 80 }} placeholder="등록번호" />
+                          <span style={{ fontSize: 12 }}>-</span>
+                          <input value={agentForm.regNum2} onChange={e => setAgentForm(p => ({ ...p, regNum2: e.target.value }))} style={{ ...INP, width: 80 }} placeholder="------" />
+                          <button style={{ height: 28, padding: '0 10px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', color: '#333' }}>사용자정보 확인</button>
+                        </div>
+                        <div style={{ fontSize: 11, color: '#555' }}>※ 민사소송규칙 제75조의2, 법원 행사서 사무서규칙 제5조의제에 그거예로 수임, 이용합니다.</div>
+                      </td>
+                    </tr>
+                    {/* 대리인명 */}
+                    <tr style={{ borderBottom: '1px solid #e8edf4' }}>
+                      <th style={TH}>대리인명 <span style={{ color: '#e53e3e' }}>*</span></th>
+                      <td style={TD}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <input value={agentForm.name} onChange={e => { setAgentForm(p => ({ ...p, name: e.target.value })); upd({ agentName: e.target.value }); }} style={{ ...INP, width: 160 }} placeholder="대리인 성명" />
+                          <span style={{ fontSize: 11, color: '#555' }}>(법무법인코드)</span>
+                        </div>
+                        <div style={{ marginTop: 5 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer' }}>
+                            <input type="checkbox" checked={agentForm.deliverySameAsParty} onChange={e => setAgentForm(p => ({ ...p, deliverySameAsParty: e.target.checked }))} style={{ accentColor: TEAL }} />
+                            당사자 송달장소와 동일
+                          </label>
+                        </div>
+                        <div style={{ fontSize: 11, color: '#555', marginTop: 3 }}>※ 대리인명에 주민등록번호, 세변(법등 등 개인정보가 입력되지 않도록 주의 하여 추가가 거사가 됩니다.</div>
+                      </td>
+                    </tr>
+                    {/* 송달장소 */}
+                    {!agentForm.deliverySameAsParty && (
+                      <tr style={{ borderBottom: '1px solid #e8edf4' }}>
+                        <th style={TH}>송달장소 <span style={{ color: '#e53e3e' }}>*</span></th>
+                        <td style={TD}>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 5 }}>
+                            <input value={agentForm.zipCode} readOnly placeholder="우편번호" style={{ ...INP, width: 76, background: '#f5f5f5', color: '#555' }} />
+                            <button onClick={() => setZipTarget('agent')} style={{ height: 28, padding: '0 10px', border: `1px solid ${TEAL}`, borderRadius: 2, background: '#fff', color: TEAL, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>우편번호 찾기 &gt;</button>
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                            <input value={agentForm.addrRoad} onChange={e => setAgentForm(p => ({ ...p, addrRoad: e.target.value }))} placeholder="도로명 주소" style={{ ...INP, width: 240 }} />
+                            <input value={agentForm.addrDetail} onChange={e => setAgentForm(p => ({ ...p, addrDetail: e.target.value }))} placeholder="상세주소 (예:성성동, 성성빌딩)" style={{ ...INP, width: 200 }} />
+                          </div>
+                          <div style={{ fontSize: 11, color: '#555' }}>※ 상세주소 표기 방법 : 동·호수 및 + (동, 아파트/건물명)</div>
+                        </td>
+                      </tr>
+                    )}
+                    {/* 송달장소와 아니다 */}
+                    <tr style={{ borderBottom: '1px solid #e8edf4' }}>
+                      <th style={TH}>송달장소와 아니다</th>
+                      <td style={TD}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input value={agentForm.addrDelivery} onChange={e => setAgentForm(p => ({ ...p, addrDelivery: e.target.value }))} style={{ ...INP, width: 280 }} placeholder="별도 송달장소 입력" />
+                          <button style={{ height: 28, padding: '0 10px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', color: '#333' }}>사용자에대리대방</button>
+                        </div>
+                      </td>
+                    </tr>
+                    {/* 연락처 - rowSpan 3 */}
+                    <tr style={{ borderBottom: '1px solid #e0e6ee' }}>
+                      <th style={{ ...TH, verticalAlign: 'middle' }} rowSpan={3}>연락처 <span style={{ color: '#e53e3e' }}>*</span></th>
+                      <td style={{ ...TD, borderBottom: '1px solid #e0e6ee' }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            <input type="checkbox" checked={agentForm.mobileShow} onChange={e => setAgentForm(p => ({ ...p, mobileShow: e.target.checked }))} style={{ accentColor: TEAL }} />제출문서에 보임
+                          </label>
+                          <span style={{ fontSize: 11, color: '#555', minWidth: 72 }}>휴대전화번호</span>
+                          <select value={agentForm.mobilePre} onChange={e => setAgentForm(p => ({ ...p, mobilePre: e.target.value }))} style={{ ...SEL, width: 64 }}>
+                            {['010','011','016','017','018','019'].map(v => <option key={v}>{v}</option>)}
+                          </select>
+                          <input value={agentForm.mobile1} onChange={e => setAgentForm(p => ({ ...p, mobile1: e.target.value }))} style={{ ...INP, width: 68 }} maxLength={4} />
+                          <input value={agentForm.mobile2} onChange={e => setAgentForm(p => ({ ...p, mobile2: e.target.value }))} style={{ ...INP, width: 68 }} maxLength={4} />
+                        </div>
+                      </td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #e0e6ee' }}>
+                      <td style={{ ...TD, borderBottom: '1px solid #e0e6ee' }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            <input type="checkbox" checked={agentForm.telShow} onChange={e => setAgentForm(p => ({ ...p, telShow: e.target.checked }))} style={{ accentColor: TEAL }} />제출문서에 보임
+                          </label>
+                          <span style={{ fontSize: 11, color: '#555', minWidth: 72 }}>전화번호(선택)</span>
+                          <select value={agentForm.telPre} onChange={e => setAgentForm(p => ({ ...p, telPre: e.target.value }))} style={{ ...SEL, width: 64 }}>
+                            {['02','031','032','033','041','042','043','044','051','052','053','054','055','061','062','063','064'].map(v => <option key={v}>{v}</option>)}
+                          </select>
+                          <input value={agentForm.tel1} onChange={e => setAgentForm(p => ({ ...p, tel1: e.target.value }))} style={{ ...INP, width: 68 }} maxLength={4} />
+                          <input value={agentForm.tel2} onChange={e => setAgentForm(p => ({ ...p, tel2: e.target.value }))} style={{ ...INP, width: 68 }} maxLength={4} />
+                        </div>
+                      </td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #e8edf4' }}>
+                      <td style={TD}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            <input type="checkbox" checked={agentForm.faxShow} onChange={e => setAgentForm(p => ({ ...p, faxShow: e.target.checked }))} style={{ accentColor: TEAL }} />제출문서에 보임
+                          </label>
+                          <span style={{ fontSize: 11, color: '#555', minWidth: 72 }}>팩스번호(선택)</span>
+                          <select value={agentForm.faxPre} onChange={e => setAgentForm(p => ({ ...p, faxPre: e.target.value }))} style={{ ...SEL, width: 64 }}>
+                            {['02','031','032','033','041','042','043','044','051','052','053','054','055','061','062','063','064'].map(v => <option key={v}>{v}</option>)}
+                          </select>
+                          <input value={agentForm.fax1} onChange={e => setAgentForm(p => ({ ...p, fax1: e.target.value }))} style={{ ...INP, width: 68 }} maxLength={4} />
+                          <input value={agentForm.fax2} onChange={e => setAgentForm(p => ({ ...p, fax2: e.target.value }))} style={{ ...INP, width: 68 }} maxLength={4} />
+                        </div>
+                      </td>
+                    </tr>
+                    {/* 이메일 */}
+                    <tr style={{ borderBottom: '1px solid #e8edf4' }}>
+                      <th style={TH}>이메일 <span style={{ color: '#e53e3e' }}>*</span></th>
+                      <td style={TD}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <input value={agentForm.email} onChange={e => setAgentForm(p => ({ ...p, email: e.target.value }))} style={{ ...INP, width: 220 }} placeholder="이메일 주소 입력" />
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, cursor: 'pointer' }}>
+                            <input type="checkbox" checked={agentForm.emailShow} onChange={e => setAgentForm(p => ({ ...p, emailShow: e.target.checked }))} style={{ accentColor: TEAL }} />제출문서에 보임
+                          </label>
+                        </div>
+                      </td>
+                    </tr>
+                    {/* 보조이메일 */}
+                    <tr>
+                      <th style={TH}>보조이메일</th>
+                      <td style={TD}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input value={agentForm.subEmail} onChange={e => setAgentForm(p => ({ ...p, subEmail: e.target.value }))} style={{ ...INP, width: 130 }} placeholder="계정" />
+                          <span style={{ fontSize: 12 }}>@</span>
+                          <input value={agentForm.subEmailDomain} onChange={e => setAgentForm(p => ({ ...p, subEmailDomain: e.target.value }))} style={{ ...INP, width: 130 }} placeholder="도메인 직접입력" />
+                          <select value={agentForm.subEmailSelect} onChange={e => setAgentForm(p => ({ ...p, subEmailSelect: e.target.value }))} style={{ ...SEL, width: 80 }}>
+                            <option>선택</option>
+                            {['naver.com','gmail.com','daum.net','kakao.com','hanmail.net','nate.com'].map(d => <option key={d}>{d}</option>)}
+                          </select>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* 참고하세요 박스 */}
+                <div style={{ marginTop: 14, border: '1px solid #d0d8e4', borderRadius: 3, background: '#f8f9fb', padding: '12px 16px', display: 'flex', gap: 12 }}>
+                  <div style={{ fontSize: 20, color: '#aaa', flexShrink: 0, marginTop: 2 }}>🖶</div>
+                  <ul style={{ margin: 0, padding: 0, listStyle: 'disc', paddingLeft: 16, fontSize: 11, color: '#555', lineHeight: 1.9 }}>
+                    <li>법대전화번호에 대리인수는 사용자의 정보를 변경하고자 하는 경우, <span style={{ color: TEAL, textDecoration: 'underline', cursor: 'pointer' }}>사용자 정보보관</span> 메뉴에서 먼저 변경하셔야 합니다.</li>
+                    <li>대리인이 대리인 목록에서 사무직원 이면 선택하지 않은 경우, 사건 상세의 법법서비스를 제공합니다.</li>
+                    <li>사건이 배당될 수수리가 적용되는 법법서비스 제공이 가능합니다.</li>
+                    <li>사용자정보에서 휴대전화번호로 주로 변경된 경우 전화하고 오는 사건이 접수세서서 발생하는 휴대전화번호로 저장된 이 이루어집니다.</li>
+                  </ul>
                 </div>
 
-                {data.hasAgent && (
-                  <div style={{ background: '#f8f9fb', border: '1px solid #d8dde6', borderRadius: 3, padding: '10px 12px' }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#333', marginBottom: 8 }}>▸ 대리인 정보 입력</div>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <tbody>
-                        <tr style={{ borderBottom: '1px solid #e8edf4' }}>
-                          <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>당사자</th>
-                          <td style={TD}>
-                            <select value={agentForm.partyId} onChange={e => setAgentForm(p => ({ ...p, partyId: e.target.value }))} style={{ ...SEL, width: 200 }}>
-                              <option value="">선택</option>
-                              {data.parties.map(p => <option key={p.id} value={p.id}>{p.role} - {p.name}</option>)}
-                            </select>
-                          </td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px solid #e8edf4' }}>
-                          <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>대리인 유형<span style={{ color: '#e53e3e' }}>*</span></th>
-                          <td style={TD}>
-                            <select value={agentForm.agentType} onChange={e => { setAgentForm(p => ({ ...p, agentType: e.target.value })); upd({ agentType: e.target.value }); }} style={{ ...SEL, width: 180 }}>
-                              <option value="">선택</option>
-                              {['변호사','법무사','국선대리인','법정대리인','임의대리인'].map(v => <option key={v}>{v}</option>)}
-                            </select>
-                          </td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px solid #e8edf4' }}>
-                          <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>성명<span style={{ color: '#e53e3e' }}>*</span></th>
-                          <td style={TD}><input value={agentForm.name} onChange={e => { setAgentForm(p => ({ ...p, name: e.target.value })); upd({ agentName: e.target.value }); }} style={{ ...INP, width: 160 }} placeholder="대리인 성명" /></td>
-                        </tr>
-                        {(agentForm.agentType === '변호사' || agentForm.agentType === '법무사') && (
-                          <tr style={{ borderBottom: '1px solid #e8edf4' }}>
-                            <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>등록번호</th>
-                            <td style={TD}><input value={agentForm.regNum} onChange={e => setAgentForm(p => ({ ...p, regNum: e.target.value }))} style={{ ...INP, width: 160 }} placeholder="등록번호 입력" /></td>
-                          </tr>
-                        )}
-                        <tr style={{ borderBottom: '1px solid #e8edf4' }}>
-                          <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>주소</th>
-                          <td style={TD}>
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 5 }}>
-                              <input value={agentForm.zipCode} readOnly placeholder="우편번호" style={{ ...INP, width: 76, background: '#f5f5f5', color: '#666' }} />
-                              <button onClick={() => setZipTarget('agent')} style={{ height: 28, padding: '0 10px', border: `1px solid ${TEAL}`, borderRadius: 2, background: '#fff', color: TEAL, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>우편번호찾기</button>
-                            </div>
-                            <div style={{ marginBottom: 4 }}><input value={agentForm.addrRoad} onChange={e => setAgentForm(p => ({ ...p, addrRoad: e.target.value }))} placeholder="도로명 주소" style={{ ...INP, width: '100%', maxWidth: 320 }} /></div>
-                            <input value={agentForm.addrDetail} onChange={e => setAgentForm(p => ({ ...p, addrDetail: e.target.value }))} placeholder="상세주소" style={{ ...INP, width: '100%', maxWidth: 320 }} />
-                          </td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px solid #e8edf4' }}>
-                          <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>전화번호</th>
-                          <td style={TD}><input value={agentForm.tel} onChange={e => setAgentForm(p => ({ ...p, tel: e.target.value }))} style={{ ...INP, width: 180 }} placeholder="02-0000-0000" /></td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px solid #e8edf4' }}>
-                          <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>휴대폰</th>
-                          <td style={TD}><input value={agentForm.mobile} onChange={e => setAgentForm(p => ({ ...p, mobile: e.target.value }))} style={{ ...INP, width: 180 }} placeholder="010-0000-0000" /></td>
-                        </tr>
-                        <tr>
-                          <th style={{ ...TH, width: 110, background: '#f0f4f8' }}>이메일</th>
-                          <td style={TD}>
-                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                              <input value={agentForm.email} onChange={e => setAgentForm(p => ({ ...p, email: e.target.value }))} style={{ ...INP, width: 110 }} placeholder="계정" />
-                              <span style={{ fontSize: 12 }}>@</span>
-                              <select value={agentForm.emailDomain} onChange={e => setAgentForm(p => ({ ...p, emailDomain: e.target.value }))} style={{ ...SEL, width: 120 }}>
-                                {EMAIL_DOMAINS.map(d => <option key={d}>{d}</option>)}
-                              </select>
-                            </div>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                {/* 초기화 / 대리인 등록 버튼 */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+                  <button onClick={() => setAgentForm(EMPTY_AGENT)} style={{ height: 32, padding: '0 16px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 12, cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    ↺ 초기화
+                  </button>
+                  <button onClick={() => { upd({ hasAgent: true, agentName: agentForm.name, agentType: agentForm.agentType }); }} style={{ height: 32, padding: '0 16px', border: 'none', borderRadius: 2, background: '#1a3a6b', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    ✎ 대리인 등록
+                  </button>
+                </div>
               </div>
             )}
           </div>
