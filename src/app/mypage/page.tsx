@@ -258,7 +258,7 @@ export default function MyPage() {
           }
           // complaint_data, grade_breakdown 컬럼이 있으면 포함
           if (r.complaint_data) payload.complaint_data = r.complaint_data
-          const rAny = r as Record<string, unknown>
+          const rAny = r as unknown as Record<string, unknown>
           if (rAny.grade_breakdown) payload.grade_breakdown = rAny.grade_breakdown
           if (r.doc_type) payload.doc_type = r.doc_type
 
