@@ -309,30 +309,15 @@ export default function ApplyPage() {
   useEffect(() => {
     if (!user) return;
 
-    async function loadAssignedCase() {
-      // 1) sessionStorage 우선 (다른 페이지에서 넘어온 경우)
+    function loadAssignedCase() {
+      // sessionStorage에 배정사건이 있을 때만 폼에 적용 (mypage에서 "소장 작성하기" 클릭 시)
       try {
         const raw = sessionStorage.getItem('assigned_case');
         if (raw) {
           const parsed: SampleCase = JSON.parse(raw);
           sessionStorage.removeItem('assigned_case');
           applyCase(parsed);
-          return;
         }
-      } catch { /* ignore */ }
-
-      // 2) Supabase assignments 테이블에서 현재 학생의 배정 사건 조회
-      try {
-        const { data: rows } = await supabase
-          .from('assignments')
-          .select('*, sample_cases(*)')
-          .eq('user_id', user!.id)
-          .order('id', { ascending: false })
-          .limit(1);
-
-        const row = rows?.[0];
-        const sc = row?.sample_cases as SampleCase | undefined;
-        if (sc) applyCase(sc);
       } catch { /* ignore */ }
     }
 
