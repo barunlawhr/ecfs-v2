@@ -291,12 +291,12 @@ export default function MyPage() {
         case_id: (r as unknown as Record<string, unknown>).case_id || null,
         submitted_at: (r as unknown as Record<string, unknown>).submitted_at || r.created_at,
       }
-      const sbRes = await fetch(`${SB_URL}/rest/v1/practice_records`, {
+      const sbRes = await fetch('/api/practice/submit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'resolution=merge-duplicates,return=minimal' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      if (sbRes.ok || sbRes.status === 201) {
+      if (sbRes.ok) {
         // localStorage에서 제거
         const all = JSON.parse(localStorage.getItem('ecfs_practice_records') || '[]')
         localStorage.setItem('ecfs_practice_records', JSON.stringify(all.filter((x: { id: string }) => x.id !== r.id)))

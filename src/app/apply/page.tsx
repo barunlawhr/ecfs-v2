@@ -495,24 +495,19 @@ export default function ApplyPage() {
       };
 
       try {
-        const sbRes = await fetch(`${SB_URL}/rest/v1/practice_records`, {
+        const sbRes = await fetch('/api/practice/submit', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': SB_KEY,
-            'Authorization': `Bearer ${SB_KEY}`,
-            'Prefer': 'return=minimal',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(sbPayload),
         });
         if (sbRes.ok) {
-          console.log('[apply] Supabase insert OK, id:', recordId);
+          console.log('[apply] submit OK, id:', recordId);
         } else {
           const errText = await sbRes.text();
-          console.error('[apply] Supabase insert failed:', sbRes.status, errText);
+          console.error('[apply] submit failed:', sbRes.status, errText);
         }
       } catch (e) {
-        console.error('[apply] Supabase fetch error:', e);
+        console.error('[apply] submit error:', e);
       }
 
       // 3) localStorage에도 저장 (오프라인 백업)
