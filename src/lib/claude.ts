@@ -60,16 +60,17 @@ export async function gradeAnswer(formData: ComplaintFormData, sampleCase: Sampl
   const prompt = buildAnswerGradingPrompt(formData, sampleCase)
 
   const message = await client.messages.create({
-    model: 'claude-opus-4-6',
+    model: 'claude-3-5-sonnet-20241022',
     max_tokens: 1024,
     messages: [{ role: 'user', content: prompt }],
   })
 
   const text = message.content[0].type === 'text' ? message.content[0].text : ''
+  console.log('[gradeAnswer] raw text:', text.slice(0, 300))
 
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new Error('No JSON found')
+    if (!jsonMatch) throw new Error('No JSON found in: ' + text.slice(0, 100))
     const parsed = JSON.parse(jsonMatch[0])
     return {
       score: Math.min(100, Math.max(0, parsed.score ?? 0)),
@@ -81,7 +82,8 @@ export async function gradeAnswer(formData: ComplaintFormData, sampleCase: Sampl
         evidence: parsed.breakdown?.evidence ?? 0,
       },
     }
-  } catch {
+  } catch (e) {
+    console.error('[gradeAnswer] parse error:', e)
     return { score: 0, feedback: '채점 중 오류가 발생했습니다.', breakdown: { parties: 0, claim: 0, cause: 0, evidence: 0 } }
   }
 }
@@ -144,16 +146,17 @@ export async function gradeComplaint(formData: ComplaintFormData, sampleCase: Sa
   const prompt = buildGradingPrompt(formData, sampleCase)
 
   const message = await client.messages.create({
-    model: 'claude-opus-4-6',
+    model: 'claude-3-5-sonnet-20241022',
     max_tokens: 1024,
     messages: [{ role: 'user', content: prompt }],
   })
 
   const text = message.content[0].type === 'text' ? message.content[0].text : ''
+  console.log('[gradeComplaint] raw text:', text.slice(0, 300))
 
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new Error('No JSON found')
+    if (!jsonMatch) throw new Error('No JSON found in: ' + text.slice(0, 100))
     const parsed = JSON.parse(jsonMatch[0])
     return {
       score: Math.min(100, Math.max(0, parsed.score ?? 0)),
@@ -165,7 +168,8 @@ export async function gradeComplaint(formData: ComplaintFormData, sampleCase: Sa
         evidence: parsed.breakdown?.evidence ?? 0,
       },
     }
-  } catch {
+  } catch (e) {
+    console.error('[gradeComplaint] parse error:', e)
     return { score: 0, feedback: '채점 중 오류가 발생했습니다.', breakdown: { parties: 0, claim: 0, cause: 0, evidence: 0 } }
   }
 }
