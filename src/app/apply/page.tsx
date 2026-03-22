@@ -10,13 +10,72 @@ import { supabase } from '@/lib/supabase';
 import type { ComplaintFormData, Party, SampleCase } from '@/types';
 
 // ── Constants ─────────────────────────────────────────────────
-const CASE_NAMES = ['대여금', '손해배상(기)', '매매대금', '부당이득금', '임금'];
-const COURTS = [
-  '서울중앙지방법원','서울동부지방법원','서울서부지방법원','서울남부지방법원','서울북부지방법원',
-  '수원지방법원','인천지방법원','부산지방법원','대구지방법원','광주지방법원',
-  '대전지방법원','울산지방법원','의정부지방법원','춘천지방법원','청주지방법원',
-  '전주지방법원','창원지방법원','제주지방법원',
+const CASE_NAMES = [
+  '가등기말소','강제집행에 관한 소송','건물','건물등철거','건물인도','건축에관한 소송',
+  '계금','공사대금','공유물분쟁','공탁금 출급청구권 확인','관리비','광고대금','구상금',
+  '근로에관한 소송','근저당권말소','기타(금전)','대여금','매매대금','매매대금반환',
+  '손해배상(건)','손해배상(국)','손해배상(기)','손해배상(산)','손해배상(연)',
+  '손해배상(의)','손해배상(자)','손해배상(지)','손해배상(직)','손해배상(체)','손해배상(환)',
+  '수표,어음금','수표금','시효중단을 위한 재판상 청구 확인의 소','신용카드이용대금',
+  '약정금','양수금','어음금','예금','용역비','운송료','위자료','유익비','유체동산도',
+  '유치권 부존재 확인','임금','임대차보증금','임목','저당권설정등기','전부금','제3자이의',
+  '증권','증권관련집단소송','집행문부여에 대한 이의의 소','집행문부여의 소','집행판결',
+  '재권조사확정재판에 대한 이의의 소','채무부존재확인','청구이의','추심금',
+  '토지','토지인도','해고무효확인','회사에 관한 소송','기타',
 ];
+const COURTS = [
+  '서울회생법원','서울중앙지방법원','서울동부지방법원','서울남부지방법원','서울북부지방법원','서울서부지방법원',
+  '의정부지방법원','의정부지법 고양지원','파주시법원','포천시법원','의정부지법 남양주지원',
+  '동두천시법원','가평군법원','연천군법원','철원군법원',
+  '인천지방법원','인천지법 부천지원','김포시법원','강화군법원',
+  '수원지방법원','수원지법 성남지원','수원지법 여주지원','수원지법 평택지원','수원지법 안산지원','수원지법 안양지원',
+  '춘천지방법원','춘천지법 강릉지원','춘천지법 원주지원','춘천지법 속초지원','춘천지법 영월지원',
+  '청주지방법원','청주지법 충주지원','청주지법 제천지원','청주지법 영동지원',
+  '대전지방법원','대전지법 홍성지원','대전지법 논산지원','대전지법 천안지원','대전지법 서산지원','대전지법 공주지원',
+  '전주지방법원','전주지법 군산지원','전주지법 정읍지원','전주지법 남원지원',
+  '광주지방법원','광주지법 목포지원','광주지법 장흥지원','광주지법 순천지원','광주지법 해남지원',
+  '부산지방법원','부산지법 동부지원','부산지법 서부지원',
+  '울산지방법원',
+  '창원지방법원','창원지법 마산지원','창원지법 진주지원','창원지법 통영지원','창원지법 밀양지원','창원지법 거창지원',
+  '대구지방법원','대구지법 서부지원','대구지법 안동지원','대구지법 경주지원','대구지법 포항지원',
+  '대구지법 김천지원','대구지법 상주지원','대구지법 의성지원','대구지법 영덕지원',
+  '제주지방법원',
+];
+
+function getCaseTitle(name: string): string {
+  if (!name) return '';
+  if (name.endsWith('의 소') || name.endsWith('소송') || name === '집행판결') return name;
+  if (name === '해고무효확인') return '해고무효확인의 소';
+  if (name === '유치권 부존재 확인') return '유치권 부존재 확인의 소';
+  if (name === '채무부존재확인') return '채무부존재확인의 소';
+  if (name === '청구이의') return '청구이의의 소';
+  return `${name} 청구의 소`;
+}
+
+function toKoreanNum(n: number): string {
+  if (!n || n === 0) return '0';
+  const digits = ['','일','이','삼','사','오','육','칠','팔','구'];
+  const su = ['','십','백','천'];
+  const bu = ['','만','억','조'];
+  let result = '';
+  let bi = 0;
+  let rem = n;
+  while (rem > 0) {
+    const chunk = rem % 10000;
+    if (chunk > 0) {
+      let cs = '';
+      for (let i = 3; i >= 0; i--) {
+        const d = Math.floor(chunk / Math.pow(10, i)) % 10;
+        if (d === 0) continue;
+        cs += (d === 1 && i > 0 ? '' : digits[d]) + su[i];
+      }
+      result = cs + bu[bi] + (result ? ' ' + result : '');
+    }
+    rem = Math.floor(rem / 10000);
+    bi++;
+  }
+  return result;
+}
 const TEAL = '#0098a3';
 const TEAL_DARK = '#007a84';
 const EMAIL_DOMAINS = ['naver.com','gmail.com','daum.net','hanmail.net','nate.com','직접입력'];
@@ -198,7 +257,8 @@ export default function ApplyPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submittedId, setSubmittedId] = useState<string | null>(null);
-  const [sogaDisp, setSogaDisp] = useState('( 0 원 )');
+  const [sogaDisp, setSogaDisp] = useState('0');
+  const [nonPropSpecial, setNonPropSpecial] = useState(false);
   const [causeTab, setCauseTab] = useState<'direct' | 'facts'>('direct');
   const [zipTarget, setZipTarget] = useState<'party' | 'agent' | null>(null);
   const [showAlertModal, setShowAlertModal] = useState(false);
@@ -267,7 +327,7 @@ export default function ApplyPage() {
   function fmtSoga(v: string) {
     const n = v.replace(/[^0-9]/g, '');
     upd({ soga: n });
-    setSogaDisp(`( ${Number(n).toLocaleString('ko-KR')} 원 )`);
+    setSogaDisp(toKoreanNum(Number(n)));
   }
 
   function addParty() {
@@ -469,69 +529,131 @@ export default function ApplyPage() {
           <div id="sec-s1" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
             <SecHd label="① 사건기본정보" open={open.s1} toggle={() => toggle('s1')} />
             {open.s1 && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody>
-                  <tr style={{ borderBottom: '1px solid #eaecf4' }}>
-                    <th style={TH}>사건명<span style={{ color: '#e53e3e' }}>*</span></th>
-                    <td style={TD}>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <select value={data.caseCategory} onChange={e => upd({ caseCategory: e.target.value })} style={{ ...SEL, width: 130 }}>
-                          <option value="">선택</option>
-                          {CASE_NAMES.map(n => <option key={n}>{n}</option>)}
-                        </select>
-                        <input value={data.caseName} onChange={e => upd({ caseName: e.target.value })} style={{ ...INP, width: 200 }} placeholder="사건명 직접입력" />
-                      </div>
-                    </td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid #eaecf4' }}>
-                    <th style={TH}>법원<span style={{ color: '#e53e3e' }}>*</span></th>
-                    <td style={TD}>
-                      <select value={data.court} onChange={e => upd({ court: e.target.value })} style={{ ...SEL, width: 200 }}>
-                        <option value="">선택</option>
-                        {COURTS.map(c => <option key={c}>{c}</option>)}
-                      </select>
-                    </td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid #eaecf4' }}>
-                    <th style={TH}>청구구분<span style={{ color: '#e53e3e' }}>*</span></th>
-                    <td style={TD}>
-                      <div style={{ display: 'flex', gap: 18 }}>
-                        {['재산권', '비재산권'].map(v => (
-                          <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
-                            <input type="radio" name="ctype" checked={data.claimType === v} onChange={() => upd({ claimType: v })} style={{ accentColor: TEAL, cursor: 'pointer' }} />
-                            <span>{v === '재산권' ? '재산권상청구' : '비재산권상 청구'}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid #eaecf4' }}>
-                    <th style={TH}>소가구분<span style={{ color: '#e53e3e' }}>*</span></th>
-                    <td style={TD}>
-                      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-                        {['금액', '토지', '불능'].map(v => (
-                          <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
-                            <input type="radio" name="sogat" checked={data.sogaType === v} onChange={() => upd({ sogaType: v })} style={{ accentColor: TEAL, cursor: 'pointer' }} />
-                            <span>{v === '금액' ? '금액' : v === '토지' ? '토지 등의 평가액' : '소가를 산출할 수 없는 경우'}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                  {data.sogaType === '금액' && (
-                    <tr>
-                      <th style={TH}>소가<span style={{ color: '#e53e3e' }}>*</span></th>
+              <div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    {/* 사건명 */}
+                    <tr style={{ borderBottom: '1px solid #eaecf4' }}>
+                      <th style={TH}>사건명<span style={{ color: '#e53e3e' }}>*</span></th>
                       <td style={TD}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <input type="text" value={data.soga} onChange={e => fmtSoga(e.target.value)} style={{ ...INP, width: 130 }} placeholder="0" />
-                          <span>원</span>
-                          <span style={{ fontSize: 11, color: '#555' }}>{sogaDisp}</span>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <select
+                            value={data.caseCategory}
+                            onChange={e => { const cat = e.target.value; upd({ caseCategory: cat, caseName: getCaseTitle(cat) }); }}
+                            style={{ ...SEL, width: 160 }}>
+                            <option value="">선택</option>
+                            {CASE_NAMES.map(n => <option key={n}>{n}</option>)}
+                          </select>
+                          <input
+                            value={data.caseName}
+                            onChange={e => upd({ caseName: e.target.value })}
+                            style={{ ...INP, width: 210 }}
+                            placeholder="사건명 자동입력" />
+                          <button type="button" style={{ height: 28, padding: '0 10px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', color: '#444', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            🔍 사건명검색
+                          </button>
                         </div>
                       </td>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                    {/* 법원 */}
+                    <tr style={{ borderBottom: '1px solid #eaecf4' }}>
+                      <th style={TH}>
+                        법원<span style={{ color: '#e53e3e' }}>*</span>{' '}
+                        <span title="관할법원을 선택해 주세요" style={{ color: '#0067c2', fontSize: 11, cursor: 'default' }}>ⓘ</span>
+                      </th>
+                      <td style={TD}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <select value={data.court} onChange={e => upd({ court: e.target.value })} style={{ ...SEL, width: 200 }}>
+                            <option value="">선택</option>
+                            {COURTS.map(c => <option key={c}>{c}</option>)}
+                          </select>
+                          <button type="button" style={{ height: 28, padding: '0 10px', border: `1px solid ${TEAL}`, borderRadius: 2, background: '#fff', color: TEAL, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>관할법원찾기 &gt;</button>
+                        </div>
+                      </td>
+                    </tr>
+                    {/* 청구구분 */}
+                    <tr style={{ borderBottom: '1px solid #eaecf4' }}>
+                      <th style={TH}>청구구분<span style={{ color: '#e53e3e' }}>*</span></th>
+                      <td style={TD}>
+                        <div style={{ display: 'flex', gap: 20 }}>
+                          {[['재산권','재산권상청구'],['비재산권','비재산권 청구']].map(([v, lbl]) => (
+                            <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
+                              <input type="radio" name="ctype" checked={data.claimType === v} onChange={() => upd({ claimType: v })} style={{ accentColor: TEAL }} />
+                              {lbl}
+                            </label>
+                          ))}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#c0392b', marginTop: 4, lineHeight: 1.6 }}>
+                          ※ 비재산권상 청구와 재산권상 청구가 병합된 경우에는 &apos;비재산권상 청구&apos;를 선택하기 바랍니다.
+                        </div>
+                      </td>
+                    </tr>
+                    {/* 유형 (비재산권 선택 시) */}
+                    {data.claimType === '비재산권' && (
+                      <tr style={{ borderBottom: '1px solid #eaecf4' }}>
+                        <th style={TH}>유형</th>
+                        <td style={TD}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                            <input type="checkbox" checked={nonPropSpecial} onChange={e => setNonPropSpecial(e.target.checked)} style={{ accentColor: TEAL }} />
+                            해고무효확인의 소를 제외한 회사 등 관계소송, 무체재산권에 관한 소송
+                          </label>
+                        </td>
+                      </tr>
+                    )}
+                    {/* 소가구분 (재산권 선택 시) */}
+                    {data.claimType === '재산권' && (
+                      <tr style={{ borderBottom: '1px solid #eaecf4' }}>
+                        <th style={TH}>소가구분<span style={{ color: '#e53e3e' }}>*</span></th>
+                        <td style={TD}>
+                          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+                            {[['금액','금액'],['토지','토지 등의 평가액'],['불능','소가를 산출할 수 없는 경우']].map(([v, lbl]) => (
+                              <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 12 }}>
+                                <input type="radio" name="sogat" checked={data.sogaType === v} onChange={() => upd({ sogaType: v })} style={{ accentColor: TEAL }} />
+                                {lbl}
+                              </label>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    {/* 소가 */}
+                    {(data.claimType === '비재산권' || data.sogaType === '금액') && (
+                      <tr style={{ borderBottom: '1px solid #eaecf4' }}>
+                        <th style={TH}>
+                          소가<span style={{ color: '#e53e3e' }}>*</span>{' '}
+                          <span title="소가 산정 안내" style={{ color: '#0067c2', fontSize: 11, cursor: 'default' }}>ⓘ</span>
+                        </th>
+                        <td style={TD}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                            <input
+                              type="text"
+                              value={data.soga ? Number(data.soga).toLocaleString('ko-KR') : ''}
+                              onChange={e => fmtSoga(e.target.value)}
+                              style={{ ...INP, width: 140, textAlign: 'right' }}
+                              placeholder="0" />
+                            <span style={{ fontSize: 12 }}>원</span>
+                            <span style={{ fontSize: 11, color: '#666' }}>({sogaDisp} 원)</span>
+                            <button type="button" style={{ height: 28, padding: '0 10px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', color: '#444', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>소가산정안내 &gt;</button>
+                          </div>
+                          <div style={{ fontSize: 11, color: '#c0392b', marginTop: 4, lineHeight: 1.6 }}>
+                            ※ 병합청구인 경우 병합청구에 따른 소가 산정방식을 확인해 주세요. 위 소가산정안내는 내 &apos;병합청구의 소가&apos;등 다양한 유형 산정 방식(합산 또는 다액여부)을 확인할 수 있습니다.
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                {/* 경고 박스 */}
+                <div style={{ margin: '0 14px 10px', border: '1px solid #d8dde8', background: '#f8f9fb', borderRadius: 2, padding: '9px 14px', fontSize: 11, color: '#555', lineHeight: 1.8 }}>
+                  • 관할권이 없는 법원에 소장이 제출된 경우에는 사건이 이송되어 소송이 지연될 수 있으므로 주의하시기 바랍니다.
+                </div>
+                {/* 등록 버튼 */}
+                <div style={{ textAlign: 'right', padding: '0 14px 12px' }}>
+                  <button type="button" style={{ height: 32, padding: '0 18px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                    ✏ 등록
+                  </button>
+                </div>
+              </div>
             )}
           </div>
 
