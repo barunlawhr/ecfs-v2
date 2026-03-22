@@ -506,29 +506,31 @@ export default function ApplyPage() {
       }
 
       // 2) 채점 API 호출
-      const gradeRes = await fetch('/api/grade', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formData: data, sampleCase: effectiveCase }),
-      });
-
-      if (gradeRes.ok) {
-        const g = await gradeRes.json();
-        if (!useLocal) {
-          await supabase.from('practice_records').update({
-            score: g.score ?? 0, feedback: g.feedback ?? '', grade_breakdown: g.breakdown ?? null, graded_at: new Date().toISOString(),
-          }).eq('id', recordId);
-        } else {
-          // localStorage에 채점 결과 업데이트
-          const localKey = 'ecfs_practice_records';
-          const existing = JSON.parse(localStorage.getItem(localKey) || '[]');
-          const idx = existing.findIndex((r: { id: string }) => r.id === recordId);
-          if (idx >= 0) {
-            existing[idx] = { ...existing[idx], score: g.score ?? 0, feedback: g.feedback ?? '', grade_breakdown: g.breakdown ?? null };
-            localStorage.setItem(localKey, JSON.stringify(existing));
+      try {
+        const gradeRes = await fetch('/api/grade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ formData: data, sampleCase: effectiveCase }),
+        });
+        if (gradeRes.ok) {
+          const g = await gradeRes.json();
+          if (g && typeof g.score === 'number' && !g.error) {
+            if (!useLocal) {
+              await supabase.from('practice_records').update({
+                score: g.score, feedback: g.feedback ?? '', grade_breakdown: g.breakdown ?? null, graded_at: new Date().toISOString(),
+              }).eq('id', recordId);
+            } else {
+              const localKey = 'ecfs_practice_records';
+              const existing = JSON.parse(localStorage.getItem(localKey) || '[]');
+              const idx = existing.findIndex((r: { id: string }) => r.id === recordId);
+              if (idx >= 0) {
+                existing[idx] = { ...existing[idx], score: g.score, feedback: g.feedback ?? '', grade_breakdown: g.breakdown ?? null };
+                localStorage.setItem(localKey, JSON.stringify(existing));
+              }
+            }
           }
         }
-      }
+      } catch { /* 채점 실패해도 제출은 완료 처리 */ }
 
       setSubmittedId(recordId);
       setSubmitted(true);
