@@ -1117,7 +1117,36 @@ export default function ApplyPage() {
                             <option value="">당사자선택</option>
                             {data.parties.map(p => <option key={p.id} value={p.id}>{p.role} - {p.name}</option>)}
                           </select>
-                          <button style={{ height: 28, padding: '0 10px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>내정보가져오기</button>
+                          <button onClick={() => {
+                            if (!user) return;
+                            // 전화번호 파싱: "010-2111-3077" → pre/mid/last
+                            const telParts = (user.tel || '').split('-');
+                            const mobilePre = telParts[0] || '010';
+                            const mobile1 = telParts[1] || '';
+                            const mobile2 = telParts[2] || '';
+                            // 이메일 파싱: "abc@domain.com" → account / domain
+                            const emailParts = (user.email || '').split('@');
+                            // 주소: 우편번호 없이 도로명만 입력
+                            setAgentForm(p => ({
+                              ...p,
+                              agentType: '변호사',
+                              name: user.name,
+                              regNum1: user.barNum || '',
+                              regNum2: '',
+                              addrRoad: user.addr || '',
+                              addrDetail: '',
+                              zipCode: '',
+                              mobilePre,
+                              mobile1,
+                              mobile2,
+                              mobileShow: false,
+                              email: user.email || '',
+                              emailShow: false,
+                              subEmail: emailParts[0] || '',
+                              subEmailDomain: emailParts[1] || '',
+                            }));
+                            upd({ hasAgent: true, agentName: user.name, agentType: '변호사' });
+                          }} style={{ height: 28, padding: '0 10px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>내정보가져오기</button>
                           <button style={{ height: 28, padding: '0 10px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', color: '#333' }}>비회원</button>
                         </div>
                       </td>
