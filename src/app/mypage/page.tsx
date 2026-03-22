@@ -304,10 +304,11 @@ export default function MyPage() {
         setTimeout(() => setSyncToast(''), 3000)
         await fetchPracticeRecords()
       } else {
-        const errText = await sbRes.text()
-        console.error('[submitRecord] failed:', sbRes.status, errText)
-        setSyncToast('제출 실패: ' + sbRes.status)
-        setTimeout(() => setSyncToast(''), 3000)
+        const errJson = await sbRes.json().catch(() => ({}))
+        const msg = errJson.error || errJson.message || sbRes.status
+        console.error('[submitRecord] failed:', sbRes.status, errJson)
+        setSyncToast(`제출 실패: ${msg}`)
+        setTimeout(() => setSyncToast(''), 5000)
       }
     } catch (e) {
       setSyncToast('제출 오류: ' + String(e))
