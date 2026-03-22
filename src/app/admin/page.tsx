@@ -995,7 +995,7 @@ export default function AdminPage() {
                   <div style={{ padding: '8px 14px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {asgns.map(a => (
                       <span key={a.id} style={{ fontSize: 12, background: '#e8f0fc', color: '#1a3a6b', padding: '3px 10px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {(a.sample_cases as SampleCase | undefined)?.title || a.case_id}
+                        {cases.find(c => String(c.id) === String(a.case_id))?.title || a.case_id}
                         <button
                           onClick={() => deleteAssignment(a.id)}
                           style={{ background: 'none', border: 'none', color: '#e53e3e', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }}
@@ -1020,16 +1020,45 @@ export default function AdminPage() {
     const [records, setRecords] = useState<PracticeRecord[]>([])
     const [recLoading, setRecLoading] = useState(true)
     const [selectedStudent, setSelectedStudent] = useState<string | null>(null)
+    const [regrading, setRegrading] = useState<Set<string>>(new Set())
 
-    useEffect(() => {
-      async function load() {
-        setRecLoading(true)
-        const { data } = await supabase.from('practice_records').select('*').order('created_at', { ascending: false })
-        setRecords(data || [])
-        setRecLoading(false)
+    async function load() {
+      setRecLoading(true)
+      const { data } = await supabase.from('practice_records').select('*').order('created_at', { ascending: false })
+      setRecords(data || [])
+      setRecLoading(false)
+    }
+
+    useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    async function regrade(r: PracticeRecord) {
+      if (!r.complaint_data) { alert('저장된 소장 데이터가 없습니다.'); return }
+      setRegrading(prev => new Set(prev).add(r.id))
+      try {
+        let sampleCase: Record<string, unknown> = { id: r.case_id || 'mock', title: r.case_type || '소장', case_type: r.case_type || '', court: r.court || '', plaintiff: r.plaintiff || '', defendant: r.defendant || '', created_at: r.created_at }
+        if (r.case_id && r.case_id !== 'mock') {
+          const { data: cases } = await supabase.from('sample_cases').select('*').eq('id', r.case_id).single()
+          if (cases) sampleCase = cases
+        }
+        const gradeRes = await fetch('/api/grade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ formData: r.complaint_data, sampleCase, doc_type: r.doc_type }),
+        })
+        const g = await gradeRes.json()
+        console.log('[regrade] response:', gradeRes.status, g)
+        if (!gradeRes.ok || !g || typeof g.score !== 'number') throw new Error(g?.error || g?.feedback || '채점 실패')
+        await supabase.from('practice_records').update({
+          score: g.score, feedback: g.feedback ?? '', grade_breakdown: g.breakdown ?? null, graded_at: new Date().toISOString(),
+        }).eq('id', r.id)
+        await load()
+        showToast(`채점 완료: ${g.score}점`)
+      } catch (e) {
+        alert('재채점 실패: ' + String(e))
+      } finally {
+        setRegrading(prev => { const n = new Set(prev); n.delete(r.id); return n })
       }
-      load()
-    }, [])
+    }
 
     // Group by student
     const byStudent: Record<string, PracticeRecord[]> = {}
@@ -1104,7 +1133,7 @@ export default function AdminPage() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr style={{ background: '#1a3a6b', color: '#fff' }}>
-                        {['점수', '사건유형', '법원', '원고', '피고', 'AI 피드백', '제출일'].map(h => (
+                        {['점수', '사건유형', '법원', '원고', '피고', 'AI 피드백', '제출일', '재채점'].map(h => (
                           <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
@@ -1131,6 +1160,15 @@ export default function AdminPage() {
                             </span>
                           </td>
                           <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: '#888' }}>{r.created_at?.slice(0, 10)}</td>
+                          <td style={{ padding: '9px 12px' }}>
+                            <button
+                              onClick={() => regrade(r)}
+                              disabled={regrading.has(r.id)}
+                              style={{ height: 28, padding: '0 12px', background: regrading.has(r.id) ? '#ccc' : '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: regrading.has(r.id) ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
+                            >
+                              {regrading.has(r.id) ? '채점중…' : '🔄 재채점'}
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

@@ -669,46 +669,6 @@ export default function MyPage() {
   const PracticeRecordsContent = () => {
     const avgScore = practiceRecords.length ? Math.round(practiceRecords.reduce((s, r) => s + r.score, 0) / practiceRecords.length) : 0
     const best = practiceRecords.length ? Math.max(...practiceRecords.map(r => r.score)) : 0
-    const [regrading, setRegrading] = useState<Set<string>>(new Set())
-
-    async function regrade(r: PracticeRecord) {
-      if (!r.complaint_data) { alert('저장된 소장 데이터가 없어 재채점할 수 없습니다.'); return }
-      setRegrading(prev => new Set(prev).add(r.id))
-      try {
-        // case_id로 sample_case 조회 (없으면 기본값)
-        let sampleCase = { id: r.case_id || 'mock', title: r.case_type || '소장', case_type: r.case_type || '', court: r.court || '', plaintiff: r.plaintiff || '', defendant: r.defendant || '', created_at: r.created_at }
-        if (r.case_id && r.case_id !== 'mock') {
-          try {
-            const res = await fetch(`${SB_URL}/rest/v1/sample_cases?id=eq.${r.case_id}&select=*`, { headers: SB_HDR })
-            const cases = await res.json()
-            if (Array.isArray(cases) && cases[0]) sampleCase = cases[0]
-          } catch { /* ignore */ }
-        }
-        const gradeRes = await fetch('/api/grade', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ formData: r.complaint_data, sampleCase, doc_type: r.doc_type }),
-        })
-        if (!gradeRes.ok) throw new Error('채점 API 오류')
-        const g = await gradeRes.json()
-        if (!g || typeof g.score !== 'number') throw new Error('채점 결과 오류')
-        // Supabase 업데이트
-        await supabase.from('practice_records').update({
-          score: g.score, feedback: g.feedback ?? '', grade_breakdown: g.breakdown ?? null, graded_at: new Date().toISOString(),
-        }).eq('id', r.id)
-        // localStorage도 업데이트
-        const localKey = 'ecfs_practice_records'
-        const existing = JSON.parse(localStorage.getItem(localKey) || '[]')
-        const idx = existing.findIndex((x: { id: string }) => x.id === r.id)
-        if (idx >= 0) { existing[idx] = { ...existing[idx], score: g.score, feedback: g.feedback ?? '' }; localStorage.setItem(localKey, JSON.stringify(existing)) }
-        await fetchPracticeRecords()
-      } catch (e) {
-        alert('재채점 실패: ' + String(e))
-      } finally {
-        setRegrading(prev => { const n = new Set(prev); n.delete(r.id); return n })
-      }
-    }
-
     return (
       <div>
         <PageHd title="나의 실습기록" actions={<><ActBtn label="🖨 출력" primary /><ActBtn label="📋 소장 작성하기" onClick={() => router.push('/apply?new=true')} primary /></>} />
@@ -759,9 +719,6 @@ export default function MyPage() {
                           🤖 AI 피드백
                           <button onClick={() => setExpandedFeedback(prev => ({ ...prev, [r.id]: !prev[r.id] }))} style={{ background: 'none', border: '1px solid #c8cdd6', borderRadius: 3, fontSize: 10, padding: '1px 6px', cursor: 'pointer', color: '#555', marginLeft: 'auto', fontFamily: 'inherit' }}>
                             {expandedFeedback[r.id] ? '접기' : '펼치기'}
-                          </button>
-                          <button onClick={() => regrade(r)} disabled={regrading.has(r.id)} style={{ background: regrading.has(r.id) ? '#ccc' : '#1a3a6b', color: '#fff', border: 'none', borderRadius: 3, fontSize: 10, padding: '1px 8px', cursor: regrading.has(r.id) ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
-                            {regrading.has(r.id) ? '채점중…' : '🔄 재채점'}
                           </button>
                         </div>
                         {expandedFeedback[r.id] && (
