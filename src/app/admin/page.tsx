@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { HARDCODED_ACCOUNTS } from '@/lib/auth'
 import type { SampleCase, Assignment, PracticeRecord } from '@/types'
+import { calculateScore, generateFeedback } from '@/lib/scoring'
 
 const SB_URL = 'https://knpvayujykoqjncctxrr.supabase.co'
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHZheXVqeWtvcWpuY2N0eHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NzA3NDUsImV4cCI6MjA4OTE0Njc0NX0.rXlo5IsOW6FS5N1X3vgqNM1RvzB84TYPqVhnYyc6FSg'
@@ -1049,29 +1050,31 @@ export default function AdminPage() {
       if (!r.complaint_data) { alert('저장된 소장 데이터가 없습니다.'); return }
       setRegrading(prev => new Set(prev).add(r.id))
       try {
-        let sampleCase: Record<string, unknown> = { id: r.case_id || 'mock', title: r.case_type || '소장', case_type: r.case_type || '', court: r.court || '', plaintiff: r.plaintiff || '', defendant: r.defendant || '', created_at: r.created_at }
-        if (r.case_id && r.case_id !== 'mock') {
-          const { data: cases } = await supabase.from('sample_cases').select('*').eq('id', r.case_id).single()
-          if (cases) sampleCase = cases
-        }
-        const gradeRes = await fetch('/api/grade', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ formData: r.complaint_data, sampleCase, doc_type: r.doc_type }),
+        const { score, breakdown } = calculateScore(r.complaint_data)
+        const feedback = generateFeedback(score, breakdown)
+        const res = await fetch(`${SB_URL}/rest/v1/practice_records?id=eq.${r.id}`, {
+          method: 'PATCH',
+          headers: { ...SB_HDR, Prefer: 'return=minimal' },
+          body: JSON.stringify({ score, feedback, grade_breakdown: breakdown }),
         })
-        const g = await gradeRes.json()
-        console.log('[regrade] response:', gradeRes.status, g)
-        if (!gradeRes.ok || !g || typeof g.score !== 'number') throw new Error(g?.error || g?.feedback || '채점 실패')
-        await supabase.from('practice_records').update({
-          score: g.score, feedback: g.feedback ?? '', grade_breakdown: g.breakdown ?? null, graded_at: new Date().toISOString(),
-        }).eq('id', r.id)
+        if (!res.ok) throw new Error(await res.text())
         await load()
-        showToast(`채점 완료: ${g.score}점`)
+        showToast(`재채점 완료: ${score}점`)
       } catch (e) {
         alert('재채점 실패: ' + String(e))
       } finally {
         setRegrading(prev => { const n = new Set(prev); n.delete(r.id); return n })
       }
+    }
+
+    async function deleteRecord(id: string) {
+      if (!confirm('이 실습기록을 삭제하시겠습니까?')) return
+      const res = await fetch(`${SB_URL}/rest/v1/practice_records?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: SB_HDR,
+      })
+      if (res.ok) { await load(); showToast('삭제되었습니다.') }
+      else alert('삭제 실패: ' + await res.text())
     }
 
     // Group by student
@@ -1097,10 +1100,14 @@ export default function AdminPage() {
       <div>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', marginBottom: 20 }}>📈 실습 현황</h2>
 
+        <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
+          💡 기록이 보이지 않으면 학생에게 <b>마이페이지 → 나의 실습기록 → 기록 동기화</b> 버튼을 클릭하도록 안내하세요.
+        </div>
+
         {recLoading ? (
           <div style={{ textAlign: 'center', padding: 40, color: '#0067c2' }}>로딩 중...</div>
         ) : studentSummaries.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>제출된 실습기록이 없습니다.</div>
+          <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>제출된 실습기록이 없습니다.<br /><span style={{ fontSize: 12 }}>학생이 마이페이지에서 기록 동기화를 해야 표시됩니다.</span></div>
         ) : (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12, marginBottom: 24 }}>
@@ -1147,7 +1154,7 @@ export default function AdminPage() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr style={{ background: '#1a3a6b', color: '#fff' }}>
-                        {['점수', '사건유형', '법원', '원고', '피고', 'AI 피드백', '제출일', '재채점'].map(h => (
+                        {['점수', '사건유형', '법원', '원고', '피고', '피드백', '제출일', '재채점', '삭제'].map(h => (
                           <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
@@ -1181,6 +1188,14 @@ export default function AdminPage() {
                               style={{ height: 28, padding: '0 12px', background: regrading.has(r.id) ? '#ccc' : '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: regrading.has(r.id) ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
                             >
                               {regrading.has(r.id) ? '채점중…' : '🔄 재채점'}
+                            </button>
+                          </td>
+                          <td style={{ padding: '9px 12px' }}>
+                            <button
+                              onClick={() => deleteRecord(r.id)}
+                              style={{ height: 28, padding: '0 12px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
+                            >
+                              🗑 삭제
                             </button>
                           </td>
                         </tr>

@@ -7,6 +7,7 @@ import GnbNav from '@/components/layout/GnbNav'
 import Footer from '@/components/layout/Footer'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { calculateScore, generateFeedback } from '@/lib/scoring'
 
 const SB_URL = 'https://knpvayujykoqjncctxrr.supabase.co'
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHZheXVqeWtvcWpuY2N0eHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NzA3NDUsImV4cCI6MjA4OTE0Njc0NX0.rXlo5IsOW6FS5N1X3vgqNM1RvzB84TYPqVhnYyc6FSg'
@@ -128,6 +129,8 @@ export default function MyPage() {
   const [allCasesLoading, setAllCasesLoading] = useState(false)
   const [practiceRecords, setPracticeRecords] = useState<PracticeRecord[]>([])
   const [practiceLoading, setPracticeLoading] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [syncToast, setSyncToast] = useState('')
   const [expandedFeedback, setExpandedFeedback] = useState<Record<string, boolean>>({})
   const [viewDocCase, setViewDocCase] = useState<ViewDocCase | null>(null)
   const [viewDocItem, setViewDocItem] = useState<DocItem | null>(null)
@@ -318,6 +321,61 @@ export default function MyPage() {
       } catch { setPracticeRecords([]) }
     }
     setPracticeLoading(false)
+  }
+
+  async function syncRecords() {
+    if (!user) return
+    setSyncing(true)
+    try {
+      const localKey = 'ecfs_practice_records'
+      const all: (PracticeRecord & { student_id?: string; submitted_at?: string })[] = JSON.parse(localStorage.getItem(localKey) || '[]')
+      const mine = all.filter(r => r.student_id === user.id)
+      if (mine.length === 0) { setSyncToast('동기화할 기록이 없습니다.'); setTimeout(() => setSyncToast(''), 3000); setSyncing(false); return }
+
+      let ok = 0
+      for (const r of mine) {
+        // score 0이면 재채점
+        let { score, feedback } = r as { score: number; feedback?: string }
+        let breakdown = (r as unknown as Record<string, unknown>).grade_breakdown as { parties: number; claim: number; cause: number; evidence: number } | undefined
+        if (!score || score === 0) {
+          const res = calculateScore(r.complaint_data || r)
+          score = res.score
+          breakdown = res.breakdown
+          feedback = generateFeedback(score, res.breakdown)
+        }
+        const payload = {
+          id: r.id,
+          student_id: r.student_id || user.id,
+          user_name: r.user_name || user.name,
+          case_type: r.case_type,
+          court: r.court,
+          plaintiff: r.plaintiff,
+          defendant: r.defendant,
+          has_agent: r.has_agent,
+          evidence_count: r.evidence_count,
+          score,
+          feedback,
+          grade_breakdown: breakdown,
+          complaint_data: r.complaint_data,
+          case_id: (r as unknown as Record<string, unknown>).case_id,
+          submitted_at: r.submitted_at || r.created_at,
+        }
+        const res = await fetch(`${SB_URL}/rest/v1/practice_records`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify(payload),
+        })
+        if (res.ok || res.status === 201) ok++
+        else console.error('[sync]', r.id, await res.text())
+      }
+      setSyncToast(`동기화 완료! ${ok}/${mine.length}건 업로드. admin에서 확인 가능합니다.`)
+      setTimeout(() => setSyncToast(''), 4000)
+      await fetchPracticeRecords()
+    } catch (e) {
+      setSyncToast('동기화 실패: ' + String(e))
+      setTimeout(() => setSyncToast(''), 3000)
+    }
+    setSyncing(false)
   }
 
   function toggleGroup(g: string) {
@@ -729,7 +787,15 @@ export default function MyPage() {
     const best = practiceRecords.length ? Math.max(...practiceRecords.map(r => r.score)) : 0
     return (
       <div>
-        <PageHd title="나의 실습기록" actions={<><ActBtn label="🖨 출력" primary /><ActBtn label="📋 소장 작성하기" onClick={() => router.push('/apply?new=true')} primary /></>} />
+        <PageHd title="나의 실습기록" actions={<>
+          <ActBtn label={syncing ? '동기화 중…' : '☁ 기록 동기화'} onClick={syncRecords} primary={false} />
+          <ActBtn label="📋 소장 작성하기" onClick={() => router.push('/apply?new=true')} primary />
+        </>} />
+        {syncToast && (
+          <div style={{ margin: '8px 20px', padding: '10px 16px', background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 8, fontSize: 13, color: '#065f46', fontWeight: 600 }}>
+            {syncToast}
+          </div>
+        )}
         <div style={{ padding: '16px 20px', background: '#fff', borderBottom: '1px solid #dde0e8', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
           {[
             { n: practiceRecords.length, l: '총 실습 횟수', c: '#003366' },

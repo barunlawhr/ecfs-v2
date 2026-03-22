@@ -8,6 +8,7 @@ import Footer from '@/components/layout/Footer';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { ComplaintFormData, Party, SampleCase } from '@/types';
+import { calculateScore, generateFeedback } from '@/lib/scoring';
 
 // ── Constants ─────────────────────────────────────────────────
 const CASE_NAMES = [
@@ -468,51 +469,15 @@ export default function ApplyPage() {
     setSubmitError(null);
     try {
       // 1) 클라이언트 사이드 채점
-      function calculateScore(fd: typeof data) {
-        const breakdown = { parties: 0, claim: 0, cause: 0, evidence: 0 };
-        const parties = fd.parties || [];
-        const hasPlaintiff = parties.some(p => p.role === '원고' && p.name?.trim());
-        const hasDefendant = parties.some(p => p.role === '피고' && p.name?.trim());
-        if (hasPlaintiff) breakdown.parties += 10;
-        if (hasDefendant) breakdown.parties += 10;
-        if (parties.length > 0 && parties.every(p => p.addr?.trim())) breakdown.parties += 5;
-        const claim = fd.claimPurpose || '';
-        if (claim.length > 10) breakdown.claim += 10;
-        if (claim.length > 30) breakdown.claim += 10;
-        if (claim.includes('원') || claim.includes('금')) breakdown.claim += 5;
-        const cause = fd.claimCause || '';
-        if (cause.length > 20) breakdown.cause += 10;
-        if (cause.length > 50) breakdown.cause += 10;
-        if (cause.length > 100) breakdown.cause += 10;
-        const evidences = fd.evidences || [];
-        if (evidences.length > 0) breakdown.evidence += 10;
-        if (evidences.length >= 2) breakdown.evidence += 5;
-        if (evidences.length > 0 && evidences.every(e => e.name?.trim() && e.purpose?.trim())) breakdown.evidence += 5;
-        const score = breakdown.parties + breakdown.claim + breakdown.cause + breakdown.evidence;
-        return { score, breakdown };
-      }
-
-      function generateFeedback(score: number, breakdown: { parties: number; claim: number; cause: number; evidence: number }) {
-        const grade = score >= 90 ? '우수' : score >= 70 ? '양호' : score >= 50 ? '보통' : '미흡';
-        return `[채점 결과: ${score}점 / ${grade}]\n\n` +
-          `당사자 정보: ${breakdown.parties}/25점\n` +
-          `청구취지: ${breakdown.claim}/25점\n` +
-          `청구원인: ${breakdown.cause}/30점\n` +
-          `입증서류: ${breakdown.evidence}/20점\n\n` +
-          (breakdown.parties < 20 ? '• 당사자 정보를 더 자세히 입력하세요.\n' : '') +
-          (breakdown.claim < 20 ? '• 청구취지를 더 구체적으로 작성하세요.\n' : '') +
-          (breakdown.cause < 20 ? '• 청구원인을 더 상세히 기술하세요.\n' : '') +
-          (breakdown.evidence < 15 ? '• 입증서류를 더 추가하고 목적을 명시하세요.\n' : '') +
-          (score >= 70 ? '• 전반적으로 잘 작성되었습니다!' : '');
-      }
-
       const { score, breakdown } = calculateScore(data);
       const feedback = generateFeedback(score, breakdown);
 
-      // 2) Supabase REST API로 직접 저장
+      // 2) Supabase REST API로 직접 저장 (id는 클라이언트에서 생성해서 upsert 가능하게)
       const SB_URL = 'https://knpvayujykoqjncctxrr.supabase.co';
       const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHZheXVqeWtvcWpuY2N0eHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NzA3NDUsImV4cCI6MjA4OTE0Njc0NX0.rXlo5IsOW6FS5N1X3vgqNM1RvzB84TYPqVhnYyc6FSg';
+      const recordId: string = crypto.randomUUID();
       const sbPayload = {
+        id: recordId,
         student_id: user!.id,
         user_name: user!.name,
         case_type: data.caseCategory || data.caseName,
@@ -524,11 +489,11 @@ export default function ApplyPage() {
         score,
         feedback,
         grade_breakdown: breakdown,
+        complaint_data: data,
         case_id: assignedCase?.id ? Number(assignedCase.id) : null,
         submitted_at: new Date().toISOString(),
       };
 
-      let recordId: string = crypto.randomUUID();
       try {
         const sbRes = await fetch(`${SB_URL}/rest/v1/practice_records`, {
           method: 'POST',
@@ -536,13 +501,11 @@ export default function ApplyPage() {
             'Content-Type': 'application/json',
             'apikey': SB_KEY,
             'Authorization': `Bearer ${SB_KEY}`,
-            'Prefer': 'return=representation',
+            'Prefer': 'return=minimal',
           },
           body: JSON.stringify(sbPayload),
         });
         if (sbRes.ok) {
-          const sbData = await sbRes.json();
-          if (sbData?.[0]?.id) recordId = sbData[0].id;
           console.log('[apply] Supabase insert OK, id:', recordId);
         } else {
           const errText = await sbRes.text();
@@ -555,7 +518,7 @@ export default function ApplyPage() {
       // 3) localStorage에도 저장 (오프라인 백업)
       const localKey = 'ecfs_practice_records';
       const existing = JSON.parse(localStorage.getItem(localKey) || '[]');
-      existing.unshift({ id: recordId, ...sbPayload, created_at: new Date().toISOString() });
+      existing.unshift({ ...sbPayload, created_at: new Date().toISOString() });
       localStorage.setItem(localKey, JSON.stringify(existing));
 
       setSubmittedId(recordId);
