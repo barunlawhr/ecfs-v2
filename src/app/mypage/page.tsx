@@ -519,11 +519,6 @@ export default function MyPage() {
       <div style={{ padding: '8px 14px', background: '#e8f4fb', border: '1px solid #c8ddf5', borderBottom: '2px solid #006699', fontSize: 12, color: '#1a4a6b' }}>
         💡 배정된 사건의 사실관계를 읽고 <strong>소장 작성하기</strong> 버튼을 클릭해 소장을 작성하세요.
       </div>
-      {assignDebug && (
-        <div style={{ margin: '8px 0', padding: '10px 14px', background: '#f5f5f5', border: '1px solid #ccc', fontSize: 11, fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#333' }}>
-          🔍 디버그 정보 (확인 후 개발자에게 전달)\n{assignDebug}
-        </div>
-      )}
       {assignmentsLoading ? (
         <div style={{ textAlign: 'center', padding: 60, color: '#999' }}>⏳ 배정된 사건을 불러오는 중...</div>
       ) : assignError ? (
