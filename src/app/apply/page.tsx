@@ -276,6 +276,10 @@ export default function ApplyPage() {
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [activeNav, setActiveNav] = useState<string | null>(null);
   const causeRef = useRef<HTMLDivElement>(null);
+  const purposeFileRef = useRef<HTMLInputElement>(null);
+  const causeFileRef = useRef<HTMLInputElement>(null);
+  const [purposeFileName, setPurposeFileName] = useState<string | null>(null);
+  const [causeFileName, setCauseFileName] = useState<string | null>(null);
   // 입증서류 상태
   const evFileInputRef = useRef<HTMLInputElement>(null);
   const evDropRef = useRef<HTMLDivElement>(null);
@@ -1329,9 +1333,11 @@ export default function ApplyPage() {
                         />
                         {/* 청구취지별지 첨부하기 */}
                         <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <button style={{ height: 26, padding: '0 12px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <button onClick={() => purposeFileRef.current?.click()} style={{ height: 26, padding: '0 12px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: 4 }}>
                             📎 청구취지별지 첨부하기
                           </button>
+                          {purposeFileName && <span style={{ fontSize: 11, color: TEAL }}>{purposeFileName}</span>}
+                          <input ref={purposeFileRef} type="file" style={{ display: 'none' }} accept=".hwp,.hwpx,.doc,.docx,.pdf,.txt,.bmp,.jpg,.jpeg,.gif,.tif,.tiff,.png" onChange={e => setPurposeFileName(e.target.files?.[0]?.name ?? null)} />
                         </div>
                         <div style={{ marginTop: 5, fontSize: 11, color: TEAL, lineHeight: 1.7 }}>
                           ※ 첨부가능한 파일 형식 : HWP, HWPX, DOC, DOCX, PDF, TXT, BMP, JPG, JPEG, GIF, TIF, TIFF, PNG (PDF파일로 자동변환, 20MB까지 첨부가능)
@@ -1435,9 +1441,13 @@ export default function ApplyPage() {
                           <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', marginBottom: 5 }}>
                             <input type="radio" name="causeAttach" style={{ accentColor: TEAL }} /> 내용파일 첨부
                           </label>
-                          <button style={{ height: 26, padding: '0 12px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: 4 }}>
-                            📎 내용파일첨부기
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <button onClick={() => causeFileRef.current?.click()} style={{ height: 26, padding: '0 12px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: 4 }}>
+                              📎 내용파일첨부하기
+                            </button>
+                            {causeFileName && <span style={{ fontSize: 11, color: TEAL }}>{causeFileName}</span>}
+                            <input ref={causeFileRef} type="file" style={{ display: 'none' }} accept=".hwp,.hwpx,.doc,.docx,.pdf,.txt,.bmp,.jpg,.jpeg,.gif,.tif,.tiff,.png" onChange={e => setCauseFileName(e.target.files?.[0]?.name ?? null)} />
+                          </div>
                         </div>
                         <div style={{ marginTop: 5, fontSize: 11, color: TEAL, lineHeight: 1.7 }}>
                           ※ 첨부가능한 파일 형식 : HWP, HWPX, DOC, DOCX, PDF, TXT, BMP, JPG, JPEG, GIF, TIF, TIFF, PNG (PDF파일로 자동변환, 20MB까지 첨부가능)
