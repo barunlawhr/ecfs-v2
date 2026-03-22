@@ -1246,26 +1246,45 @@ export default function ApplyPage() {
           <div id="sec-s4" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
             <SecHd label="④ 청구취지" open={open.s4} toggle={() => toggle('s4')} />
             {open.s4 && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody>
-                  <tr>
-                    <th style={{ ...TH, verticalAlign: 'top', paddingTop: 11 }}>청구취지<span style={{ color: '#e53e3e' }}>*</span></th>
-                    <td style={{ ...TD, verticalAlign: 'top', paddingTop: 10 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <span style={{ fontSize: 11, color: '#666' }}>청구취지를 입력하세요 (한글 2,000자 이내)</span>
-                        <span style={{ fontSize: 11, color: '#888' }}>{data.claimPurpose.length} / 6000 Bytes</span>
-                      </div>
-                      <textarea
-                        value={data.claimPurpose}
-                        onChange={e => upd({ claimPurpose: e.target.value })}
-                        rows={5}
-                        style={{ width: '100%', padding: '7px 8px', border: '1px solid #c8cdd6', borderRadius: 2, fontSize: 12, lineHeight: 1.7, resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' }}
-                        placeholder="예) 피고는 원고에게 금 OOO원 및 이에 대하여 OOOO. OO. OO.부터 이 사건 소장 부본 송달일까지는 연 5%의, 그 다음 날부터 다 갚는 날까지는 연 12%의 각 비율로 계산한 돈을 지급하라. 소송비용은 피고가 부담한다."
-                      />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <div style={{ padding: '12px 14px 14px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4' }}>
+                  <tbody>
+                    <tr>
+                      <th style={{ ...TH, verticalAlign: 'top', paddingTop: 11, width: 120 }}>청구취지<span style={{ color: '#e53e3e' }}>*</span></th>
+                      <td style={{ ...TD, verticalAlign: 'top', paddingTop: 10 }}>
+                        {/* 상단: 작성예시참고 + 바이트 */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                          <button style={{ height: 24, padding: '0 10px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            🗒 작성예시참고
+                          </button>
+                          <span style={{ fontSize: 11, color: '#888' }}>( {new TextEncoder().encode(data.claimPurpose).length} / 6000 Bytes )</span>
+                        </div>
+                        <textarea
+                          value={data.claimPurpose}
+                          onChange={e => upd({ claimPurpose: e.target.value })}
+                          rows={6}
+                          style={{ width: '100%', padding: '7px 8px', border: '1px solid #c8cdd6', borderRadius: 2, fontSize: 12, lineHeight: 1.8, resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' }}
+                          placeholder={'피고는 원고에게 △△△△△△△△△△원과 이에 대하여 △△△△. △△. △△.부터 이 사건 소장 부본을 송달받는 날까지는 연 △△%의,\n그 다음날부터 다 갚는 날까지는 연 △△%의 각 비율로 계산한 돈을 지급하라.\n※ 자연손해금의 청구는 원고가 △△△△. △△. △△.까지 소유권이전 및 인도를 완료한 경우에 가능'}
+                        />
+                        {/* 청구취지별지 첨부하기 */}
+                        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <button style={{ height: 26, padding: '0 12px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            📎 청구취지별지 첨부하기
+                          </button>
+                        </div>
+                        <div style={{ marginTop: 5, fontSize: 11, color: TEAL, lineHeight: 1.7 }}>
+                          ※ 첨부가능한 파일 형식 : HWP, HWPX, DOC, DOCX, PDF, TXT, BMP, JPG, JPEG, GIF, TIF, TIFF, PNG (PDF파일로 자동변환, 20MB까지 첨부가능)
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+                  <button onClick={() => upd({ claimPurpose: data.claimPurpose })} style={{ height: 32, padding: '0 20px', border: 'none', borderRadius: 2, background: '#1a3a6b', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    ✎ 등록
+                  </button>
+                </div>
+              </div>
             )}
           </div>
 
@@ -1273,57 +1292,108 @@ export default function ApplyPage() {
           <div id="sec-s5" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
             <SecHd label="⑤ 청구원인" open={open.s5} toggle={() => toggle('s5')} />
             {open.s5 && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody>
-                  <tr>
-                    <th style={{ ...TH, verticalAlign: 'top', paddingTop: 11 }}>청구원인<span style={{ color: '#e53e3e' }}>*</span></th>
-                    <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
-                      {/* 탭 */}
-                      <div style={{ display: 'flex', borderBottom: '1px solid #d0d8e4', marginBottom: 0 }}>
-                        {(['direct','facts'] as const).map(tab => (
-                          <button key={tab} onClick={() => setCauseTab(tab)} style={{ height: 30, padding: '0 14px', border: 'none', borderBottom: causeTab === tab ? `2px solid ${TEAL}` : '2px solid transparent', background: causeTab === tab ? '#fff' : '#f5f7fb', color: causeTab === tab ? TEAL : '#666', fontWeight: causeTab === tab ? 700 : 400, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', marginBottom: '-1px' }}>
-                            {tab === 'direct' ? '직접입력' : '요건사실'}
-                          </button>
-                        ))}
-                      </div>
-                      {causeTab === 'direct' ? (
-                        <div style={{ border: '1px solid #c8cdd6', borderTop: 'none', borderRadius: '0 0 2px 2px' }}>
-                          <div style={{ background: '#f0f3f8', borderBottom: '1px solid #dde0e6', padding: '3px 7px', display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                            {[['B','bold'],['I','italic'],['U','underline']].map(([lbl,cmd]) => (
-                              <button key={cmd} onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }} style={{ height: 22, minWidth: 22, padding: '0 3px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 11, cursor: 'pointer', fontFamily: 'serif' }}><b>{lbl}</b></button>
-                            ))}
-                            <span style={{ width: 1, height: 14, background: '#c8cdd6', margin: '4px 2px' }} />
-                            <button onMouseDown={e => { e.preventDefault(); document.execCommand('undo'); }} style={{ height: 22, minWidth: 22, padding: '0 3px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 11, cursor: 'pointer' }}>↩</button>
-                            <button onMouseDown={e => { e.preventDefault(); document.execCommand('redo'); }} style={{ height: 22, minWidth: 22, padding: '0 3px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 11, cursor: 'pointer' }}>↪</button>
-                          </div>
-                          <div
-                            ref={causeRef}
-                            contentEditable
-                            suppressContentEditableWarning
-                            onInput={() => { if (causeRef.current) upd({ claimCause: causeRef.current.innerText }); }}
-                            style={{ minHeight: 140, padding: '9px 12px', fontSize: 12, fontFamily: "'맑은 고딕',sans-serif", lineHeight: 1.8, outline: 'none', background: '#fff' }}
-                            data-placeholder="청구원인을 입력하세요. (한글 2000자 이내)"
-                          />
-                          <div style={{ background: '#f7f8fb', borderTop: '1px solid #e5e8ee', padding: '3px 10px', textAlign: 'right', fontSize: 11, color: '#888' }}>글자: {data.claimCause.length}/2000</div>
-                        </div>
-                      ) : (
-                        <div style={{ border: '1px solid #c8cdd6', borderTop: 'none', borderRadius: '0 0 2px 2px', padding: '14px' }}>
-                          <div style={{ background: '#f0f7f8', border: `1px solid ${TEAL}30`, borderRadius: 2, padding: '8px 12px', marginBottom: 10, fontSize: 11, color: '#555', lineHeight: 1.8 }}>
-                            ℹ️ 청구원인의 각 요건사실을 항목별로 입력하세요.
-                          </div>
-                          {['1. 당사자 관계', '2. 계약 체결 사실', '3. 이행 청구 근거', '4. 손해 발생 사실'].map((label, i) => (
-                            <div key={i} style={{ marginBottom: 10 }}>
-                              <label style={{ fontSize: 12, fontWeight: 600, color: '#333', display: 'block', marginBottom: 3 }}>{label}</label>
-                              <textarea rows={2} style={{ width: '100%', padding: '5px 8px', border: '1px solid #c8cdd6', borderRadius: 2, fontSize: 12, lineHeight: 1.7, resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' }} placeholder={`${label} 입력`} />
-                            </div>
+              <div style={{ padding: '12px 14px 14px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4' }}>
+                  <tbody>
+                    <tr>
+                      <th style={{ ...TH, verticalAlign: 'top', paddingTop: 11, width: 120 }}>청구원인<span style={{ color: '#e53e3e' }}>*</span></th>
+                      <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
+                        {/* 탭 */}
+                        <div style={{ display: 'flex', gap: 4, marginBottom: 0 }}>
+                          {(['direct','facts'] as const).map(tab => (
+                            <button key={tab} onClick={() => setCauseTab(tab)} style={{ height: 28, padding: '0 14px', border: `1px solid ${causeTab === tab ? TEAL : '#c8cdd6'}`, borderRadius: '2px 2px 0 0', background: causeTab === tab ? TEAL : '#f5f7fb', color: causeTab === tab ? '#fff' : '#555', fontWeight: causeTab === tab ? 700 : 400, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                              {tab === 'direct' ? '직접입력' : '요건사실'}
+                            </button>
                           ))}
                         </div>
-                      )}
-                      <style>{`[data-placeholder]:empty::before{content:attr(data-placeholder);color:#bbb;pointer-events:none}`}</style>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                        {/* 에디터 박스 */}
+                        <div style={{ border: '1px solid #c8cdd6', borderRadius: '0 2px 2px 2px' }}>
+                          {/* 툴바 행 1 */}
+                          <div style={{ background: '#f0f3f8', borderBottom: '1px solid #dde0e6', padding: '3px 6px', display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                            {['🗋','💾','✕','⧉','📋','🗑'].map((ic,i) => (
+                              <button key={i} style={{ height: 22, minWidth: 22, padding: '0 3px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 11, cursor: 'pointer' }}>{ic}</button>
+                            ))}
+                            <span style={{ width: 1, height: 14, background: '#c8cdd6', margin: '0 2px' }} />
+                            <button onMouseDown={e => { e.preventDefault(); document.execCommand('undo'); }} style={{ height: 22, minWidth: 22, padding: '0 3px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 11, cursor: 'pointer' }}>↩</button>
+                            <button onMouseDown={e => { e.preventDefault(); document.execCommand('redo'); }} style={{ height: 22, minWidth: 22, padding: '0 3px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 11, cursor: 'pointer' }}>↪</button>
+                            <span style={{ width: 1, height: 14, background: '#c8cdd6', margin: '0 2px' }} />
+                            <button style={{ height: 22, minWidth: 22, padding: '0 3px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 11, cursor: 'pointer' }}>¶</button>
+                            <button onMouseDown={e => { e.preventDefault(); document.execCommand('bold'); }} style={{ height: 22, minWidth: 22, padding: '0 3px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'serif' }}>B</button>
+                            <button onMouseDown={e => { e.preventDefault(); document.execCommand('italic'); }} style={{ height: 22, minWidth: 22, padding: '0 3px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'serif', fontStyle: 'italic' }}>I</button>
+                            <button onMouseDown={e => { e.preventDefault(); document.execCommand('underline'); }} style={{ height: 22, minWidth: 22, padding: '0 3px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>U</button>
+                            <span style={{ width: 1, height: 14, background: '#c8cdd6', margin: '0 2px' }} />
+                            <button style={{ height: 22, minWidth: 22, padding: '0 3px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 11, cursor: 'pointer' }}>―</button>
+                            <button style={{ height: 22, minWidth: 22, padding: '0 3px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 11, cursor: 'pointer' }}>❝</button>
+                            <span style={{ width: 1, height: 14, background: '#c8cdd6', margin: '0 2px' }} />
+                            <button onMouseDown={e => { e.preventDefault(); document.execCommand('justifyLeft'); }} style={{ height: 22, minWidth: 22, padding: '0 3px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 11, cursor: 'pointer' }}>≡</button>
+                            <button onMouseDown={e => { e.preventDefault(); document.execCommand('justifyCenter'); }} style={{ height: 22, minWidth: 22, padding: '0 3px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 11, cursor: 'pointer' }}>☰</button>
+                            <button onMouseDown={e => { e.preventDefault(); document.execCommand('justifyRight'); }} style={{ height: 22, minWidth: 22, padding: '0 3px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 11, cursor: 'pointer' }}>≣</button>
+                            <span style={{ width: 1, height: 14, background: '#c8cdd6', margin: '0 2px' }} />
+                            <button style={{ height: 22, padding: '0 4px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 11, cursor: 'pointer', color: '#e53e3e' }}>A</button>
+                            <button style={{ height: 22, padding: '0 4px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 11, cursor: 'pointer' }}>A-</button>
+                          </div>
+                          {/* 툴바 행 2: 글꼴/크기 */}
+                          <div style={{ background: '#f5f7fb', borderBottom: '1px solid #dde0e6', padding: '2px 6px', display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <span style={{ fontSize: 11, color: '#555' }}>글꼴</span>
+                            <select style={{ ...SEL, width: 80, height: 22, fontSize: 11 }}><option>글꼴</option><option>맑은 고딕</option><option>굴림</option><option>돋움</option></select>
+                            <span style={{ fontSize: 11, color: '#555' }}>-</span>
+                            <span style={{ fontSize: 11, color: '#555' }}>크기</span>
+                            <select style={{ ...SEL, width: 60, height: 22, fontSize: 11 }}><option>크기</option><option>10</option><option>11</option><option>12</option><option>14</option><option>16</option></select>
+                            <span style={{ fontSize: 11, color: '#555' }}>-</span>
+                          </div>
+                          {/* 안내 */}
+                          <div style={{ background: '#e8f4fd', borderBottom: '1px solid #c8dff0', padding: '4px 10px', fontSize: 11, color: '#1a6fa8', display: 'flex', alignItems: 'center', gap: 5 }}>
+                            ℹ 편집기에 대한 도움말은 ALT + 숫자 이(면 자판 위 숫자키)를 누르세요
+                          </div>
+                          {causeTab === 'direct' ? (
+                            <>
+                              <div
+                                ref={causeRef}
+                                contentEditable
+                                suppressContentEditableWarning
+                                onInput={() => { if (causeRef.current) upd({ claimCause: causeRef.current.innerText }); }}
+                                style={{ minHeight: 160, padding: '9px 12px', fontSize: 12, fontFamily: "'맑은 고딕',sans-serif", lineHeight: 1.8, outline: 'none', background: '#fff', color: '#222' }}
+                                data-placeholder="청구원인을 입력하세요. (한글 2000자 이내, 표나 그림은 내용파일첨부를 이용)"
+                              />
+                              <div style={{ background: '#f7f8fb', borderTop: '1px solid #e5e8ee', padding: '3px 10px', textAlign: 'right', fontSize: 11, color: '#888' }}>글자: {data.claimCause.length}/2000</div>
+                            </>
+                          ) : (
+                            <div style={{ padding: '14px' }}>
+                              {['1. 당사자 관계', '2. 계약 체결 사실', '3. 이행 청구 근거', '4. 손해 발생 사실'].map((label, i) => (
+                                <div key={i} style={{ marginBottom: 10 }}>
+                                  <label style={{ fontSize: 12, fontWeight: 600, color: '#333', display: 'block', marginBottom: 3 }}>{label}</label>
+                                  <textarea rows={2} style={{ width: '100%', padding: '5px 8px', border: '1px solid #c8cdd6', borderRadius: 2, fontSize: 12, lineHeight: 1.7, resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box', outline: 'none' }} placeholder={`${label} 입력`} />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <style>{`[data-placeholder]:empty::before{content:attr(data-placeholder);color:#bbb;pointer-events:none}`}</style>
+                        {/* 내용파일 첨부 */}
+                        <div style={{ marginTop: 8 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', marginBottom: 5 }}>
+                            <input type="radio" name="causeAttach" style={{ accentColor: TEAL }} /> 내용파일 첨부
+                          </label>
+                          <button style={{ height: 26, padding: '0 12px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            📎 내용파일첨부기
+                          </button>
+                        </div>
+                        <div style={{ marginTop: 5, fontSize: 11, color: TEAL, lineHeight: 1.7 }}>
+                          ※ 첨부가능한 파일 형식 : HWP, HWPX, DOC, DOCX, PDF, TXT, BMP, JPG, JPEG, GIF, TIF, TIFF, PNG (PDF파일로 자동변환, 20MB까지 첨부가능)
+                        </div>
+                        <div style={{ marginTop: 3, fontSize: 11, color: '#555', lineHeight: 1.7 }}>
+                          ※ 청구원인을 청구취지를 별첨하는 주장사실만 기재하여 작성하시고, 청구원인 이외의 다른 기재내용은 첨부되지 않도록 하여 주시기 바랍니다.
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+                  <button onClick={() => upd({ claimCause: data.claimCause })} style={{ height: 32, padding: '0 20px', border: 'none', borderRadius: 2, background: '#1a3a6b', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    ✎ 등록
+                  </button>
+                </div>
+              </div>
             )}
           </div>
 
