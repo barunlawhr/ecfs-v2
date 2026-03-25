@@ -20,8 +20,11 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
     setLoggingIn(false)
     if (!user) { setErr('아이디 또는 비밀번호가 올바르지 않습니다.'); return }
     onClose()
-    if (user.role === 'admin') router.push('/admin')
-    else router.push('/mypage')
+    const redirect = localStorage.getItem('redirectAfterLogin')
+    if (redirect) {
+      localStorage.removeItem('redirectAfterLogin')
+      router.push(redirect)
+    }
   }
 
   return (

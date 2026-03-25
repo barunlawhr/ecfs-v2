@@ -77,7 +77,7 @@ const years = Array.from({ length: 5 }, (_, i) => 2026 - i);
 const caseTypes = ['가단', '가합', '나', '다', '라', '마'];
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [searchValue, setSearchValue] = useState('');
@@ -89,7 +89,11 @@ export default function HomePage() {
 
   const go = (href: string) => {
     if (href === '#' || href.startsWith('#')) { alert('실습 모드에서는 지원되지 않습니다.'); return; }
-    if (!user) { setShowLoginModal(true); return; }
+    if (!user) {
+      localStorage.setItem('redirectAfterLogin', href)
+      setShowLoginModal(true)
+      return
+    }
     router.push(href);
   };
 
@@ -197,7 +201,11 @@ export default function HomePage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {/* 로그인 */}
             <div style={{ background: '#fff', borderRadius: 10, padding: '16px', border: '1px solid #b8d0e8' }}>
-              {user ? (
+              {loading ? (
+                <div style={{ textAlign: 'center', padding: '16px 0', fontSize: 13, color: '#aaa' }}>
+                  로그인 상태 확인 중...
+                </div>
+              ) : user ? (
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 14, color: '#333', marginBottom: 10 }}>
                     <strong style={{ color: '#003087' }}>{user.name}</strong> 님 환영합니다
