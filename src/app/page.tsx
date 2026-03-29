@@ -1,12 +1,31 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import MockBar from '@/components/layout/MockBar';
 import GnbNav from '@/components/layout/GnbNav';
 import Footer from '@/components/layout/Footer';
 import LoginModal from '@/components/auth/LoginModal';
 import { useAuth } from '@/context/AuthContext';
+
+function getUnreadCount(userId: string): number {
+  try {
+    const key = `ecfs_unread_delivery_${userId}`;
+    const stored = localStorage.getItem(key);
+    if (!stored) {
+      // 최초: 3건 세팅
+      const docs = [
+        { id: 'ud1', confirmed: false, court: '서울중앙지방법원', division: '민사51부', caseNum: '2026가단100234', docName: '소장 부본', sentDate: '2026-03-25', docType: '소장부본송달' },
+        { id: 'ud2', confirmed: false, court: '서울중앙지방법원', division: '민사51부', caseNum: '2026가단100234', docName: '보정명령', sentDate: '2026-03-27', docType: '보정명령송달' },
+        { id: 'ud3', confirmed: false, court: '수원지방법원', division: '민사11부', caseNum: '2026가합200567', docName: '기일통지서', sentDate: '2026-03-28', docType: '기일통지송달' },
+      ];
+      localStorage.setItem(key, JSON.stringify(docs));
+      return 3;
+    }
+    const docs = JSON.parse(stored);
+    return docs.filter((d: { confirmed: boolean }) => !d.confirmed).length;
+  } catch { return 0; }
+}
 
 const quickIcons = [
   { label: '나의사건관리', icon: '📁', href: '/mypage' },
@@ -85,6 +104,11 @@ export default function HomePage() {
   const [caseYear, setCaseYear] = useState('2026');
   const [caseType, setCaseType] = useState('다');
   const [caseNum, setCaseNum] = useState('');
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (user) setUnreadCount(getUnreadCount(user.id));
+  }, [user]);
   const [partyName, setPartyName] = useState('');
 
   const go = (href: string) => {
@@ -189,7 +213,19 @@ export default function HomePage() {
                     <div style={{
                       width: 46, height: 46, background: 'rgba(255,255,255,0.18)',
                       borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
-                    }}>{item.icon}</div>
+                      position: 'relative',
+                    }}>
+                      {item.icon}
+                      {item.label === '미확인송달문서' && unreadCount > 0 && (
+                        <span style={{
+                          position: 'absolute', top: -4, right: -4,
+                          background: '#e8173e', color: '#fff', fontSize: 10, fontWeight: 800,
+                          minWidth: 18, height: 18, borderRadius: 9,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          padding: '0 4px', lineHeight: 1,
+                        }}>{unreadCount}</span>
+                      )}
+                    </div>
                     <span style={{ fontSize: 11, color: '#fff', fontWeight: 600, textAlign: 'center', lineHeight: 1.3 }}>{item.label}</span>
                   </button>
                 ))}
