@@ -636,9 +636,12 @@ export default function MyPage() {
                       <div style={{ fontSize: 12, color: '#555', lineHeight: 1.9, whiteSpace: 'pre-wrap' }}>{c.facts || c.key_facts}</div>
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4, gap: 8 }}>
                     <button onClick={() => goToApply(c)} style={{ height: 38, padding: '0 22px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                       📝 소장 작성하기 →
+                    </button>
+                    <button onClick={() => { sessionStorage.setItem('assigned_case', JSON.stringify(c)); router.push('/answer'); }} style={{ height: 38, padding: '0 22px', background: '#fff', color: '#1a3a6b', border: '1px solid #1a3a6b', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      📋 답변서 작성하기 →
                     </button>
                   </div>
                 </div>
@@ -731,7 +734,8 @@ export default function MyPage() {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#003366' }}>{r.case_type || '소장 실습'}</span>
+            <span style={{ fontSize: 10, background: r.doc_type === 'answer' ? '#e0e7ff' : '#dcfce7', color: r.doc_type === 'answer' ? '#3730a3' : '#166534', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>{r.doc_type === 'answer' ? '답변서' : '소장'}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#003366' }}>{r.case_type || (r.doc_type === 'answer' ? '답변서 실습' : '소장 실습')}</span>
             <span style={{ fontSize: 11, color: '#888' }}>{r.court || ''}</span>
             {isLocal && <span style={{ fontSize: 10, background: '#fef3c7', color: '#92400e', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>미제출</span>}
             <span style={{ fontSize: 11, color: '#aaa', marginLeft: 'auto' }}>{r.created_at?.slice(0, 10) || ''}</span>

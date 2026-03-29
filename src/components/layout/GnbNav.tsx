@@ -93,10 +93,10 @@ const MEGA: Record<string, MegaMenu> = {
     groups: [
       { title: '서류검색', items: [] },
       { title: '민사서류', items: [
-        { label: '민사본안', href: '/apply?new=true' },
-        { label: '민사신청', href: '/apply?new=true' },
-        { label: '지급명령(독촉)신청', href: '/apply?new=true' },
-        { label: '전체서류', href: '/apply?new=true' },
+        { label: '민사본안', href: '/submit/civil' },
+        { label: '민사신청', href: '/submit/petition' },
+        { label: '지급명령(독촉)신청', href: '/submit/payment' },
+        { label: '전체서류', href: '/submit/all' },
       ]},
       { title: '형사서류', items: [
         { label: '형사공판', href: '#' },
@@ -141,10 +141,10 @@ const MEGA: Record<string, MegaMenu> = {
       [
         { title: '서류검색', items: [] },
         { title: '민사서류', items: [
-          { label: '민사본안', href: '/apply?new=true' },
-          { label: '민사신청', href: '/apply?new=true' },
-          { label: '지급명령(독촉)신청', href: '/apply?new=true' },
-          { label: '전체서류', href: '/apply?new=true' },
+          { label: '민사본안', href: '/submit/civil' },
+          { label: '민사신청', href: '/submit/petition' },
+          { label: '지급명령(독촉)신청', href: '/submit/payment' },
+          { label: '전체서류', href: '/submit/all' },
         ]},
       ],
       [
@@ -321,7 +321,7 @@ const MEGA: Record<string, MegaMenu> = {
 const MENUS = ['나의전자소송', '서류제출', '각종신청', '사건유형별 절차안내', '고객센터']
 const HREFS: Record<string, string> = {
   '나의전자소송': '/mypage',
-  '서류제출': '/apply?new=true',
+  '서류제출': '/submit/civil',
   '각종신청': '#',
   '사건유형별 절차안내': '#',
   '고객센터': '#',

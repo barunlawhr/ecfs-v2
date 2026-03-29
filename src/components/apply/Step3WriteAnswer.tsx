@@ -20,9 +20,21 @@ const COURTS = [
 
 type SectionKey = 'basic' | 'purpose' | 'cause'
 
+const PURPOSE_EXAMPLES = [
+  {
+    title: '금전 청구 기각',
+    text: '1. 원고의 청구를 기각한다.\n2. 소송비용은 원고가 부담한다.\n라는 판결을 구합니다.',
+  },
+  {
+    title: '일부 인용 예상 시',
+    text: '1. 원고의 청구를 기각한다.\n2. 소송비용은 원고가 부담한다.\n라는 판결을, 만약 위 청구가 인용된다면\n3. 위 제1항은 가집행할 수 있다.\n는 판결을 구합니다.',
+  },
+]
+
 export default function Step3WriteAnswer({ data, onChange, onNext, onBack, assignedCase }: Step3WriteAnswerProps) {
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({ basic: true, purpose: true, cause: true })
   const [factsExpanded, setFactsExpanded] = useState(false)
+  const [showPurposeEx, setShowPurposeEx] = useState(false)
   const causeRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -135,15 +147,39 @@ export default function Step3WriteAnswer({ data, onChange, onNext, onBack, assig
             <span style={{ fontSize: 18 }}>{open.purpose ? '▲' : '▼'}</span>
           </div>
           <div style={sectionBodyStyle(open.purpose)}>
-            <label style={{ fontSize: 13, color: '#6b7280', display: 'block', marginBottom: 6 }}>
-              답변 취지 <span className="req">*</span>
-            </label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <label style={{ fontSize: 13, color: '#6b7280' }}>
+                답변 취지 <span className="req">*</span>
+              </label>
+              <button onClick={() => setShowPurposeEx(true)} style={{ height: 24, padding: '0 10px', background: '#f0f6fb', border: '1px solid #b0c8d8', borderRadius: 2, fontSize: 11, color: '#0067c2', cursor: 'pointer' }}>작성예시</button>
+            </div>
             <div style={{
               background: '#f0f7ff', border: '1px solid #c5d8f6', borderRadius: 4,
               padding: '10px 12px', fontSize: 12, color: '#1e40af', marginBottom: 10, lineHeight: 1.7,
             }}>
               <strong>예시:</strong> 1. 원고의 청구를 기각한다. 2. 소송비용은 원고가 부담한다. 라는 판결을 구합니다.
             </div>
+            {showPurposeEx && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ background: '#fff', width: 520, borderRadius: 6, boxShadow: '0 4px 24px rgba(0,0,0,.3)', overflow: 'hidden' }}>
+                  <div style={{ background: '#1e3a5f', color: '#fff', padding: '11px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, fontSize: 14 }}>답변 취지 작성예시</span>
+                    <button onClick={() => setShowPurposeEx(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+                  </div>
+                  <div style={{ padding: '16px 20px' }}>
+                    {PURPOSE_EXAMPLES.map((ex, i) => (
+                      <div key={i} style={{ marginBottom: 14, border: '1px solid #e0e6ee', borderRadius: 4, overflow: 'hidden' }}>
+                        <div style={{ background: '#f5f7fb', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#1e3a5f', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>{ex.title}</span>
+                          <button onClick={() => { onChange({ ...data, claimPurpose: ex.text }); setShowPurposeEx(false); }} style={{ height: 24, padding: '0 10px', background: '#1e3a5f', color: '#fff', border: 'none', borderRadius: 2, fontSize: 11, cursor: 'pointer' }}>적용</button>
+                        </div>
+                        <pre style={{ margin: 0, padding: '10px 12px', fontSize: 12, color: '#333', lineHeight: 1.8, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{ex.text}</pre>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
             <textarea
               value={data.claimPurpose}
               onChange={e => onChange({ ...data, claimPurpose: e.target.value })}

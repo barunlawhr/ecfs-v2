@@ -145,9 +145,10 @@ interface AgentLocal {
   faxPre: string; fax1: string; fax2: string; faxShow: boolean;
   email: string; emailShow: boolean;
   subEmail: string; subEmailDomain: string; subEmailSelect: string;
+  isStaff: boolean;
 }
 const EMPTY_AGENT: AgentLocal = {
-  partyId: '', agentType: '변호사', litigationStructure: false,
+  partyId: '', agentType: '변호사', litigationStructure: false, isStaff: false,
   regNum1: '', regNum2: '',
   name: '', deliverySameAsParty: false,
   zipCode: '', addrRoad: '', addrDetail: '',
@@ -255,6 +256,87 @@ function AlertModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function SogaGuideModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: '#fff', width: 540, borderRadius: 4, boxShadow: '0 4px 24px rgba(0,0,0,.3)', overflow: 'hidden' }}>
+        <div style={{ background: TEAL, color: '#fff', padding: '11px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontWeight: 700, fontSize: 14 }}>소가 산정 안내</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+        </div>
+        <div style={{ padding: '20px 24px', fontSize: 13, lineHeight: 1.8, color: '#333' }}>
+          <p style={{ fontWeight: 700, marginBottom: 8 }}>■ 소가(訴價)란?</p>
+          <p style={{ marginBottom: 12 }}>소가는 원고가 청구하는 금액(청구금액)을 말합니다. 소가에 따라 납부해야 할 인지액이 결정됩니다.</p>
+          <p style={{ fontWeight: 700, marginBottom: 8 }}>■ 인지액 산정 기준</p>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 12 }}>
+            <thead>
+              <tr style={{ background: '#f5f7fb' }}>
+                <th style={{ border: '1px solid #d0d8e4', padding: '6px 10px' }}>소가 구간</th>
+                <th style={{ border: '1px solid #d0d8e4', padding: '6px 10px' }}>인지액</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ['1,000만원 미만', '소가 × 0.5%'],
+                ['1,000만원 이상 ~ 1억원 미만', '소가 × 0.45% + 5,000원'],
+                ['1억원 이상 ~ 10억원 미만', '소가 × 0.4% + 55,000원'],
+                ['10억원 이상', '소가 × 0.35% + 555,000원'],
+              ].map(([r, v]) => (
+                <tr key={r}>
+                  <td style={{ border: '1px solid #e0e6ee', padding: '6px 10px' }}>{r}</td>
+                  <td style={{ border: '1px solid #e0e6ee', padding: '6px 10px' }}>{v}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p style={{ fontSize: 12, color: '#888' }}>※ 민사소송 등 인지법에 따라 인지액은 1,000원 미만은 1,000원으로 합니다.</p>
+          <div style={{ marginTop: 16, textAlign: 'right' }}>
+            <button onClick={onClose} style={{ height: 30, padding: '0 18px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>확인</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PurposeExampleModal({ onClose, onApply }: { onClose: () => void; onApply: (text: string) => void }) {
+  const examples = [
+    {
+      title: '금전 청구 (대여금/손해배상)',
+      text: '피고는 원고에게 금 OOO원 및 이에 대하여 OO년 OO월 OO일부터 이 사건 소장 부본 송달일까지는 연 5%의, 그 다음날부터 다 갚는 날까지는 연 12%의 각 비율에 의한 금원을 지급하라.\n소송비용은 피고가 부담한다.\n위 제1항은 가집행할 수 있다.',
+    },
+    {
+      title: '부동산 인도 청구',
+      text: '피고는 원고에게 별지 목록 기재 부동산을 인도하라.\n소송비용은 피고가 부담한다.\n위 제1항은 가집행할 수 있다.',
+    },
+    {
+      title: '임금 청구',
+      text: '피고는 원고에게 금 OOO원 및 이에 대하여 OO년 OO월 OO일부터 이 사건 소장 부본 송달일까지는 연 6%의, 그 다음날부터 다 갚는 날까지는 연 12%의 각 비율에 의한 금원을 지급하라.\n소송비용은 피고가 부담한다.',
+    },
+  ];
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: '#fff', width: 580, borderRadius: 4, boxShadow: '0 4px 24px rgba(0,0,0,.3)', overflow: 'hidden', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ background: TEAL, color: '#fff', padding: '11px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+          <span style={{ fontWeight: 700, fontSize: 14 }}>청구취지 작성예시</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+        </div>
+        <div style={{ padding: '16px 20px', overflowY: 'auto' }}>
+          {examples.map((ex, i) => (
+            <div key={i} style={{ marginBottom: 16, border: '1px solid #e0e6ee', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ background: '#f5f7fb', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#1a3a6b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>{ex.title}</span>
+                <button onClick={() => { onApply(ex.text); onClose(); }} style={{ height: 24, padding: '0 10px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 11, cursor: 'pointer' }}>적용</button>
+              </div>
+              <pre style={{ margin: 0, padding: '10px 12px', fontSize: 12, color: '#333', lineHeight: 1.8, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{ex.text}</pre>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────
 export default function ApplyPage() {
   const { user, loading } = useAuth();
@@ -265,16 +347,21 @@ export default function ApplyPage() {
   const [open, setOpen] = useState({ s1: true, s2: true, s3: true, s4: true, s5: true, s6: true, s7: true });
   const [partyForm, setPartyForm] = useState<PartyLocal>(EMPTY_PARTY);
   const [agentForm, setAgentForm] = useState<AgentLocal>(EMPTY_AGENT);
-  const [evForm, setEvForm] = useState({ name: '', purpose: '' });
+  const [evForm, setEvForm] = useState({ name: '', purpose: '', role: '원고' as '원고' | '피고' });
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submittedId, setSubmittedId] = useState<string | null>(null);
   const [sogaDisp, setSogaDisp] = useState('0');
+  const [sogaFormatted, setSogaFormatted] = useState('0');
   const [nonPropSpecial, setNonPropSpecial] = useState(false);
   const [causeTab, setCauseTab] = useState<'direct' | 'facts'>('direct');
   const [zipTarget, setZipTarget] = useState<'party' | 'agent' | null>(null);
   const [showAlertModal, setShowAlertModal] = useState(false);
+  const [showSogaModal, setShowSogaModal] = useState(false);
+  const [showPurposeExample, setShowPurposeExample] = useState(false);
+  const [frequentParties, setFrequentParties] = useState<PartyLocal[]>([]);
+  const [showFreqModal, setShowFreqModal] = useState(false);
   const [activeNav, setActiveNav] = useState<string | null>(null);
   const causeRef = useRef<HTMLDivElement>(null);
   const purposeFileRef = useRef<HTMLInputElement>(null);
@@ -313,9 +400,15 @@ export default function ApplyPage() {
     if (!user) return;
 
     function loadAssignedCase() {
+      // ?type=answer → 답변서 페이지로 리다이렉트
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('type') === 'answer') {
+        router.replace('/answer');
+        return;
+      }
+
       // ?draftId=xxx → 임시저장 불러오기
       try {
-        const params = new URLSearchParams(window.location.search);
         const draftId = params.get('draftId');
         if (draftId) {
           const drafts: {id:string;userId:string;formData:ComplaintFormData}[] = JSON.parse(localStorage.getItem('ecfs_drafts') || '[]');
@@ -365,6 +458,21 @@ export default function ApplyPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('frequent_parties') || '[]');
+      setFrequentParties(saved);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      saveDraft(true); // true = silent (no toast for auto)
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [user, data]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const toggle = useCallback((k: keyof typeof open) => setOpen(p => ({ ...p, [k]: !p[k] })), []);
   const upd = (patch: Partial<ComplaintFormData>) => setData(p => ({ ...p, ...patch }));
 
@@ -372,6 +480,7 @@ export default function ApplyPage() {
     const n = v.replace(/[^0-9]/g, '');
     upd({ soga: n });
     setSogaDisp(toKoreanNum(Number(n)));
+    setSogaFormatted(Number(n).toLocaleString('ko-KR'));
   }
 
   function addParty() {
@@ -390,14 +499,22 @@ export default function ApplyPage() {
 
   function addEvidence() {
     if (!evForm.name.trim()) { alert('서류명을 입력해주세요.'); return; }
-    const num = `갑 제${data.evidences.length + 1}호증`;
-    upd({ evidences: [...data.evidences, { id: crypto.randomUUID(), number: num, name: evForm.name.trim(), purpose: evForm.purpose.trim() }] });
-    setEvForm({ name: '', purpose: '' });
+    const prefix = evForm.role === '피고' ? '을' : '갑';
+    const num = data.evidences.filter(e => e.number.startsWith(prefix)).length + 1;
+    const numStr = `${prefix} 제${num}호증`;
+    upd({ evidences: [...data.evidences, { id: crypto.randomUUID(), number: numStr, name: evForm.name.trim(), purpose: evForm.purpose.trim() }] });
+    setEvForm({ name: '', purpose: '', role: '원고' });
   }
 
   function delEvidence(id: string) {
     const filtered = data.evidences.filter(e => e.id !== id);
-    upd({ evidences: filtered.map((e, i) => ({ ...e, number: `갑 제${i + 1}호증` })) });
+    const gapCount: Record<string, number> = {};
+    const renumbered = filtered.map(e => {
+      const prefix = e.number.startsWith('을') ? '을' : '갑';
+      gapCount[prefix] = (gapCount[prefix] || 0) + 1;
+      return { ...e, number: `${prefix} 제${gapCount[prefix]}호증` };
+    });
+    upd({ evidences: renumbered });
   }
 
   function handleEvFiles(files: FileList | null) {
@@ -441,7 +558,7 @@ export default function ApplyPage() {
     });
   }
 
-  function saveDraft() {
+  function saveDraft(silent = false) {
     if (!user) return;
     try {
       const drafts: unknown[] = JSON.parse(localStorage.getItem('ecfs_drafts') || '[]');
@@ -453,10 +570,12 @@ export default function ApplyPage() {
         title,
         formData: data,
       };
-      localStorage.setItem('ecfs_drafts', JSON.stringify([draft, ...drafts]));
-      setDraftToast(true);
-      setTimeout(() => setDraftToast(false), 2500);
-    } catch { alert('임시저장에 실패했습니다.'); }
+      localStorage.setItem('ecfs_drafts', JSON.stringify([draft, ...drafts.slice(0, 9)]));
+      if (!silent) {
+        setDraftToast(true);
+        setTimeout(() => setDraftToast(false), 2500);
+      }
+    } catch { if (!silent) alert('임시저장에 실패했습니다.'); }
   }
 
   async function handleSubmit() {
@@ -480,6 +599,7 @@ export default function ApplyPage() {
         id: recordId,
         student_id: user!.id,
         user_name: user!.name,
+        doc_type: 'complaint',
         case_type: data.caseCategory || data.caseName,
         court: data.court,
         plaintiff: data.parties.find(p => p.role === '원고')?.name || '',
@@ -583,6 +703,26 @@ export default function ApplyPage() {
         />
       )}
       {showAlertModal && <AlertModal onClose={() => setShowAlertModal(false)} />}
+      {showSogaModal && <SogaGuideModal onClose={() => setShowSogaModal(false)} />}
+      {showPurposeExample && <PurposeExampleModal onClose={() => setShowPurposeExample(false)} onApply={(text) => upd({ claimPurpose: text })} />}
+      {showFreqModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', width: 420, borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,.2)', overflow: 'hidden' }}>
+            <div style={{ background: TEAL, color: '#fff', padding: '10px 14px', display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontWeight: 700, fontSize: 13 }}>자주 쓰는 당사자</span>
+              <button onClick={() => setShowFreqModal(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 16, cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ padding: 14 }}>
+              {frequentParties.map((fp, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #eee' }}>
+                  <span style={{ fontSize: 13 }}>{fp.name || fp.corpName} ({fp.role})</span>
+                  <button onClick={() => { setPartyForm({ ...fp }); setShowFreqModal(false); }} style={{ height: 24, padding: '0 10px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 11, cursor: 'pointer' }}>선택</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Page body */}
       <div style={{ flex: 1, display: 'flex', maxWidth: 1160, margin: '0 auto', width: '100%', padding: '14px 10px 60px', boxSizing: 'border-box', gap: 12, alignItems: 'flex-start' }}>
@@ -675,6 +815,11 @@ export default function ApplyPage() {
                             {COURTS.map(c => <option key={c}>{c}</option>)}
                           </select>
                           <button type="button" style={{ height: 28, padding: '0 10px', border: `1px solid ${TEAL}`, borderRadius: 2, background: '#fff', color: TEAL, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>관할법원찾기 &gt;</button>
+                          {data.court && (
+                            <span style={{ fontSize: 11, color: '#0067c2', marginLeft: 8 }}>
+                              ✔ {data.court} 관할구역 내 분쟁에 해당하는 경우 제출 가능합니다.
+                            </span>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -734,13 +879,13 @@ export default function ApplyPage() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
                             <input
                               type="text"
-                              value={data.soga ? Number(data.soga).toLocaleString('ko-KR') : ''}
+                              value={sogaFormatted === '0' && !data.soga ? '' : sogaFormatted}
                               onChange={e => fmtSoga(e.target.value)}
                               style={{ ...INP, width: 140, textAlign: 'right' }}
                               placeholder="0" />
                             <span style={{ fontSize: 12 }}>원</span>
                             <span style={{ fontSize: 11, color: '#666' }}>({sogaDisp} 원)</span>
-                            <button type="button" style={{ height: 28, padding: '0 10px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', color: '#444', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>소가산정안내 &gt;</button>
+                            <button type="button" onClick={() => setShowSogaModal(true)} style={{ height: 24, padding: '0 8px', background: '#f0f6fb', border: '1px solid #c0d0e0', borderRadius: 2, fontSize: 11, color: '#0067c2', cursor: 'pointer', whiteSpace: 'nowrap' }}>소가산정안내</button>
                           </div>
                           <div style={{ fontSize: 11, color: '#c0392b', marginTop: 4, lineHeight: 1.6 }}>
                             ※ 병합청구인 경우 병합청구에 따른 소가 산정방식을 확인해 주세요. 위 소가산정안내는 내 &apos;병합청구의 소가&apos;등 다양한 유형 산정 방식(합산 또는 다액여부)을 확인할 수 있습니다.
@@ -804,7 +949,44 @@ export default function ApplyPage() {
 
                 {/* 당사자 입력 폼 */}
                 <div style={{ background: '#f8f9fb', border: '1px solid #d8dde6', borderRadius: 3, padding: '10px 12px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#333', marginBottom: 8 }}>▸ 당사자기본정보 입력</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#333', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>▸ 당사자기본정보 입력</span>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      <button onClick={() => {
+                        if (!user) return;
+                        setPartyForm(p => ({
+                          ...p,
+                          name: user.name || '',
+                          zipCode: user.zipCode || '',
+                          addrRoad: user.addr || '',
+                          addrDetail: user.addrDetail || '',
+                          mobilePre: '010',
+                          mobile1: user.mobile?.split('-')[1] || '',
+                          mobile2: user.mobile?.split('-')[2] || '',
+                          email: user.email?.split('@')[0] || '',
+                          emailDomain: user.email?.split('@')[1] || 'naver.com',
+                        }));
+                      }} style={{ height: 26, padding: '0 10px', background: '#f0f6fb', border: '1px solid #b0c8d8', borderRadius: 2, fontSize: 11, color: '#0067c2', cursor: 'pointer' }}>
+                        내 정보 가져오기
+                      </button>
+                      <button onClick={() => {
+                        const name = partyForm.personType === 'individual' ? partyForm.name : partyForm.corpName;
+                        if (!name) { alert('먼저 당사자 정보를 입력하세요.'); return; }
+                        const saved = JSON.parse(localStorage.getItem('frequent_parties') || '[]');
+                        const updated = [{ ...partyForm, id: Date.now().toString() }, ...saved].slice(0, 5);
+                        localStorage.setItem('frequent_parties', JSON.stringify(updated));
+                        setFrequentParties(updated);
+                        alert('자주 쓰는 당사자로 저장되었습니다.');
+                      }} style={{ height: 26, padding: '0 10px', background: '#fff8e6', border: '1px solid #e6c060', borderRadius: 2, fontSize: 11, color: '#7a5800', cursor: 'pointer' }}>
+                        자주 쓰는 당사자 저장
+                      </button>
+                      {frequentParties.length > 0 && (
+                        <button onClick={() => setShowFreqModal(true)} style={{ height: 26, padding: '0 10px', background: '#fff8e6', border: '1px solid #e6c060', borderRadius: 2, fontSize: 11, color: '#7a5800', cursor: 'pointer' }}>
+                          자주 쓰는 당사자 불러오기
+                        </button>
+                      )}
+                    </div>
+                  </div>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <tbody>
                       {/* 당사자 구분 */}
@@ -1194,9 +1376,15 @@ export default function ApplyPage() {
                     <tr style={{ borderBottom: '1px solid #e8edf4' }}>
                       <th style={TH}>대리인구분 <span style={{ color: '#e53e3e' }}>*</span></th>
                       <td style={TD}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                         <select value={agentForm.agentType} onChange={e => { setAgentForm(p => ({ ...p, agentType: e.target.value })); upd({ agentType: e.target.value }); }} style={{ ...SEL, width: 160 }}>
                           {['변호사','법무사','국선대리인','법정대리인','임의대리인'].map(v => <option key={v}>{v}</option>)}
                         </select>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}>
+                          <input type="checkbox" checked={agentForm.isStaff} onChange={e => setAgentForm(p => ({ ...p, isStaff: e.target.checked }))} />
+                          사무직원
+                        </label>
+                        </div>
                         <div style={{ marginTop: 5, fontSize: 11, color: '#555', lineHeight: 1.7 }}>
                           ※ 전자소송에서 소재대리인은 본인 인증된 법원전자소송으로 등록 인구를 등록 할 수 없습니다. 소재서류에서 개인대리인의 자격 소 소 등의 출력으로는: 선생규범으로 주원할 수 있는: 서류의 (기계관련소시) 건의 등의: 선택서비스 <span style={{ color: '#c00', fontWeight: 700 }}>선생적분 및 소송법인으로 제출하여야 수시가 바랍니다.</span><br />
                           ※ 대리인의 등록 사용여부가 아닌 경우에는: 비로변명 확인을 클릭하고 입력하시기 바랍니다.
@@ -1236,6 +1424,22 @@ export default function ApplyPage() {
                       <td style={TD}>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                           <input value={agentForm.name} onChange={e => { setAgentForm(p => ({ ...p, name: e.target.value })); upd({ agentName: e.target.value }); }} style={{ ...INP, width: 160 }} placeholder="대리인 성명" />
+                          <button onClick={() => {
+                            if (!user) return;
+                            setAgentForm(p => ({
+                              ...p,
+                              name: user.name || '',
+                              zipCode: user.zipCode || '',
+                              addrRoad: user.addr || '',
+                              addrDetail: user.addrDetail || '',
+                              mobilePre: '010',
+                              mobile1: user.mobile?.split('-')[1] || '',
+                              mobile2: user.mobile?.split('-')[2] || '',
+                              email: user.email || '',
+                            }));
+                          }} style={{ height: 26, padding: '0 10px', background: '#f0f6fb', border: '1px solid #b0c8d8', borderRadius: 2, fontSize: 11, color: '#0067c2', cursor: 'pointer' }}>
+                            내 정보 가져오기
+                          </button>
                           <span style={{ fontSize: 11, color: '#555' }}>(법무법인코드)</span>
                         </div>
                         <div style={{ marginTop: 5 }}>
@@ -1387,9 +1591,12 @@ export default function ApplyPage() {
                       <td style={{ ...TD, verticalAlign: 'top', paddingTop: 10 }}>
                         {/* 상단: 작성예시참고 + 바이트 */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                          <div style={{ display: 'flex', gap: 5 }}>
                           <button style={{ height: 24, padding: '0 10px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: 4 }}>
                             🗒 작성예시참고
                           </button>
+                          <button onClick={() => setShowPurposeExample(true)} style={{ height: 24, padding: '0 8px', background: '#f0f6fb', border: '1px solid #b0c8d8', borderRadius: 2, fontSize: 11, color: '#0067c2', cursor: 'pointer' }}>작성예시</button>
+                          </div>
                           <span style={{ fontSize: 11, color: '#888' }}>( {new TextEncoder().encode(data.claimPurpose).length} / 6000 Bytes )</span>
                         </div>
                         <textarea
@@ -1613,6 +1820,17 @@ export default function ApplyPage() {
                 <div style={{ fontSize: 11, color: '#555', marginTop: 6, marginBottom: 4 }}>※ 파일첨부가 완료되면 [목록에 추가]버튼을 눌러 첨부파일을 입증서류목록에 추가할 수 있습니다.</div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
                   <button onClick={addToEvidenceList} style={{ height: 30, padding: '0 14px', border: '1px solid #1a3a6b', borderRadius: 2, background: '#1a3a6b', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>목록에 추가</button>
+                </div>
+
+                {/* 서증 직접 입력 폼 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, padding: '8px 10px', border: '1px solid #d0d8e4', background: '#f8f9fb', borderRadius: 2 }}>
+                  <select value={evForm.role} onChange={e => setEvForm(p => ({ ...p, role: e.target.value as '원고' | '피고' }))} style={{ ...SEL, width: 120 }}>
+                    <option value="원고">갑호증(원고)</option>
+                    <option value="피고">을호증(피고)</option>
+                  </select>
+                  <input value={evForm.name} onChange={e => setEvForm(p => ({ ...p, name: e.target.value }))} style={{ ...INP, flex: 1 }} placeholder="서류명" />
+                  <input value={evForm.purpose} onChange={e => setEvForm(p => ({ ...p, purpose: e.target.value }))} style={{ ...INP, flex: 1 }} placeholder="입증취지" />
+                  <button onClick={addEvidence} style={{ height: 28, padding: '0 12px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>서증 추가</button>
                 </div>
 
                 {/* 입증서류목록 */}
@@ -2015,9 +2233,11 @@ export default function ApplyPage() {
 
           {/* Bottom buttons */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <button onClick={saveDraft} style={{ height: 34, padding: '0 16px', border: '1px solid #c8cdd6', background: '#fff', color: '#555', borderRadius: 2, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
-              임시저장
-            </button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => saveDraft()} style={{ height: 32, padding: '0 16px', background: '#fff', border: '1px solid #0098a3', color: '#0098a3', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                임시저장
+              </button>
+            </div>
             <button onClick={handleSubmit} disabled={submitting} style={{ height: 34, padding: '0 24px', background: submitting ? '#7ab8bd' : TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
               {submitting ? '⏳ 제출 중...' : '작성완료 →'}
             </button>
@@ -2026,8 +2246,8 @@ export default function ApplyPage() {
       </div>
 
       {draftToast && (
-        <div style={{ position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)', background: '#1a3a6b', color: '#fff', padding: '11px 28px', borderRadius: 8, fontSize: 13, fontWeight: 700, zIndex: 9999, boxShadow: '0 4px 16px rgba(0,0,0,.25)' }}>
-          ✅ 임시저장 완료
+        <div style={{ position: 'fixed', bottom: 32, right: 32, background: '#1a3a6b', color: '#fff', padding: '10px 20px', borderRadius: 6, fontSize: 13, fontWeight: 600, zIndex: 9999, boxShadow: '0 2px 12px rgba(0,0,0,.3)' }}>
+          ✓ 임시저장되었습니다
         </div>
       )}
       <Footer />
