@@ -356,7 +356,7 @@ export default function ApplyPage() {
   const [sogaDisp, setSogaDisp] = useState('0');
   const [sogaFormatted, setSogaFormatted] = useState('0');
   const [nonPropSpecial, setNonPropSpecial] = useState(false);
-  const [causeTab, setCauseTab] = useState<'direct' | 'facts'>('direct');
+  const [causeTab, setCauseTab] = useState<'direct' | 'file' | 'facts'>('direct');
   const [zipTarget, setZipTarget] = useState<'party' | 'agent' | null>(null);
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [showSogaModal, setShowSogaModal] = useState(false);
@@ -1684,9 +1684,9 @@ export default function ApplyPage() {
                       <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
                         {/* 탭 */}
                         <div style={{ display: 'flex', gap: 4, marginBottom: 0 }}>
-                          {(['direct','facts'] as const).map(tab => (
+                          {(['direct','file','facts'] as const).map(tab => (
                             <button key={tab} onClick={() => setCauseTab(tab)} style={{ height: 28, padding: '0 14px', border: `1px solid ${causeTab === tab ? TEAL : '#c8cdd6'}`, borderRadius: '2px 2px 0 0', background: causeTab === tab ? TEAL : '#f5f7fb', color: causeTab === tab ? '#fff' : '#555', fontWeight: causeTab === tab ? 700 : 400, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
-                              {tab === 'direct' ? '직접입력' : '요건사실'}
+                              {tab === 'direct' ? '직접입력' : tab === 'file' ? '내용파일첨부' : '요건사실'}
                             </button>
                           ))}
                         </div>
@@ -1741,6 +1741,30 @@ export default function ApplyPage() {
                               />
                               <div style={{ background: '#f7f8fb', borderTop: '1px solid #e5e8ee', padding: '3px 10px', textAlign: 'right', fontSize: 11, color: '#888' }}>글자: {data.claimCause.length}/2000</div>
                             </>
+                          ) : causeTab === 'file' ? (
+                            <div style={{ padding: '20px 16px' }}>
+                              <div style={{ fontSize: 12, color: '#333', marginBottom: 12, lineHeight: 1.7 }}>
+                                청구원인을 파일로 첨부합니다. HWP, HWPX, DOC, DOCX, PDF, TXT 등의 파일을 첨부할 수 있습니다.
+                              </div>
+                              <div style={{ border: '2px dashed #c8d8e8', borderRadius: 6, padding: '28px 20px', textAlign: 'center', background: '#fafbfe', marginBottom: 12 }}>
+                                <div style={{ fontSize: 32, marginBottom: 8, opacity: .5 }}>📄</div>
+                                <button onClick={() => causeFileRef.current?.click()} style={{ height: 34, padding: '0 24px', background: TEAL, color: '#fff', border: 'none', borderRadius: 3, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                                  📎 내용파일 첨부하기
+                                </button>
+                                <div style={{ fontSize: 11, color: '#888', marginTop: 8 }}>또는 이 영역에 파일을 드래그하세요</div>
+                                {causeFileName && (
+                                  <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                    <span style={{ fontSize: 12, color: TEAL, fontWeight: 600 }}>✓ {causeFileName}</span>
+                                    <button onClick={() => setCauseFileName(null)} style={{ background: 'none', border: 'none', color: '#c00', fontSize: 14, cursor: 'pointer' }}>✕</button>
+                                  </div>
+                                )}
+                                <input ref={causeFileRef} type="file" style={{ display: 'none' }} accept=".hwp,.hwpx,.doc,.docx,.pdf,.txt,.bmp,.jpg,.jpeg,.gif,.tif,.tiff,.png" onChange={e => { setCauseFileName(e.target.files?.[0]?.name ?? null); if (e.target.files?.[0]) upd({ claimCause: `[내용파일첨부] ${e.target.files[0].name}` }); }} />
+                              </div>
+                              <div style={{ fontSize: 11, color: TEAL, lineHeight: 1.7 }}>
+                                ※ 첨부가능한 파일 형식 : HWP, HWPX, DOC, DOCX, PDF, TXT, BMP, JPG, JPEG, GIF, TIF, TIFF, PNG<br/>
+                                ※ PDF파일로 자동변환되며, 20MB까지 첨부 가능합니다.
+                              </div>
+                            </div>
                           ) : (
                             <div style={{ padding: '14px' }}>
                               {['1. 당사자 관계', '2. 계약 체결 사실', '3. 이행 청구 근거', '4. 손해 발생 사실'].map((label, i) => (
