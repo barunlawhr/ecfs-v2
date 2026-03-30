@@ -15,10 +15,10 @@ function getUnreadCount(userId: string): number {
     if (!stored) {
       // 최초: 4건 세팅 (실제 대법원 전자소송과 동일 데이터)
       const docs = [
-        { id: 'ud1', confirmed: false, court: '인천지법', division: '민사7단독', caseNum: '2024가단329907', docName: '조정회부결정등본', sentDate: '2025.03.10', hasIssue: true, docType: '결정등본송달' },
-        { id: 'ud2', confirmed: false, court: '김포시법원', division: '민사소액', caseNum: '2024가소71207', docName: '준비서면부본(25.03.06.자)', sentDate: '2025.03.09', hasIssue: false, docType: '준비서면부본송달' },
-        { id: 'ud3', confirmed: false, court: '서울중앙지방법원', division: '민사302단독(소액)', caseNum: '2024가소2010301', docName: '변론기일통지서', sentDate: '2025.03.06', hasIssue: false, docType: '기일통지송달' },
-        { id: 'ud4', confirmed: false, court: '서울행정법원', division: '행정10단독', caseNum: '2024구단15292', docName: '변론기일통지서', sentDate: '2025.03.06', hasIssue: false, docType: '기일통지송달' },
+        { id: 'ud1', confirmed: false, court: '인천지법', division: '민사7단독', caseNum: '2024가단318205', docName: '조정회부결정등본', sentDate: '2025.03.10', hasIssue: true, docType: '결정등본송달' },
+        { id: 'ud2', confirmed: false, court: '김포시법원', division: '민사소액', caseNum: '2024가소68413', docName: '준비서면부본(25.03.06.자)', sentDate: '2025.03.09', hasIssue: false, docType: '준비서면부본송달' },
+        { id: 'ud3', confirmed: false, court: '서울중앙지방법원', division: '민사302단독(소액)', caseNum: '2024가소1985402', docName: '변론기일통지서', sentDate: '2025.03.06', hasIssue: false, docType: '기일통지송달' },
+        { id: 'ud4', confirmed: false, court: '서울행정법원', division: '행정10단독', caseNum: '2024구단14078', docName: '변론기일통지서', sentDate: '2025.03.06', hasIssue: false, docType: '기일통지송달' },
       ];
       localStorage.setItem(key, JSON.stringify(docs));
       return 4;

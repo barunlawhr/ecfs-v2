@@ -1127,11 +1127,11 @@ export default function MyPage() {
   // 진행중사건 mock 데이터 (실제 대법원 화면과 동일)
   interface MockCase { id: number; court: string; caseNum: string; division: string; status: string; filedDate: string; plaintiff: string; defendant: string; hearingDate: string; hearingPlace: string }
   const MOCK_ACTIVE_CASES: MockCase[] = [
-    { id:1, court:'제주지법', caseNum:'2025가단7122', division:'미배당', status:'원고대리인', filedDate:'2025.03.12', plaintiff:'심경태', defendant:'주식회사 지에이유아이키팩토리 외 1명', hearingDate:'', hearingPlace:'' },
-    { id:2, court:'인천지법', caseNum:'2025머11269', division:'민사조정17단독', status:'원고대리인', filedDate:'2025.03.11', plaintiff:'윤진권', defendant:'주식회사 지앤지테크 놀러지', hearingDate:'', hearingPlace:'' },
-    { id:3, court:'서울서부지법', caseNum:'2025머2151', division:'민사61단독(조정)', status:'원고대리인', filedDate:'2025.03.04', plaintiff:'변주경', defendant:'이현수 외 1명', hearingDate:'', hearingPlace:'' },
-    { id:4, court:'인천지법 부천지원', caseNum:'2025가단103674', division:'민사5단독', status:'원고대리인', filedDate:'2025.02.25', plaintiff:'김경희', defendant:'주식회사 웰브릿지 외 1명', hearingDate:'', hearingPlace:'' },
-    { id:5, court:'대전지법', caseNum:'2024머237008', division:'대전3조정부', status:'원고대리인', filedDate:'2024.12.31', plaintiff:'민지해 외', defendant:'백수현 외', hearingDate:'2025.02.04 14:00', hearingPlace:'본관(1층) 15호 조정실' },
+    { id:1, court:'제주지법', caseNum:'2025가단7122', division:'미배당', status:'원고대리인', filedDate:'2025.03.12', plaintiff:'박준호', defendant:'주식회사 하나솔루션즈 외 1명', hearingDate:'', hearingPlace:'' },
+    { id:2, court:'인천지법', caseNum:'2025머11269', division:'민사조정17단독', status:'원고대리인', filedDate:'2025.03.11', plaintiff:'최영민', defendant:'주식회사 블루오션테크', hearingDate:'', hearingPlace:'' },
+    { id:3, court:'서울서부지법', caseNum:'2025머2151', division:'민사61단독(조정)', status:'원고대리인', filedDate:'2025.03.04', plaintiff:'한소영', defendant:'정태우 외 1명', hearingDate:'', hearingPlace:'' },
+    { id:4, court:'인천지법 부천지원', caseNum:'2025가단103674', division:'민사5단독', status:'원고대리인', filedDate:'2025.02.25', plaintiff:'오세진', defendant:'주식회사 그린라이트 외 1명', hearingDate:'', hearingPlace:'' },
+    { id:5, court:'대전지법', caseNum:'2024머237008', division:'대전3조정부', status:'원고대리인', filedDate:'2024.12.31', plaintiff:'이하은 외', defendant:'강민석 외', hearingDate:'2025.02.04 14:00', hearingPlace:'본관(1층) 15호 조정실' },
   ]
 
   const ActiveCasesContent = () => {
@@ -1511,10 +1511,10 @@ export default function MyPage() {
     const stored = localStorage.getItem(key)
     if (!stored) {
       const docs: UnreadDoc[] = [
-        { id: 'ud1', confirmed: false, court: '인천지법', division: '민사7단독', caseNum: '2024가단329907', docName: '조정회부결정등본', sentDate: '2025.03.10', hasIssue: true, docType: '결정등본송달' },
-        { id: 'ud2', confirmed: false, court: '김포시법원', division: '민사소액', caseNum: '2024가소71207', docName: '준비서면부본(25.03.06.자)', sentDate: '2025.03.09', hasIssue: false, docType: '준비서면부본송달' },
-        { id: 'ud3', confirmed: false, court: '서울중앙지방법원', division: '민사302단독(소액)', caseNum: '2024가소2010301', docName: '변론기일통지서', sentDate: '2025.03.06', hasIssue: false, docType: '기일통지송달' },
-        { id: 'ud4', confirmed: false, court: '서울행정법원', division: '행정10단독', caseNum: '2024구단15292', docName: '변론기일통지서', sentDate: '2025.03.06', hasIssue: false, docType: '기일통지송달' },
+        { id: 'ud1', confirmed: false, court: '인천지법', division: '민사7단독', caseNum: '2024가단318205', docName: '조정회부결정등본', sentDate: '2025.03.10', hasIssue: true, docType: '결정등본송달' },
+        { id: 'ud2', confirmed: false, court: '김포시법원', division: '민사소액', caseNum: '2024가소68413', docName: '준비서면부본(25.03.06.자)', sentDate: '2025.03.09', hasIssue: false, docType: '준비서면부본송달' },
+        { id: 'ud3', confirmed: false, court: '서울중앙지방법원', division: '민사302단독(소액)', caseNum: '2024가소1985402', docName: '변론기일통지서', sentDate: '2025.03.06', hasIssue: false, docType: '기일통지송달' },
+        { id: 'ud4', confirmed: false, court: '서울행정법원', division: '행정10단독', caseNum: '2024구단14078', docName: '변론기일통지서', sentDate: '2025.03.06', hasIssue: false, docType: '기일통지송달' },
       ]
       localStorage.setItem(key, JSON.stringify(docs))
       return docs
