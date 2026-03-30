@@ -1292,54 +1292,54 @@ export default function MyPage() {
         {/* 메뉴선택 모달 (실제 대법원 동일) */}
         {menuCaseNum && (
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.45)', zIndex:3000, display:'flex', alignItems:'flex-start', justifyContent:'center', paddingTop:60 }}>
-            <div style={{ background:'#fff', width:560, boxShadow:'0 8px 40px rgba(0,0,0,.35)', overflow:'hidden' }}>
+            <div style={{ background:'#fff', width:620, boxShadow:'0 8px 40px rgba(0,0,0,.35)', overflow:'hidden' }}>
               {/* 헤더 */}
               <div style={{ background:'#1a1a2e', color:'#fff', padding:'12px 20px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span style={{ fontWeight:700, fontSize:15 }}>메뉴선택</span>
-                <button onClick={()=>setMenuCaseNum(null)} style={{ background:'none', border:'none', color:'#fff', fontSize:22, cursor:'pointer', lineHeight:1 }}>✕</button>
+                <span style={{ fontWeight:700, fontSize:16, letterSpacing:1 }}>메뉴선택</span>
+                <button onClick={()=>setMenuCaseNum(null)} style={{ background:'none', border:'none', color:'#fff', fontSize:24, cursor:'pointer', lineHeight:1 }}>✕</button>
               </div>
               {/* 사건번호 */}
-              <div style={{ padding:'24px 20px 6px', textAlign:'center' }}>
-                <div style={{ fontSize:16, fontWeight:700, color:'#1a1a2e', marginBottom:8 }}>{menuCaseNum}</div>
-                <div style={{ fontSize:13, color:'#c00', marginBottom:16 }}>아래 항목을 클릭하시면, 해당 화면으로 바로가기 됩니다.</div>
+              <div style={{ padding:'28px 20px 6px', textAlign:'center' }}>
+                <div style={{ fontSize:17, fontWeight:700, color:'#1a1a2e', marginBottom:10 }}>{menuCaseNum}</div>
+                <div style={{ fontSize:13, color:'#c00', marginBottom:20 }}>아래 항목을 클릭하시면, 해당 화면으로 바로가기 됩니다.</div>
               </div>
               {/* 버튼 그리드 3x4 */}
-              <div style={{ padding:'0 28px 16px', display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+              <div style={{ padding:'0 36px 20px', display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12 }}>
                 {[
-                  { label:'사건기록열람', active: false },
-                  { label:'소송서류제출', active: false },
-                  { label:'소송비용납부', active: false },
-                  { label:'알림서비스', active: false },
-                  { label:'제출/송달내역', active: true },
-                  { label:'기록목록조회', active: false },
-                  { label:'관련사건등록', active: false },
-                  { label:'관련사건조회', active: false },
-                  { label:'미확인송달물확인처리', active: false },
-                  { label:'제증명신청', active: false },
-                ].map(({ label, active }) => (
+                  '사건기록열람','소송서류제출','소송비용납부',
+                  '알림서비스','제출/송달내역','기록목록조회',
+                  '관련사건등록','관련사건조회','미확인송달물확인처리',
+                  '제증명신청',
+                ].map(label => (
                   <button
                     key={label}
                     onClick={() => {
                       setMenuCaseNum(null)
-                      if (label === '사건기록열람') window.open(`/case-viewer?case=${encodeURIComponent(menuCaseNum)}`, '_blank', 'width=1400,height=900')
+                      if (label === '사건기록열람') window.open(`/case-viewer?case=${encodeURIComponent(menuCaseNum!)}`, '_blank', 'width=1400,height=900')
                       else if (label === '제출/송달내역') navTo('doc-history')
                       else if (label === '소송서류제출') router.push('/apply?new=true')
+                      else if (label === '소송비용납부') navTo('pay')
                       else if (label === '미확인송달물확인처리') navTo('unread-delivery')
                       else if (label === '알림서비스') navTo('alert-service')
-                      else alert('실습 모드에서는 지원하지 않는 기능입니다.')
+                      else if (label === '기록목록조회') window.open(`/case-viewer?case=${encodeURIComponent(menuCaseNum!)}`, '_blank', 'width=1400,height=900')
+                      else if (label === '관련사건등록') navTo('active-cases')
+                      else if (label === '관련사건조회') navTo('active-cases')
+                      else if (label === '제증명신청') navTo('generic', '제증명신청')
                     }}
+                    onMouseEnter={e => { e.currentTarget.style.border = '2px solid #0067c2'; e.currentTarget.style.color = '#0067c2'; e.currentTarget.style.fontWeight = '700' }}
+                    onMouseLeave={e => { e.currentTarget.style.border = '1px solid #c8cdd6'; e.currentTarget.style.color = '#333'; e.currentTarget.style.fontWeight = '400' }}
                     style={{
-                      padding:'12px 6px', border: active ? '2px solid #0067c2' : '1px solid #c8cdd6',
-                      background:'#fff', color: active ? '#0067c2' : '#333',
-                      borderRadius:2, fontSize:13, fontWeight: active ? 700 : 400,
-                      cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap',
+                      padding:'13px 6px', border:'1px solid #c8cdd6',
+                      background:'#fff', color:'#333',
+                      borderRadius:3, fontSize:13, fontWeight:400,
+                      cursor:'pointer', fontFamily:'inherit',
                     }}
                   >{label}</button>
                 ))}
               </div>
               {/* 닫기 */}
-              <div style={{ padding:'16px 20px 28px', textAlign:'center' }}>
-                <button onClick={()=>setMenuCaseNum(null)} style={{ height:38, padding:'0 50px', background:'#fff', color:'#333', border:'1px solid #999', borderRadius:3, fontSize:14, cursor:'pointer', fontFamily:'inherit' }}>닫기</button>
+              <div style={{ padding:'10px 20px 32px', display:'flex', justifyContent:'flex-end', paddingRight:36 }}>
+                <button onClick={()=>setMenuCaseNum(null)} style={{ height:40, padding:'0 44px', background:'#fff', color:'#333', border:'1px solid #999', borderRadius:3, fontSize:14, cursor:'pointer', fontFamily:'inherit' }}>닫기</button>
               </div>
             </div>
           </div>
