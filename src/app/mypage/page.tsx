@@ -1248,7 +1248,7 @@ export default function MyPage() {
                     <td style={{ ...tdS, textAlign:'center', whiteSpace:'nowrap', color:'#555', fontSize:11 }}>{c.hearingDate}</td>
                     <td style={{ ...tdS, textAlign:'center', whiteSpace:'nowrap', color:'#888', fontSize:11, maxWidth:90, overflow:'hidden', textOverflow:'ellipsis' }}>{c.hearingPlace}</td>
                     <td style={{ ...tdS, textAlign:'center' }}>
-                      <button onClick={() => setMenuCaseNum(c.caseNum)} style={{ height:24, padding:'0 8px', background:'#fff', border:'1px solid #8899bb', borderRadius:3, fontSize:11, cursor:'pointer', color:'#003366', fontFamily:'inherit' }}>메뉴선택</button>
+                      <button onClick={() => setMenuCaseNum(c.caseNum)} style={{ height:26, padding:'0 10px', background:'#fff', border:'1px solid #8899bb', borderRadius:3, fontSize:11, cursor:'pointer', color:'#003366', fontFamily:'inherit', whiteSpace:'nowrap' }}>메뉴선택</button>
                     </td>
                   </tr>
                 ))}
