@@ -1321,7 +1321,8 @@ export default function MyPage() {
                     key={label}
                     onClick={() => {
                       setMenuCaseNum(null)
-                      if (label === '제출/송달내역') navTo('doc-history')
+                      if (label === '사건기록열람') window.open(`/case-viewer?case=${encodeURIComponent(menuCaseNum)}`, '_blank', 'width=1400,height=900')
+                      else if (label === '제출/송달내역') navTo('doc-history')
                       else if (label === '소송서류제출') router.push('/apply?new=true')
                       else if (label === '미확인송달물확인처리') navTo('unread-delivery')
                       else if (label === '알림서비스') navTo('alert-service')
