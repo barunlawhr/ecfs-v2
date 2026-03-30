@@ -347,6 +347,7 @@ export default function ApplyPage() {
   const [open, setOpen] = useState({ s1: true, s2: true, s3: true, s4: true, s5: true, s6: true, s7: true });
   const [partyForm, setPartyForm] = useState<PartyLocal>(EMPTY_PARTY);
   const [agentForm, setAgentForm] = useState<AgentLocal>(EMPTY_AGENT);
+  const [agentList, setAgentList] = useState<{ id: string; type: string; name: string; partyRole: string; partyName: string }[]>([]);
   const [evForm, setEvForm] = useState({ name: '', purpose: '', role: '원고' as '원고' | '피고' });
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -1305,15 +1306,44 @@ export default function ApplyPage() {
                 </div>
                 <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4', marginBottom: 10 }}>
                   <thead>
-                    <tr style={{ background: '#f5f7fb' }}>
-                      {['대리인구분','이름(사무소이름이다)','대리인성세','당사자구분','당사자','알림서비스','순서변번','삭제'].map(h => (
-                        <th key={h} style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: '#333', borderBottom: '1px solid #d0d8e4', borderRight: '1px solid #e0e6ee', textAlign: 'center', whiteSpace: 'nowrap' }}>{h}</th>
+                    <tr style={{ background: '#f5f7fb', borderBottom: '2px solid #333' }}>
+                      {['대리인구분','이름(사용자아이디)','대리인상세','당사자구분','당사자','알림서비스','순서변경','삭제'].map(h => (
+                        <th key={h} style={{ padding: '7px 8px', fontSize: 11, fontWeight: 700, color: '#333', borderRight: '1px solid #e0e6ee', textAlign: 'center', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    <tr><td colSpan={8} style={{ padding: '12px', textAlign: 'center', fontSize: 12, color: '#888' }}>총 0명</td></tr>
+                    {agentList.length === 0 ? (
+                      <tr><td colSpan={8} style={{ padding: '12px', textAlign: 'center', fontSize: 12, color: '#888' }}>총 0명</td></tr>
+                    ) : (
+                      agentList.map((ag, i) => (
+                        <tr key={ag.id} style={{ borderBottom: '1px solid #e8edf4' }}>
+                          <td style={{ padding: '8px', fontSize: 12, textAlign: 'center' }}>{ag.type}</td>
+                          <td style={{ padding: '8px', fontSize: 12, textAlign: 'center' }}>
+                            <span style={{ color: '#0067c2', textDecoration: 'underline', cursor: 'pointer' }}>{ag.name}</span>
+                          </td>
+                          <td style={{ padding: '8px', fontSize: 12, textAlign: 'center' }}></td>
+                          <td style={{ padding: '8px', fontSize: 12, textAlign: 'center' }}>{ag.partyRole}</td>
+                          <td style={{ padding: '8px', fontSize: 12, textAlign: 'center' }}>{ag.partyName}</td>
+                          <td style={{ padding: '8px', fontSize: 12, textAlign: 'center' }}>
+                            <button style={{ height: 22, padding: '0 10px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 10, cursor: 'pointer', fontFamily: 'inherit' }}>설정</button>
+                          </td>
+                          <td style={{ padding: '8px', fontSize: 12, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <button style={{ width: 20, height: 20, border: '1px solid #ccc', background: '#fff', borderRadius: 2, cursor: 'pointer', fontSize: 10 }}>▲</button>
+                            <button style={{ width: 20, height: 20, border: '1px solid #ccc', background: '#fff', borderRadius: 2, cursor: 'pointer', fontSize: 10, marginLeft: 2 }}>▼</button>
+                          </td>
+                          <td style={{ padding: '8px', fontSize: 12, textAlign: 'center' }}>
+                            <button onClick={() => { setAgentList(prev => prev.filter(a => a.id !== ag.id)); if (agentList.length <= 1) upd({ hasAgent: false, agentName: undefined, agentType: undefined }); }} style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', color: '#999' }}>✕</button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
+                  {agentList.length > 0 && (
+                    <tfoot>
+                      <tr><td colSpan={8} style={{ padding: '6px 8px', fontSize: 11, color: '#555' }}>총 {agentList.length}명</td></tr>
+                    </tfoot>
+                  )}
                 </table>
 
                 {/* 대리인 정보 입력 */}
@@ -1571,7 +1601,19 @@ export default function ApplyPage() {
                   <button onClick={() => setAgentForm(EMPTY_AGENT)} style={{ height: 32, padding: '0 16px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 12, cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: 5 }}>
                     ↺ 초기화
                   </button>
-                  <button onClick={() => { upd({ hasAgent: true, agentName: agentForm.name, agentType: agentForm.agentType }); setShowAgentRegModal(true); }} style={{ height: 32, padding: '0 16px', border: 'none', borderRadius: 2, background: '#1a3a6b', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <button onClick={() => {
+                    if (!agentForm.name.trim()) { alert('대리인명을 입력해주세요.'); return; }
+                    const partyMatch = data.parties.find(p => p.id === agentForm.partyId) || data.parties[0];
+                    setAgentList(prev => [...prev, {
+                      id: crypto.randomUUID(),
+                      type: agentForm.agentType,
+                      name: agentForm.name.trim(),
+                      partyRole: partyMatch?.role || '원고',
+                      partyName: partyMatch?.name || '',
+                    }]);
+                    upd({ hasAgent: true, agentName: agentForm.name, agentType: agentForm.agentType });
+                    setAgentForm(EMPTY_AGENT);
+                  }} style={{ height: 32, padding: '0 16px', border: 'none', borderRadius: 2, background: '#1a3a6b', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
                     ✎ 대리인 등록
                   </button>
                 </div>
