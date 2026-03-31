@@ -1,3 +1,5 @@
+const normalize = (s: string) => s.replace(/\s+/g, ' ').trim()
+
 export interface ScoreBreakdown {
   parties: number
   claim: number
@@ -23,13 +25,13 @@ export function calculateScore(complaintData: any): ScoreResult {
   if (parties.some((p: { addr?: string }) => (p.addr?.trim() ?? '').length > 0)) breakdown.parties += 5
 
   // 청구취지 (25점)
-  const claim = complaintData.claimPurpose || ''
+  const claim = normalize(complaintData.claimPurpose || '')
   if (claim.length >= 5) breakdown.claim += 8
   if (claim.length >= 20) breakdown.claim += 9
   if (claim.length >= 50) breakdown.claim += 8
 
   // 청구원인 (30점)
-  const cause = complaintData.claimCause || ''
+  const cause = normalize(complaintData.claimCause || '')
   if (cause.length >= 10) breakdown.cause += 10
   if (cause.length >= 50) breakdown.cause += 10
   if (cause.length >= 150) breakdown.cause += 10
@@ -57,13 +59,13 @@ export function calculateAnswerScore(answerData: any): ScoreResult {
   if (parties.some((p: { addr?: string }) => (p.addr?.trim() ?? '').length > 0)) breakdown.parties += 5
 
   // 청구취지 답변 (30점) - "원고의 청구 기각" 포함 여부
-  const claim = answerData.claimPurpose || ''
+  const claim = normalize(answerData.claimPurpose || '')
   if (claim.length >= 5) breakdown.claim += 10
   if (claim.includes('기각') || claim.includes('棄却')) breakdown.claim += 10
   if (claim.includes('소송비용') || claim.includes('원고')) breakdown.claim += 10
 
   // 청구원인 답변 (30점)
-  const cause = answerData.claimCause || ''
+  const cause = normalize(answerData.claimCause || '')
   if (cause.length >= 10) breakdown.cause += 10
   if (cause.length >= 50) breakdown.cause += 10
   if (cause.length >= 150) breakdown.cause += 10
