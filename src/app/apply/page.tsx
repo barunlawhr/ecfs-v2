@@ -579,6 +579,9 @@ export default function ApplyPage() {
     } catch { if (!silent) alert('임시저장에 실패했습니다.'); }
   }
 
+  const [gradeResult, setGradeResult] = useState<{ score: number; feedback: string; breakdown: { parties: number; claim: number; cause: number; evidence: number } } | null>(null);
+  const [grading, setGrading] = useState(false);
+
   async function handleSubmit() {
     if (!data.court) { alert('법원을 선택해주세요.'); return; }
     if (data.parties.length < 2) { alert('원고와 피고를 각 1명 이상 등록해주세요.'); return; }
@@ -587,15 +590,47 @@ export default function ApplyPage() {
 
     setSubmitting(true);
     setSubmitError(null);
+    setGrading(true);
     try {
-      // 1) 클라이언트 사이드 채점
-      const { score, breakdown } = calculateScore(data);
-      const feedback = generateFeedback(score, breakdown);
-
-      // 2) Supabase REST API로 직접 저장 (id는 클라이언트에서 생성해서 upsert 가능하게)
-      const SB_URL = 'https://knpvayujykoqjncctxrr.supabase.co';
-      const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHZheXVqeWtvcWpuY2N0eHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NzA3NDUsImV4cCI6MjA4OTE0Njc0NX0.rXlo5IsOW6FS5N1X3vgqNM1RvzB84TYPqVhnYyc6FSg';
       const recordId: string = crypto.randomUUID();
+
+      // 1) 클라이언트 기본 채점 (fallback)
+      const { score: clientScore, breakdown: clientBreakdown } = calculateScore(data);
+      const clientFeedback = generateFeedback(clientScore, clientBreakdown);
+
+      let finalScore = clientScore;
+      let finalFeedback = clientFeedback;
+      let finalBreakdown = clientBreakdown;
+
+      // 2) AI 자동채점 시도
+      const mockCase = assignedCase || {
+        id: 'manual', title: data.caseName || data.caseCategory, case_type: data.caseCategory || data.caseName,
+        court: data.court, plaintiff: data.parties.find(p => p.role === '원고')?.name || '',
+        defendant: data.parties.find(p => p.role === '피고')?.name || '', created_at: new Date().toISOString(),
+      };
+
+      try {
+        const gradeRes = await fetch('/api/grade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ formData: data, sampleCase: mockCase, doc_type: 'complaint' }),
+        });
+        if (gradeRes.ok) {
+          const aiResult = await gradeRes.json();
+          if (aiResult.score !== undefined && aiResult.score > 0) {
+            finalScore = aiResult.score;
+            finalFeedback = aiResult.feedback || clientFeedback;
+            finalBreakdown = aiResult.breakdown || clientBreakdown;
+            console.log('[apply] AI grading success, score:', finalScore);
+          }
+        }
+      } catch (e) {
+        console.log('[apply] AI grading failed, using client score:', e);
+      }
+
+      setGradeResult({ score: finalScore, feedback: finalFeedback, breakdown: finalBreakdown });
+
+      // 3) 서버에 저장
       const sbPayload = {
         id: recordId,
         student_id: user!.id,
@@ -607,31 +642,25 @@ export default function ApplyPage() {
         defendant: data.parties.find(p => p.role === '피고')?.name || '',
         has_agent: data.hasAgent,
         evidence_count: data.evidences.length,
-        score,
-        feedback,
-        grade_breakdown: breakdown,
+        score: finalScore,
+        feedback: finalFeedback,
+        grade_breakdown: finalBreakdown,
         complaint_data: data,
         case_id: assignedCase?.id ? Number(assignedCase.id) : null,
         submitted_at: new Date().toISOString(),
       };
 
       try {
-        const sbRes = await fetch('/api/practice/submit', {
+        await fetch('/api/practice/submit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(sbPayload),
         });
-        if (sbRes.ok) {
-          console.log('[apply] submit OK, id:', recordId);
-        } else {
-          const errText = await sbRes.text();
-          console.error('[apply] submit failed:', sbRes.status, errText);
-        }
       } catch (e) {
         console.error('[apply] submit error:', e);
       }
 
-      // 3) localStorage에도 저장 (오프라인 백업)
+      // 4) localStorage 백업
       const localKey = 'ecfs_practice_records';
       const existing = JSON.parse(localStorage.getItem(localKey) || '[]');
       existing.unshift({ ...sbPayload, created_at: new Date().toISOString() });
@@ -643,6 +672,7 @@ export default function ApplyPage() {
       setSubmitError(err instanceof Error ? err.message : '제출 중 오류가 발생했습니다.');
     } finally {
       setSubmitting(false);
+      setGrading(false);
     }
   }
 
@@ -655,16 +685,64 @@ export default function ApplyPage() {
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif", background: '#f2f4f7' }}>
         <MockBar /><GnbNav active="서류제출" />
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <div style={{ background: '#fff', border: '1px solid #d0d8e4', borderRadius: 6, padding: '48px 40px', textAlign: 'center', maxWidth: 480 }}>
+          <div style={{ background: '#fff', border: '1px solid #d0d8e4', borderRadius: 6, padding: '40px 36px', textAlign: 'center', maxWidth: 560 }}>
             <div style={{ fontSize: 52, marginBottom: 12 }}>✅</div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, color: '#003366', margin: '0 0 12px' }}>소장 작성이 완료되었습니다!</h2>
-            <div style={{ background: '#f0f7f8', border: `1px solid ${TEAL}40`, borderRadius: 4, padding: '14px 18px', fontSize: 13, color: TEAL_DARK, lineHeight: 1.7, marginBottom: 24 }}>
-              채점 결과는 <strong>나의전자소송 &gt; 나의 실습기록</strong>에서 확인하세요.
-              {submittedId && <span style={{ display: 'block', marginTop: 4, color: '#888', fontSize: 11 }}>기록 ID: {submittedId}</span>}
-            </div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: '#003366', margin: '0 0 16px' }}>소장 제출 및 AI 채점이 완료되었습니다!</h2>
+
+            {/* AI 채점 결과 */}
+            {gradeResult && (
+              <div style={{ textAlign: 'left', marginBottom: 20 }}>
+                {/* 점수 */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 16 }}>
+                  <div style={{ width: 90, height: 90, borderRadius: '50%', background: gradeResult.score >= 80 ? '#ecfdf5' : gradeResult.score >= 60 ? '#fffbeb' : '#fef2f2', border: `3px solid ${gradeResult.score >= 80 ? '#10b981' : gradeResult.score >= 60 ? '#f59e0b' : '#ef4444'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: 28, fontWeight: 800, color: gradeResult.score >= 80 ? '#059669' : gradeResult.score >= 60 ? '#d97706' : '#dc2626', lineHeight: 1 }}>{gradeResult.score}</span>
+                    <span style={{ fontSize: 10, color: '#888' }}>/ 100점</span>
+                  </div>
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: gradeResult.score >= 80 ? '#059669' : gradeResult.score >= 60 ? '#d97706' : '#dc2626', marginBottom: 4 }}>
+                      {gradeResult.score >= 90 ? '우수' : gradeResult.score >= 70 ? '양호' : gradeResult.score >= 50 ? '보통' : '미흡'}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#888' }}>AI 자동채점 결과</div>
+                  </div>
+                </div>
+                {/* 항목별 점수 */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                  {[
+                    { label: '당사자 정보', score: gradeResult.breakdown.parties, max: 25 },
+                    { label: '청구취지', score: gradeResult.breakdown.claim, max: 25 },
+                    { label: '청구원인', score: gradeResult.breakdown.cause, max: 30 },
+                    { label: '입증서류', score: gradeResult.breakdown.evidence, max: 20 },
+                  ].map(item => (
+                    <div key={item.label} style={{ background: '#f8f9fc', border: '1px solid #e0e6ee', borderRadius: 4, padding: '8px 12px' }}>
+                      <div style={{ fontSize: 11, color: '#555', marginBottom: 4 }}>{item.label}</div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                        <span style={{ fontSize: 18, fontWeight: 700, color: '#003366' }}>{item.score}</span>
+                        <span style={{ fontSize: 11, color: '#999' }}>/ {item.max}점</span>
+                      </div>
+                      <div style={{ height: 4, background: '#e5e7eb', borderRadius: 2, marginTop: 4 }}>
+                        <div style={{ height: 4, background: item.score / item.max >= 0.8 ? '#10b981' : item.score / item.max >= 0.5 ? '#f59e0b' : '#ef4444', borderRadius: 2, width: `${(item.score / item.max) * 100}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* 피드백 */}
+                <div style={{ background: '#f0f7f8', border: `1px solid ${TEAL}40`, borderRadius: 4, padding: '12px 14px', fontSize: 12, color: '#333', lineHeight: 1.8, whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto', textAlign: 'left' }}>
+                  {gradeResult.feedback}
+                </div>
+              </div>
+            )}
+
+            {!gradeResult && (
+              <div style={{ background: '#f0f7f8', border: `1px solid ${TEAL}40`, borderRadius: 4, padding: '14px 18px', fontSize: 13, color: TEAL_DARK, lineHeight: 1.7, marginBottom: 24 }}>
+                채점 결과는 <strong>나의전자소송 &gt; 나의 실습기록</strong>에서 확인하세요.
+              </div>
+            )}
+
+            {submittedId && <div style={{ fontSize: 11, color: '#888', marginBottom: 12 }}>기록 ID: {submittedId}</div>}
+
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button onClick={() => router.push('/mypage')} style={{ padding: '10px 22px', background: TEAL, color: '#fff', border: 'none', borderRadius: 3, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>나의 실습기록 확인</button>
-              <button onClick={() => { setData(EMPTY); setSubmitted(false); setSubmittedId(null); }} style={{ padding: '10px 22px', background: '#fff', color: TEAL, border: `1px solid ${TEAL}`, borderRadius: 3, fontSize: 14, cursor: 'pointer' }}>새 소장 작성</button>
+              <button onClick={() => { setData(EMPTY); setSubmitted(false); setSubmittedId(null); setGradeResult(null); }} style={{ padding: '10px 22px', background: '#fff', color: TEAL, border: `1px solid ${TEAL}`, borderRadius: 3, fontSize: 14, cursor: 'pointer' }}>새 소장 작성</button>
             </div>
           </div>
         </div>
@@ -2305,7 +2383,7 @@ export default function ApplyPage() {
               </button>
             </div>
             <button onClick={handleSubmit} disabled={submitting} style={{ height: 34, padding: '0 24px', background: submitting ? '#7ab8bd' : TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
-              {submitting ? '⏳ 제출 중...' : '작성완료 →'}
+              {submitting ? (grading ? '🤖 AI 채점 중...' : '⏳ 제출 중...') : '작성완료 →'}
             </button>
           </div>
         </div>
