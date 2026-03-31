@@ -9,8 +9,8 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { calculateScore, generateFeedback } from '@/lib/scoring'
 
-const SB_URL = 'https://knpvayujykoqjncctxrr.supabase.co'
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHZheXVqeWtvcWpuY2N0eHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NzA3NDUsImV4cCI6MjA4OTE0Njc0NX0.rXlo5IsOW6FS5N1X3vgqNM1RvzB84TYPqVhnYyc6FSg'
+const SB_URL = 'https://ecmeafiajoksyeuisreh.supabase.co'
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjbWVhZmlham9rc3lldWlzcmVoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDA3MjYzOCwiZXhwIjoyMDg5NjQ4NjM4fQ.leU8zdVO_gby-lhQ1GfgVcynGfkP2tHQjAGp9kxRNJA'
 const SB_HDR = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
 
 type ActivePage =
@@ -264,20 +264,45 @@ export default function MyPage() {
     if (!user) return
     setSubmittingId(r.id)
     try {
-      // score 0이면 재채점
       let score = r.score || 0
       let feedback = r.feedback || ''
       let breakdown = (r as unknown as Record<string, unknown>).grade_breakdown
+      const docType = r.doc_type || 'complaint'
+
+      // AI 자동채점 시도
       if (!score || score === 0) {
-        const res = calculateScore(r.complaint_data || r)
-        score = res.score
-        breakdown = res.breakdown
-        feedback = generateFeedback(score, res.breakdown)
+        setSyncToast('🤖 AI 채점 중...')
+        try {
+          const mockCase = {
+            id: 'manual', title: r.case_type || '', case_type: r.case_type || '',
+            court: r.court || '', plaintiff: r.plaintiff || '', defendant: r.defendant || '',
+            created_at: new Date().toISOString(),
+          }
+          const gradeRes = await fetch('/api/grade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ formData: r.complaint_data || r, sampleCase: mockCase, doc_type: docType }),
+          })
+          if (gradeRes.ok) {
+            const aiResult = await gradeRes.json()
+            if (aiResult.score > 0) {
+              score = aiResult.score; feedback = aiResult.feedback || ''; breakdown = aiResult.breakdown
+            }
+          }
+        } catch { /* AI 실패 시 클라이언트 채점 */ }
+
+        if (!score || score === 0) {
+          const res = calculateScore(r.complaint_data || r)
+          score = res.score; breakdown = res.breakdown
+          feedback = generateFeedback(score, res.breakdown, docType as 'complaint' | 'answer')
+        }
       }
+
       const payload = {
         id: r.id,
         student_id: r.student_id || user.id,
         user_name: r.user_name || user.name,
+        doc_type: docType,
         case_type: r.case_type,
         court: r.court,
         plaintiff: r.plaintiff,
@@ -297,10 +322,9 @@ export default function MyPage() {
         body: JSON.stringify(payload),
       })
       if (sbRes.ok) {
-        // localStorage에서 제거
         const all = JSON.parse(localStorage.getItem('ecfs_practice_records') || '[]')
         localStorage.setItem('ecfs_practice_records', JSON.stringify(all.filter((x: { id: string }) => x.id !== r.id)))
-        setSyncToast('제출 완료! admin에서 확인 가능합니다.')
+        setSyncToast('✅ 제출 완료! AI 채점 결과가 반영되었습니다.')
         setTimeout(() => setSyncToast(''), 3000)
         await fetchPracticeRecords()
       } else {

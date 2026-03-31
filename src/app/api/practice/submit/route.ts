@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const SB_URL = 'https://knpvayujykoqjncctxrr.supabase.co'
-const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtucHZheXVqeWtvcWpuY2N0eHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NzA3NDUsImV4cCI6MjA4OTE0Njc0NX0.rXlo5IsOW6FS5N1X3vgqNM1RvzB84TYPqVhnYyc6FSg'
+const SB_URL = 'https://ecmeafiajoksyeuisreh.supabase.co'
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjbWVhZmlham9rc3lldWlzcmVoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDA3MjYzOCwiZXhwIjoyMDg5NjQ4NjM4fQ.leU8zdVO_gby-lhQ1GfgVcynGfkP2tHQjAGp9kxRNJA'
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_ANON
     const client = createClient(SB_URL, key)
 
-    const { error } = await client.from('practice_records').upsert({
+    const record: Record<string, unknown> = {
       id: p.id,
       student_id: p.student_id,
       user_name: p.user_name || null,
@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
       complaint_data: p.complaint_data || null,
       case_id: p.case_id || null,
       submitted_at: p.submitted_at || null,
-    }, { onConflict: 'id' })
+    }
+    const { error } = await client.from('practice_records').upsert(record, { onConflict: 'id' })
 
     if (error) {
       console.error('[practice/submit] error:', JSON.stringify(error))
