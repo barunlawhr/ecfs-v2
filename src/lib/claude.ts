@@ -1,175 +1,84 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { ComplaintFormData, GradeResult, SampleCase } from '@/types'
+import { ruleGrade, buildFeedback } from './scoring'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-export function buildAnswerGradingPrompt(formData: ComplaintFormData, sampleCase: SampleCase): string {
-  const partiesText = formData.parties.map(p =>
-    `[${p.role}] ${p.name} / 주소: ${p.addr || '미입력'}${p.tel ? ' / 전화: ' + p.tel : ''}`
-  ).join('\n')
+// ─── 2차: AI 품질 피드백 (1차 통과 시에만 호출) ───
+// 1차 규칙 점수를 기반으로, AI는 법률적 적절성·표현 품질만 평가
+function buildPrompt(data: ComplaintFormData, sc: SampleCase, ruleScore: number): string {
+  const isAnswer = data.doc_type === 'answer'
+  const parties = data.parties.map(p => `[${p.role}] ${p.name} / ${p.addr || '주소 미입력'}`).join('\n')
+  const evList = data.evidences.length > 0
+    ? data.evidences.map(e => `${e.number}. ${e.name} (${e.purpose})`).join('\n')
+    : '없음'
 
-  return `당신은 법원 실습 교육 채점자입니다. 학생이 작성한 답변서를 아래 루브릭에 따라 채점하고, 한국어로 상세한 피드백을 제공하세요.
+  return `법원 실습 교육 채점자입니다. 학생이 작성한 ${isAnswer ? '답변서' : '소장'}의 법률적 품질을 평가하세요.
 
-=== 사건 정보 (출제 기준) ===
-사건명: ${sampleCase.title}
-사건유형: ${sampleCase.case_type}
-법원: ${sampleCase.court}
-원고: ${sampleCase.plaintiff}
-피고(답변인): ${sampleCase.defendant}
-${sampleCase.background ? `사건개요: ${sampleCase.background}` : ''}
-${sampleCase.key_facts ? `원고 주장 사실관계: ${sampleCase.key_facts}` : ''}
+규칙 기반 1차 채점에서 ${ruleScore}점을 받았습니다. 당신은 내용의 법률적 적절성과 표현 품질만 평가하세요.
 
-=== 학생 제출 답변서 ===
-【사건기본정보】
-사건명: ${formData.caseName || formData.caseCategory}
-법원: ${formData.court}
-사건번호: ${formData.sogaType || '미입력'}
+=== 출제 기준 ===
+사건: ${sc.title} (${sc.case_type}) | 법원: ${sc.court}
+원고: ${sc.plaintiff} | 피고: ${sc.defendant}
+${sc.claim_purpose ? `모범 청구취지: ${sc.claim_purpose}` : ''}
+${sc.claim_reason ? `모범 청구원인: ${sc.claim_reason}` : ''}
 
-【당사자 정보】
-${partiesText || '미입력'}
+=== 학생 제출 ===
+【당사자】${parties || '미입력'}
+【${isAnswer ? '답변취지' : '청구취지'}】${data.claimPurpose || '미입력'}
+【${isAnswer ? '답변이유' : '청구원인'}】${data.claimCause || '미입력'}
+【입증서류】${evList}
 
-【답변 취지】
-${formData.claimPurpose || '미입력'}
+=== 평가 기준 ===
+1. 규칙점수(${ruleScore}점)에서 ±15점 범위 내에서 최종 점수 조정
+2. 법률 용어 사용의 적절성
+3. 논리 구성과 사실관계 기술의 충실도
+4. 실무적 형식 준수 여부
 
-【답변 이유】
-${formData.claimCause || '미입력'}
-
-【입증서류】
-${formData.evidences.length > 0 ? formData.evidences.map(e => `${e.number}. ${e.name} (${e.purpose})`).join('\n') : '없음'}
-
-=== 채점 루브릭 (총 100점) ===
-1. 당사자 정보 (20점): 원고/피고 역할 정확성, 답변인(피고) 정보 완성도
-2. 청구취지 답변 (30점): "원고의 청구 기각" 명시, 소송비용 부담 표시, 법적 형식 준수
-3. 청구원인 답변 (30점): 원고 주장에 대한 반박 충실도, 구체적 사실 서술, 논리적 구성
-4. 입증서류 (20점): 을호증 번호 부여, 서류 적절성, 반박 근거와의 연관성
-
-반드시 아래 JSON 형식으로만 응답하세요 (다른 텍스트 없이):
-{
-  "score": <0-100 정수>,
-  "breakdown": {
-    "parties": <0-20>,
-    "claim": <0-30>,
-    "cause": <0-30>,
-    "evidence": <0-20>
-  },
-  "feedback": "<학생에게 전달할 상세 피드백. 잘한 점, 부족한 점, 개선 방향을 구체적으로. 마크다운 **볼드** 사용 가능. 최소 200자>"
-}`
+JSON만 응답:
+{"score":<정수>,"feedback":"<150자 이상 한국어 피드백. 잘한 점, 부족한 점, 개선 방향>"}`
 }
 
-export async function gradeAnswer(formData: ComplaintFormData, sampleCase: SampleCase): Promise<GradeResult> {
-  const prompt = buildAnswerGradingPrompt(formData, sampleCase)
-
-  const message = await client.messages.create({
-    model: 'claude-3-5-sonnet-20241022',
-    max_tokens: 1024,
+async function callAI(prompt: string): Promise<{ score: number; feedback: string }> {
+  const msg = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 512,
     messages: [{ role: 'user', content: prompt }],
   })
+  const text = msg.content[0].type === 'text' ? msg.content[0].text : ''
+  const m = text.match(/\{[\s\S]*\}/)
+  if (!m) throw new Error('No JSON')
+  const p = JSON.parse(m[0])
+  return { score: Math.min(100, Math.max(0, p.score ?? 0)), feedback: p.feedback ?? '' }
+}
 
-  const text = message.content[0].type === 'text' ? message.content[0].text : ''
-  console.log('[gradeAnswer] raw text:', text.slice(0, 300))
+// ─── 통합 채점: 1차 규칙 → (조건부) 2차 AI ───
+export async function grade(data: ComplaintFormData, sc: SampleCase): Promise<GradeResult> {
+  // 1차 규칙 채점
+  const rule = ruleGrade(data, sc)
+  const ruleFeedback = buildFeedback(rule, (data.doc_type || 'complaint') as 'complaint' | 'answer')
 
+  // 1차에서 40점 미만이면 AI 호출 안 함 (기본적인 것도 안 채움)
+  if (rule.score < 40) {
+    return { score: rule.score, feedback: ruleFeedback + '\n\n⚠️ 기본 항목을 먼저 채워주세요. (AI 채점은 40점 이상부터 제공)', breakdown: rule.breakdown }
+  }
+
+  // 2차 AI 품질 피드백
   try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new Error('No JSON found in: ' + text.slice(0, 100))
-    const parsed = JSON.parse(jsonMatch[0])
+    const ai = await callAI(buildPrompt(data, sc, rule.score))
+    // AI 점수는 규칙 점수 ±15 범위로 제한
+    const finalScore = Math.min(100, Math.max(0, Math.min(rule.score + 15, Math.max(rule.score - 15, ai.score))))
     return {
-      score: Math.min(100, Math.max(0, parsed.score ?? 0)),
-      feedback: parsed.feedback ?? '피드백을 생성할 수 없습니다.',
-      breakdown: {
-        parties: parsed.breakdown?.parties ?? 0,
-        claim: parsed.breakdown?.claim ?? 0,
-        cause: parsed.breakdown?.cause ?? 0,
-        evidence: parsed.breakdown?.evidence ?? 0,
-      },
+      score: finalScore,
+      feedback: ruleFeedback + `\n\n🤖 AI 피드백:\n${ai.feedback}`,
+      breakdown: rule.breakdown,
     }
   } catch (e) {
-    console.error('[gradeAnswer] parse error:', e)
-    return { score: 0, feedback: '채점 중 오류가 발생했습니다.', breakdown: { parties: 0, claim: 0, cause: 0, evidence: 0 } }
+    console.error('[grade] AI failed:', e)
+    return { score: rule.score, feedback: ruleFeedback + '\n\n(AI 피드백 생성 실패 — 규칙 채점 결과만 표시)', breakdown: rule.breakdown }
   }
 }
 
-export function buildGradingPrompt(formData: ComplaintFormData, sampleCase: SampleCase): string {
-  const partiesText = formData.parties.map(p =>
-    `[${p.role}] ${p.name} / 주소: ${p.addr || '미입력'}${p.tel ? ' / 전화: ' + p.tel : ''}`
-  ).join('\n')
-
-  return `당신은 법원 실습 교육 채점자입니다. 학생이 작성한 소장을 아래 루브릭에 따라 채점하고, 한국어로 상세한 피드백을 제공하세요.
-
-=== 사건 정보 (출제 기준) ===
-사건명: ${sampleCase.title}
-사건유형: ${sampleCase.case_type}
-법원: ${sampleCase.court}
-원고: ${sampleCase.plaintiff}
-피고: ${sampleCase.defendant}
-${sampleCase.claim_amount ? `청구금액: ${sampleCase.claim_amount.toLocaleString()}원` : ''}
-${sampleCase.background ? `사건개요: ${sampleCase.background}` : ''}
-${sampleCase.claim_reason ? `모범 청구원인: ${sampleCase.claim_reason}` : ''}
-
-=== 학생 제출 소장 ===
-【사건기본정보】
-사건명: ${formData.caseName || formData.caseCategory}
-법원: ${formData.court}
-소가: ${formData.soga || '미입력'}원
-
-【당사자 정보】
-${partiesText || '미입력'}
-
-【청구취지】
-${formData.claimPurpose || '미입력'}
-
-【청구원인】
-${formData.claimCause || '미입력'}
-
-【입증서류】
-${formData.evidences.length > 0 ? formData.evidences.map(e => `${e.number}. ${e.name} (${e.purpose})`).join('\n') : '없음'}
-
-=== 채점 루브릭 (총 100점) ===
-1. 당사자 정보 (25점): 원고/피고 존재 여부, 이름·주소 완성도, 역할 정확성
-2. 청구취지 (25점): 구체적 금액 명시, 청구 내용 명확성, 법적 형식
-3. 청구원인 (30점): 사실관계 서술 충실도, 법리 적용, 논리적 구성, 출제 기준과의 부합도
-4. 입증서류 (20점): 서류 종류 적절성, 갑호증 번호 부여, 충분성
-
-반드시 아래 JSON 형식으로만 응답하세요 (다른 텍스트 없이):
-{
-  "score": <0-100 정수>,
-  "breakdown": {
-    "parties": <0-25>,
-    "claim": <0-25>,
-    "cause": <0-30>,
-    "evidence": <0-20>
-  },
-  "feedback": "<학생에게 전달할 상세 피드백. 잘한 점, 부족한 점, 개선 방향을 구체적으로. 마크다운 **볼드** 사용 가능. 최소 200자>"
-}`
-}
-
-export async function gradeComplaint(formData: ComplaintFormData, sampleCase: SampleCase): Promise<GradeResult> {
-  const prompt = buildGradingPrompt(formData, sampleCase)
-
-  const message = await client.messages.create({
-    model: 'claude-3-5-sonnet-20241022',
-    max_tokens: 1024,
-    messages: [{ role: 'user', content: prompt }],
-  })
-
-  const text = message.content[0].type === 'text' ? message.content[0].text : ''
-  console.log('[gradeComplaint] raw text:', text.slice(0, 300))
-
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new Error('No JSON found in: ' + text.slice(0, 100))
-    const parsed = JSON.parse(jsonMatch[0])
-    return {
-      score: Math.min(100, Math.max(0, parsed.score ?? 0)),
-      feedback: parsed.feedback ?? '피드백을 생성할 수 없습니다.',
-      breakdown: {
-        parties: parsed.breakdown?.parties ?? 0,
-        claim: parsed.breakdown?.claim ?? 0,
-        cause: parsed.breakdown?.cause ?? 0,
-        evidence: parsed.breakdown?.evidence ?? 0,
-      },
-    }
-  } catch (e) {
-    console.error('[gradeComplaint] parse error:', e)
-    return { score: 0, feedback: '채점 중 오류가 발생했습니다.', breakdown: { parties: 0, claim: 0, cause: 0, evidence: 0 } }
-  }
-}
+// 하위 호환
+export async function gradeComplaint(data: ComplaintFormData, sc: SampleCase): Promise<GradeResult> { return grade(data, sc) }
+export async function gradeAnswer(data: ComplaintFormData, sc: SampleCase): Promise<GradeResult> { return grade({ ...data, doc_type: 'answer' }, sc) }
