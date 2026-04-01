@@ -30,7 +30,7 @@ ${isAnswer ? '답변이유' : '청구원인'}: ${data.claimCause || '미입력'}
 
 async function callAI(prompt: string): Promise<{ score: number; feedback: string }> {
   const msg = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: 'claude-haiku-4-5-20241022',
     max_tokens: 512,
     system: SYSTEM,
     messages: [{ role: 'user', content: prompt }],
