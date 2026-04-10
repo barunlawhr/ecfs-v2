@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Noto_Sans_KR } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/context/AuthContext'
+import QuickSidebar from '@/components/layout/QuickSidebar'
 
 const notoSansKr = Noto_Sans_KR({
   subsets: ['latin'],
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={notoSansKr.className}>
         <AuthProvider>
           {children}
+          <QuickSidebar />
         </AuthProvider>
       </body>
     </html>
