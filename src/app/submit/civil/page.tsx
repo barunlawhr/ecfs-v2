@@ -10,10 +10,11 @@ import { useAuth } from '@/context/AuthContext'
 import LoginModal from '@/components/auth/LoginModal'
 
 const APPLY = '/apply?new=true'
+const ANSWER = '/apply/answer'
 const S = '#'
 
 const FREQUENT = [
-  { label: '답변서(청구취지/원인)', href: S },
+  { label: '답변서(청구취지/원인)', href: ANSWER },
   { label: '소장', href: APPLY },
   { label: '준비서면', href: S },
   { label: '반소장', href: S },
@@ -127,7 +128,7 @@ const SECTIONS = [
       { label: '청구취지 및 청구원인변경신청서', href: S },
       { label: '조정에 갈음하는 결정에 대한 이의신청서', href: S },
       { label: '화해권고결정에 대한 이의신청서', href: S },
-      { label: '답변서(청구취지/원인)', href: S }, { label: '취하신청서', href: S },
+      { label: '답변서(청구취지/원인)', href: ANSWER }, { label: '취하신청서', href: S },
       { label: '이의신청서', href: S }, { label: '답변서', href: S },
     ],
   },
@@ -171,7 +172,7 @@ export default function CivilMainPage() {
 
   const go = (href: string) => {
     if (href === S) { alert('실습 모드에서는 지원되지 않습니다.'); return }
-    if (!user && href === APPLY) { setShowLogin(true); return }
+    if (!user && (href === APPLY || href === ANSWER)) { setShowLogin(true); return }
     router.push(href)
   }
 
