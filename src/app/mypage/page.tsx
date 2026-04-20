@@ -1337,33 +1337,46 @@ export default function MyPage() {
               {/* 버튼 그리드 3x4 */}
               <div style={{ padding:'0 36px 20px', display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12 }}>
                 {[
-                  '사건기록열람','소송서류제출','소송비용납부',
-                  '알림서비스','제출/송달내역','기록목록조회',
-                  '관련사건등록','관련사건조회','미확인송달물확인처리',
-                  '제증명신청',
-                ].map(label => (
+                  { label:'사건기록열람', disabled:false },
+                  { label:'소송서류제출', disabled:false },
+                  { label:'소송비용납부', disabled:false },
+                  { label:'알림서비스', disabled:false },
+                  { label:'제출/송달내역', disabled:false },
+                  { label:'기록목록조회', disabled:true },
+                  { label:'관련사건등록', disabled:false },
+                  { label:'관련사건조회', disabled:true },
+                  { label:'미확인송달물확인처리', disabled:true },
+                  { label:'제증명신청', disabled:false },
+                ].map(({ label, disabled }) => (
                   <button
                     key={label}
+                    disabled={disabled}
                     onClick={() => {
+                      if (disabled) return
+                      const caseNum = menuCaseNum!
                       setMenuCaseNum(null)
-                      if (label === '사건기록열람') window.open(`/case-viewer?case=${encodeURIComponent(menuCaseNum!)}`, '_blank', 'width=1400,height=900')
-                      else if (label === '제출/송달내역') navTo('doc-history')
+                      if (label === '사건기록열람') window.open(`/case-viewer?case=${encodeURIComponent(caseNum)}`, '_blank', 'width=1400,height=900')
+                      else if (label === '제출/송달내역') {
+                        // 사건번호로 해당 사건 정보를 찾아 viewDocCase에 설정
+                        const found = MOCK_ACTIVE_CASES.find(c => c.caseNum === caseNum)
+                        if (found) setViewDocCase({ caseNo: found.caseNum, court: found.court, dept: found.division, plaintiff: found.plaintiff, defendant: found.defendant, caseName: '' })
+                        navTo('doc-history')
+                      }
                       else if (label === '소송서류제출') router.push('/apply?new=true')
                       else if (label === '소송비용납부') navTo('pay')
-                      else if (label === '미확인송달물확인처리') navTo('unread-delivery')
                       else if (label === '알림서비스') navTo('alert-service')
-                      else if (label === '기록목록조회') window.open(`/case-viewer?case=${encodeURIComponent(menuCaseNum!)}`, '_blank', 'width=1400,height=900')
                       else if (label === '관련사건등록') navTo('active-cases')
-                      else if (label === '관련사건조회') navTo('active-cases')
                       else if (label === '제증명신청') navTo('generic', '제증명신청')
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.border = '2px solid #0067c2'; e.currentTarget.style.color = '#0067c2'; e.currentTarget.style.fontWeight = '700' }}
-                    onMouseLeave={e => { e.currentTarget.style.border = '1px solid #c8cdd6'; e.currentTarget.style.color = '#333'; e.currentTarget.style.fontWeight = '400' }}
+                    onMouseEnter={e => { if (!disabled) { e.currentTarget.style.border = '2px solid #0067c2'; e.currentTarget.style.color = '#0067c2'; e.currentTarget.style.fontWeight = '700' } }}
+                    onMouseLeave={e => { if (!disabled) { e.currentTarget.style.border = '1px solid #c8cdd6'; e.currentTarget.style.color = '#333'; e.currentTarget.style.fontWeight = '400' } }}
                     style={{
                       padding:'13px 6px', border:'1px solid #c8cdd6',
-                      background:'#fff', color:'#333',
+                      background: disabled ? '#f5f5f5' : '#fff',
+                      color: disabled ? '#bbb' : '#333',
                       borderRadius:3, fontSize:13, fontWeight:400,
-                      cursor:'pointer', fontFamily:'inherit',
+                      cursor: disabled ? 'not-allowed' : 'pointer',
+                      fontFamily:'inherit',
                     }}
                   >{label}</button>
                 ))}
@@ -2272,6 +2285,78 @@ export default function MyPage() {
   }
 
   // ── 전자문서제출/송달내역 (목록) ─────────────────────────────
+  // 사건별 제출/송달 문서 생성
+  function generateDocsForCase(ci: ViewDocCase): DocItem[] {
+    // 사건번호에서 시드 추출
+    const seed = ci.caseNo.replace(/[^0-9]/g, '').slice(-4)
+    const s = parseInt(seed) || 1234
+    const submitter = user ? `${user.name}(${user.id})` : '전병주(30026atlaw)'
+
+    // 기본 날짜 생성 (확정된사건은 이미 종료되었으므로 과거 날짜)
+    const baseYear = ci.caseNo.startsWith('2025') ? '2025' : ci.caseNo.startsWith('2024') ? '2024' : '2025'
+    const m = (s % 9) + 1 // 1~9월
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const d1 = `${baseYear}.${pad(m)}.${pad((s%20)+5)}`
+    const d2 = `${baseYear}.${pad(m+1 > 12 ? 1 : m+1)}.${pad((s%15)+3)}`
+    const d3 = `${baseYear}.${pad(m+2 > 12 ? m+2-12 : m+2)}.${pad((s%18)+2)}`
+    const d4 = `${baseYear}.${pad(m+3 > 12 ? m+3-12 : m+3)}.${pad((s%12)+8)}`
+
+    const docs: DocItem[] = [
+      { no:1, docName:'소장', gubun:'제출', submitDate:d1, delivDate:'', confirmDate:'', submitter },
+    ]
+    let no = 2
+    if (s % 3 === 0) {
+      docs.push({ no, docName:'소송위임장', gubun:'제출', submitDate:d1, delivDate:'', confirmDate:'', submitter })
+      no++
+    }
+    docs.push({ no, docName:'소장부본', gubun:'송달', submitDate:'', delivDate:d1, confirmDate:`${d1}`, docSubmitNo:`20971${String(s).padStart(5,'0')}01` })
+    no++
+    if (s % 2 === 0) {
+      docs.push({ no, docName:'보정명령등본', gubun:'송달', submitDate:'', delivDate:d2, confirmDate:d2, docSubmitNo:`20971${String(s).padStart(5,'0')}02` })
+      no++
+      docs.push({ no, docName:'보정서', gubun:'제출', submitDate:d2, delivDate:'', confirmDate:'', submitter })
+      no++
+    }
+    docs.push({ no, docName:'답변서(청구취지/원인)', gubun:'제출', submitDate:d3, delivDate:'', confirmDate:'', submitter })
+    no++
+    docs.push({ no, docName:'답변서부본', gubun:'송달', submitDate:'', delivDate:d3, confirmDate:`${d3}(자동확인)`, docSubmitNo:`20971${String(s).padStart(5,'0')}03` })
+    no++
+    if (s % 4 === 0) {
+      docs.push({ no, docName:'준비서면', gubun:'제출', submitDate:d4, delivDate:'', confirmDate:'', submitter })
+      no++
+      docs.push({ no, docName:`준비서면부본(${d4.slice(2).replace(/\./g,'.')}.자)`, gubun:'송달', submitDate:'', delivDate:d4, confirmDate:d4, docSubmitNo:`20971${String(s).padStart(5,'0')}04` })
+      no++
+    }
+    docs.push({ no, docName:'기일통지서', gubun:'송달', submitDate:'', delivDate:d3, confirmDate:d3, docSubmitNo:`20971${String(s).padStart(5,'0')}05` })
+    no++
+    if (s % 5 === 0) {
+      docs.push({ no, docName:'기일변경명령등본', gubun:'송달', submitDate:'', delivDate:d4, confirmDate:`${d4}(자동확인)`, docSubmitNo:`20971${String(s).padStart(5,'0')}06` })
+      no++
+    }
+    return docs
+  }
+
+  // 사건별 서명내역 생성
+  function generateSignatures(ci: ViewDocCase, doc: DocItem) {
+    const submitter = user ? `${user.name}(${user.id})` : '전병주(30026atlaw)'
+    const signerRole = ci.plaintiff ? '원고대리인' : '피고대리인'
+    const datetime = doc.submitDate ? `${doc.submitDate} 16:54` : '-'
+    const sigs = [
+      { docName: doc.docName, datetime, role: signerRole, signer: submitter },
+    ]
+    // 제출문서에 따라 추가 서명 행
+    if (doc.docName === '소장') {
+      sigs.push({ docName: '소송위임장', datetime, role: signerRole, signer: submitter })
+      if (ci.plaintiff?.includes('주식회사')) {
+        sigs.push({ docName: `${ci.plaintiff.split('(')[0].trim()} 법인등기사항전부증명서`, datetime, role: signerRole, signer: submitter })
+      }
+      if (ci.defendant?.includes('주식회사')) {
+        sigs.push({ docName: `${ci.defendant.split('(')[0].trim()} 법인등기사항전부증명서`, datetime, role: signerRole, signer: submitter })
+      }
+    }
+    return sigs
+  }
+
   const DocHistoryContent = () => {
     const [filterGubun, setFilterGubun] = useState('전체')
     const [searchText, setSearchText] = useState('')
@@ -2279,23 +2364,7 @@ export default function MyPage() {
     const perPage = 10
     const ci = viewDocCase || { caseNo:'2026가단11234', court:'서울중앙지방법원', dept:'민사3단독', plaintiff:'홍길동 외 1명', defendant:'이순신 외 1명', caseName:'손해배상 등' }
 
-    const DOCS: DocItem[] = [
-      { no:1,  docName:'변경기일통지서',                      gubun:'송달', submitDate:'', delivDate:'2026.01.19', confirmDate:'2026.01.27(자동확인)', docSubmitNo:'2097108001234' },
-      { no:2,  docName:'준비서면',                            gubun:'제출', submitDate:'2026.01.11', delivDate:'', confirmDate:'', submitter:'홍길동(practice01)' },
-      { no:3,  docName:'준비서면부본(26.01.05.자)',            gubun:'송달', submitDate:'', delivDate:'2026.01.12', confirmDate:'2026.01.19', docSubmitNo:'2097107998765' },
-      { no:4,  docName:'기일변경명령등본',                     gubun:'송달', submitDate:'', delivDate:'2025.12.26', confirmDate:'2025.12.27', docSubmitNo:'2097107956789' },
-      { no:5,  docName:'변경기일통지서',                      gubun:'송달', submitDate:'', delivDate:'2025.11.19', confirmDate:'2025.11.23', docSubmitNo:'2097107923456' },
-      { no:6,  docName:'서증 직접 신청서부본(25.10.14.자)',   gubun:'송달', submitDate:'', delivDate:'2025.10.15', confirmDate:'2025.10.19', docSubmitNo:'2097107889012' },
-      { no:7,  docName:'준비서면부본(25.10.14.자)',            gubun:'송달', submitDate:'', delivDate:'2025.10.15', confirmDate:'2025.10.19', docSubmitNo:'2097107889011' },
-      { no:8,  docName:'변경기일통지서',                      gubun:'송달', submitDate:'', delivDate:'2025.10.15', confirmDate:'2025.10.19', docSubmitNo:'2097107889010' },
-      { no:9,  docName:'서증부본(25.08.08.자)',                gubun:'송달', submitDate:'', delivDate:'2025.08.08', confirmDate:'2025.08.09', docSubmitNo:'2097107845678' },
-      { no:10, docName:'증거설명서부본(25.08.08.자)',          gubun:'송달', submitDate:'', delivDate:'2025.08.08', confirmDate:'2025.08.09', docSubmitNo:'2097107845677' },
-      { no:11, docName:'답변서부본',                          gubun:'송달', submitDate:'', delivDate:'2026.02.25', confirmDate:'2026.02.26', docSubmitNo:'2097108023456' },
-      { no:12, docName:'소장',                                gubun:'제출', submitDate:'2026.02.15', delivDate:'', confirmDate:'', submitter:'홍길동(practice01)' },
-      { no:13, docName:'소장부본',                            gubun:'송달', submitDate:'', delivDate:'2026.02.15', confirmDate:'2026.02.15', docSubmitNo:'2097108012345' },
-      { no:14, docName:'기일통지서',                          gubun:'송달', submitDate:'', delivDate:'2026.03.10', confirmDate:'2026.03.11', docSubmitNo:'2097108034567' },
-      { no:15, docName:'증거신청서',                          gubun:'제출', submitDate:'2026.03.20', delivDate:'', confirmDate:'', submitter:'홍길동(practice01)' },
-    ]
+    const DOCS: DocItem[] = generateDocsForCase(ci)
 
     const filtered = DOCS.filter(d => {
       if (filterGubun !== '전체' && d.gubun !== filterGubun) return false
@@ -2383,8 +2452,7 @@ export default function MyPage() {
           <div>
             <div style={{ fontSize:12, fontWeight:700, color:'#003366', marginBottom:6 }}>참고하세요</div>
             <ul style={{ margin:0, paddingLeft:16, fontSize:11, color:'#555', lineHeight:1.9 }}>
-              <li>전자소송으로 처리된 문서들의 제출 및 송달 내역을 확인할 수 있습니다.</li>
-              <li>송달문서 클릭 시 송달내역 상세 정보 및 조회이력을 확인할 수 있습니다.</li>
+              <li>송달문서의 경우 전자송달확인 메뉴에서 확인된 송달문서만 조회됩니다.</li>
             </ul>
           </div>
         </div>
@@ -2470,6 +2538,8 @@ export default function MyPage() {
     const ci = viewDocCase || { caseNo:'2026가단11234', court:'서울중앙지방법원', dept:'민사3단독', plaintiff:'홍길동 외 1명', defendant:'이순신 외 1명', caseName:'손해배상 등' }
     const thS: React.CSSProperties = { padding:'9px 14px', background:'#f5f6fa', fontWeight:600, color:'#555', width:'14%', textAlign:'left', whiteSpace:'nowrap', borderBottom:'1px solid #eee', fontSize:12 }
     const tdS: React.CSSProperties = { padding:'9px 14px', borderBottom:'1px solid #eee', fontSize:12 }
+    const submitter = user ? `${user.name}(${user.id})` : '전병주(30026atlaw)'
+    const sigs = doc ? generateSignatures(ci, doc) : []
 
     return (
       <div>
@@ -2487,11 +2557,11 @@ export default function MyPage() {
                 <th style={thS}>제출문서명</th>
                 <td style={tdS}><span onClick={()=>alert('실습 모드 — 문서 열람')} style={{ color:'#0057a8', textDecoration:'underline', cursor:'pointer' }}>{doc?.docName || '–'}</span></td>
                 <th style={thS}>접수일시</th>
-                <td style={tdS}>{doc?.submitDate ? doc.submitDate + ' 19:57' : '–'}</td>
+                <td style={tdS}>{doc?.submitDate ? doc.submitDate + ' 16:54' : '–'}</td>
               </tr>
               <tr>
                 <th style={{...thS, borderBottom:'none'}}>제출자명</th>
-                <td style={{...tdS, borderBottom:'none'}} colSpan={3}>홍길동(practice01)</td>
+                <td style={{...tdS, borderBottom:'none'}} colSpan={3}>{submitter}</td>
               </tr>
             </tbody>
           </table>
@@ -2511,12 +2581,14 @@ export default function MyPage() {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td style={{ padding:'8px 12px', textAlign:'center', borderBottom:'1px solid #eee' }}>{doc?.docName || '–'}</td>
-                <td style={{ padding:'8px 12px', textAlign:'center', borderBottom:'1px solid #eee' }}>{doc?.submitDate ? doc.submitDate + ' 19:57' : '–'}</td>
-                <td style={{ padding:'8px 12px', textAlign:'center', borderBottom:'1px solid #eee' }}>피고대리인</td>
-                <td style={{ padding:'8px 12px', textAlign:'center', borderBottom:'1px solid #eee' }}>홍길동(practice01)</td>
-              </tr>
+              {sigs.map((sig, i) => (
+                <tr key={i}>
+                  <td style={{ padding:'8px 12px', textAlign:'center', borderBottom:'1px solid #eee' }}>{sig.docName}</td>
+                  <td style={{ padding:'8px 12px', textAlign:'center', borderBottom:'1px solid #eee' }}>{sig.datetime}</td>
+                  <td style={{ padding:'8px 12px', textAlign:'center', borderBottom:'1px solid #eee' }}>{sig.role}</td>
+                  <td style={{ padding:'8px 12px', textAlign:'center', borderBottom:'1px solid #eee' }}>{sig.signer}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -2561,14 +2633,19 @@ export default function MyPage() {
     ]
 
     const [page, setPage] = useState(1)
+    const [cfMenuCase, setCfMenuCase] = useState<typeof CONFIRMED_CASES[0] | null>(null)
     const perPage = 10
     const totalPages = Math.ceil(CONFIRMED_CASES.length / perPage)
     const shown = CONFIRMED_CASES.slice((page - 1) * perPage, page * perPage)
     const thS: React.CSSProperties = { padding:'8px 10px', background:'#f5f6fa', fontWeight:600, color:'#555', fontSize:12, borderBottom:'2px solid #003366', textAlign:'center', whiteSpace:'nowrap' }
     const tdS: React.CSSProperties = { padding:'7px 10px', fontSize:12, borderBottom:'1px solid #eee', verticalAlign:'middle', textAlign:'center' }
 
-    // 열람 가능 여부: id 1은 행정사건이라 열람 안됨
     const canView = (c: typeof CONFIRMED_CASES[0]) => c.id !== 1
+
+    function openDocHistory(c: typeof CONFIRMED_CASES[0]) {
+      setViewDocCase({ caseNo: c.caseNo, court: c.court, dept: c.dept, plaintiff: c.plaintiff, defendant: c.defendant, caseName: '' })
+      navTo('doc-history')
+    }
 
     return (
       <div>
@@ -2662,7 +2739,7 @@ export default function MyPage() {
                     )}
                   </td>
                   <td style={tdS}>
-                    <button style={{ height:26, padding:'0 10px', border:'1px solid #aaa', borderRadius:3, background:'#fff', color:'#555', fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>메뉴선택</button>
+                    <button onClick={() => setCfMenuCase(c)} style={{ height:26, padding:'0 10px', border:'1px solid #8899bb', borderRadius:3, background:'#fff', color:'#003366', fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>메뉴선택</button>
                   </td>
                 </tr>
               ))}
@@ -2688,6 +2765,77 @@ export default function MyPage() {
             <option>50개씩 보기</option>
           </select>
         </div>
+
+        {/* 참고하세요 */}
+        <div style={{ background:'#f8f9fc', border:'1px solid #dde0e8', padding:'14px 18px', marginTop:8, display:'flex', gap:12, alignItems:'flex-start' }}>
+          <div style={{ fontSize:22, marginTop:2 }}>🖥</div>
+          <div>
+            <div style={{ fontSize:12, fontWeight:700, color:'#003366', marginBottom:6 }}>참고하세요</div>
+            <ul style={{ margin:0, paddingLeft:16, fontSize:11, color:'#555', lineHeight:1.9 }}>
+              <li>완료사건 지정은 <strong style={{ color:'#003366' }}>확정일</strong> 또는 <strong style={{ color:'#003366' }}>기록인계일의 입력된 사건</strong>이나 본안사건 중 <strong style={{ color:'#003366' }}>상소기록 송부일이 입력된 사건</strong>에 한하여 완료된 사건으로 지정이 가능합니다. 완료된 사건 지정 처리가 되지 않는 사건은 사용자지원센터(02-3480-1715)로 문의 바랍니다.</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* 메뉴선택 모달 */}
+        {cfMenuCase && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.45)', zIndex:3000, display:'flex', alignItems:'flex-start', justifyContent:'center', paddingTop:60 }}>
+            <div style={{ background:'#fff', width:620, boxShadow:'0 8px 40px rgba(0,0,0,.35)', overflow:'hidden' }}>
+              <div style={{ background:'#1a1a2e', color:'#fff', padding:'12px 20px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ fontWeight:700, fontSize:16, letterSpacing:1 }}>메뉴선택</span>
+                <button onClick={()=>setCfMenuCase(null)} style={{ background:'none', border:'none', color:'#fff', fontSize:24, cursor:'pointer', lineHeight:1 }}>✕</button>
+              </div>
+              <div style={{ padding:'28px 20px 6px', textAlign:'center' }}>
+                <div style={{ fontSize:17, fontWeight:700, color:'#1a1a2e', marginBottom:10 }}>{cfMenuCase.caseNo}</div>
+                <div style={{ fontSize:13, color:'#c00', marginBottom:20 }}>아래 항목을 클릭하시면, 해당 화면으로 바로가기 됩니다.</div>
+              </div>
+              <div style={{ padding:'0 36px 20px', display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12 }}>
+                {[
+                  { label:'사건기록열람', disabled:false },
+                  { label:'소송서류제출', disabled:false },
+                  { label:'소송비용납부', disabled:false },
+                  { label:'알림서비스', disabled:false },
+                  { label:'제출/송달내역', disabled:false },
+                  { label:'기록목록조회', disabled:true },
+                  { label:'관련사건등록', disabled:false },
+                  { label:'관련사건조회', disabled:true },
+                  { label:'미확인송달물확인처리', disabled:true },
+                  { label:'제증명신청', disabled:false },
+                ].map(({ label, disabled }) => (
+                  <button
+                    key={label}
+                    disabled={disabled}
+                    onClick={() => {
+                      if (disabled) return
+                      const c = cfMenuCase!
+                      setCfMenuCase(null)
+                      if (label === '사건기록열람') window.open(`/case-detail?id=${c.id}`, '_blank', 'width=1200,height=900')
+                      else if (label === '제출/송달내역') openDocHistory(c)
+                      else if (label === '소송서류제출') router.push('/apply/answer')
+                      else if (label === '소송비용납부') navTo('pay')
+                      else if (label === '알림서비스') navTo('alert-service')
+                      else if (label === '관련사건등록') navTo('confirmed-cases')
+                      else if (label === '제증명신청') navTo('generic', '제증명신청')
+                    }}
+                    onMouseEnter={e => { if (!disabled) { e.currentTarget.style.border = '2px solid #0067c2'; e.currentTarget.style.color = '#0067c2'; e.currentTarget.style.fontWeight = '700' } }}
+                    onMouseLeave={e => { if (!disabled) { e.currentTarget.style.border = '1px solid #c8cdd6'; e.currentTarget.style.color = disabled ? '#bbb' : '#333'; e.currentTarget.style.fontWeight = '400' } }}
+                    style={{
+                      padding:'13px 6px', border:'1px solid #c8cdd6',
+                      background: disabled ? '#f5f5f5' : '#fff',
+                      color: disabled ? '#bbb' : '#333',
+                      borderRadius:3, fontSize:13, fontWeight:400,
+                      cursor: disabled ? 'not-allowed' : 'pointer',
+                      fontFamily:'inherit',
+                    }}
+                  >{label}</button>
+                ))}
+              </div>
+              <div style={{ padding:'10px 20px 32px', display:'flex', justifyContent:'flex-end', paddingRight:36 }}>
+                <button onClick={()=>setCfMenuCase(null)} style={{ height:40, padding:'0 44px', background:'#fff', color:'#333', border:'1px solid #999', borderRadius:3, fontSize:14, cursor:'pointer', fontFamily:'inherit' }}>닫기</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
