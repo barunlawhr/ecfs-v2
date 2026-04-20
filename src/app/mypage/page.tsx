@@ -2528,6 +2528,170 @@ export default function MyPage() {
     )
   }
 
+  // ── 확정된사건 ─────────────────────────────────────────────
+  const ConfirmedCasesContent = () => {
+    const CONFIRMED_CASES = [
+      { id:1, court:'서울행정법원', caseNo:'2023구단59165', dept:'행정3단독', status:'원고대리인', confirmedDate:'2026.02.24', plaintiff:'이종윤', defendant:'서울지방고용노동청서울강남지청장' },
+      { id:2, court:'서울중앙지법', caseNo:'2025머44968', dept:'민사103-4단독(조정)', status:'원고대리인', confirmedDate:'2025.12.05', plaintiff:'투티 주식회사(TOOTI Inc.)', defendant:'데이비드 히메네즈' },
+      { id:3, court:'서울중앙지법', caseNo:'2025가소287195', dept:'민사1003단독(소액)', status:'원고대리인', confirmedDate:'2025.12.05', plaintiff:'투티 주식회사(TOOTI Inc.)', defendant:'데이비드 히메네즈' },
+      { id:4, court:'서울행정법원', caseNo:'2024구단79494', dept:'행정12단독', status:'원고대리인', confirmedDate:'2025.12.02', plaintiff:'김인식 외 1명', defendant:'동대문구청장' },
+      { id:5, court:'전주지법 군산지원', caseNo:'2024가단55226', dept:'민사1단독', status:'원고대리인', confirmedDate:'2025.06.24', plaintiff:'주식회사 명신', defendant:'이현주' },
+      { id:6, court:'서울중앙지법', caseNo:'2025차전66868', dept:'전자독촉8계', status:'채권자대리인', confirmedDate:'2025.05.14', plaintiff:'이선용', defendant:'주식회사 한덕엔지니어링' },
+      { id:7, court:'용인시법원', caseNo:'2025차전2568', dept:'전자독촉전담3', status:'채권자대리인', confirmedDate:'2025.04.29', plaintiff:'김숙라', defendant:'주식회사 대성로지스' },
+      { id:8, court:'수원지법', caseNo:'2024가단603480', dept:'민사8단독', status:'원고대리인', confirmedDate:'2025.02.04', plaintiff:'김미자', defendant:'박주이' },
+      { id:9, court:'용인시법원', caseNo:'2024가소237233', dept:'소액2단독', status:'원고대리인', confirmedDate:'2025.01.11', plaintiff:'김미자', defendant:'이지영' },
+      { id:10, court:'수원지법', caseNo:'2024가소381166', dept:'민사51단독(소액)', status:'원고대리인', confirmedDate:'2024.12.03', plaintiff:'김미자', defendant:'이지영' },
+      { id:11, court:'서울중앙지법', caseNo:'2024가단5190823', dept:'민사201단독', status:'원고대리인', confirmedDate:'2024.11.28', plaintiff:'주식회사 글로벌텍', defendant:'정하늘' },
+      { id:12, court:'인천지법', caseNo:'2024가단318205', dept:'민사7단독', status:'원고대리인', confirmedDate:'2024.11.15', plaintiff:'이승환', defendant:'주식회사 해든건설' },
+      { id:13, court:'서울남부지법', caseNo:'2024가소1843267', dept:'민사4단독(소액)', status:'원고대리인', confirmedDate:'2024.10.22', plaintiff:'박민수', defendant:'김정태' },
+      { id:14, court:'서울동부지법', caseNo:'2024가단221078', dept:'민사11단독', status:'원고대리인', confirmedDate:'2024.10.08', plaintiff:'최영미', defendant:'주식회사 대한로지스' },
+      { id:15, court:'수원지법 성남지원', caseNo:'2024가소298712', dept:'소액1단독', status:'원고대리인', confirmedDate:'2024.09.25', plaintiff:'이정호', defendant:'홍길동' },
+      { id:16, court:'대전지법', caseNo:'2024가단107823', dept:'민사5단독', status:'원고대리인', confirmedDate:'2024.09.12', plaintiff:'주식회사 세종테크', defendant:'박영수' },
+      { id:17, court:'부산지법', caseNo:'2024가소567891', dept:'민사21단독(소액)', status:'원고대리인', confirmedDate:'2024.08.30', plaintiff:'김태영', defendant:'이수진' },
+      { id:18, court:'대구지법', caseNo:'2024가단89023', dept:'민사3단독', status:'원고대리인', confirmedDate:'2024.08.15', plaintiff:'정민호', defendant:'주식회사 동방물류' },
+      { id:19, court:'인천지법 부천지원', caseNo:'2024가소412389', dept:'소액3단독', status:'원고대리인', confirmedDate:'2024.07.29', plaintiff:'송미경', defendant:'한도현' },
+      { id:20, court:'서울서부지법', caseNo:'2024가단156790', dept:'민사6단독', status:'원고대리인', confirmedDate:'2024.07.18', plaintiff:'주식회사 프라임솔루션', defendant:'오상훈' },
+      { id:21, court:'춘천지법', caseNo:'2024가소234567', dept:'민사2단독(소액)', status:'원고대리인', confirmedDate:'2024.07.01', plaintiff:'윤서현', defendant:'김동현' },
+      { id:22, court:'광주지법', caseNo:'2024가단78901', dept:'민사9단독', status:'원고대리인', confirmedDate:'2024.06.20', plaintiff:'이상민', defendant:'주식회사 남도건설' },
+      { id:23, court:'창원지법', caseNo:'2023가소998877', dept:'민사11단독(소액)', status:'원고대리인', confirmedDate:'2024.06.05', plaintiff:'박지은', defendant:'최영호' },
+      { id:24, court:'서울북부지법', caseNo:'2023가단445566', dept:'민사4단독', status:'원고대리인', confirmedDate:'2024.05.22', plaintiff:'주식회사 한양테크', defendant:'김수연' },
+      { id:25, court:'의정부지법', caseNo:'2023가소778899', dept:'소액5단독', status:'원고대리인', confirmedDate:'2024.05.10', plaintiff:'조영진', defendant:'이하영' },
+      { id:26, court:'청주지법', caseNo:'2023가단112233', dept:'민사2단독', status:'원고대리인', confirmedDate:'2024.04.28', plaintiff:'강민지', defendant:'주식회사 충북유통' },
+      { id:27, court:'서울중앙지법', caseNo:'2023가소556677', dept:'민사501단독(소액)', status:'원고대리인', confirmedDate:'2024.04.15', plaintiff:'임수빈', defendant:'정태호' },
+    ]
+
+    const [page, setPage] = useState(1)
+    const perPage = 10
+    const totalPages = Math.ceil(CONFIRMED_CASES.length / perPage)
+    const shown = CONFIRMED_CASES.slice((page - 1) * perPage, page * perPage)
+    const thS: React.CSSProperties = { padding:'8px 10px', background:'#f5f6fa', fontWeight:600, color:'#555', fontSize:12, borderBottom:'2px solid #003366', textAlign:'center', whiteSpace:'nowrap' }
+    const tdS: React.CSSProperties = { padding:'7px 10px', fontSize:12, borderBottom:'1px solid #eee', verticalAlign:'middle', textAlign:'center' }
+
+    // 열람 가능 여부: id 1은 행정사건이라 열람 안됨
+    const canView = (c: typeof CONFIRMED_CASES[0]) => c.id !== 1
+
+    return (
+      <div>
+        <PageHd title="확정된사건" actions={<><ActBtn label="📌 나의 메뉴 추가" /><ActBtn label="🖨 출력" /></>} />
+
+        {/* 필터 */}
+        <div style={{ background:'#fff', borderBottom:'1px solid #eee', padding:'12px 14px', display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#555', minWidth:50 }}>소송유형</span>
+            <select style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+              {['전체','민사','형사','가사','행정','특허','회생파산'].map(t => <option key={t}>{t}</option>)}
+            </select>
+            <select style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+              <option>전체</option>
+            </select>
+            <span style={{ fontSize:12, fontWeight:600, color:'#555', marginLeft:12 }}>법원</span>
+            <select style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit', minWidth:100 }}>
+              <option>전체</option>
+            </select>
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <label style={{ fontSize:12, display:'flex', alignItems:'center', gap:4 }}>
+              <input type="radio" name="cf-search" defaultChecked style={{ accentColor:'#003366' }} /> 확정일자
+            </label>
+            <label style={{ fontSize:12, display:'flex', alignItems:'center', gap:4 }}>
+              <input type="radio" name="cf-search" style={{ accentColor:'#003366' }} /> 사건번호
+            </label>
+            <input type="date" style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px' }} />
+            <span>~</span>
+            <input type="date" style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px' }} />
+            {['오늘','3일','1주일','1개월','전체'].map(b => (
+              <button key={b} style={{ height:28, padding:'0 12px', border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, background:'#fff', cursor:'pointer', color:'#555', fontFamily:'inherit' }}>{b}</button>
+            ))}
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#555', minWidth:50 }}>정렬순서</span>
+            {['확정일자 ↓','법원 ↑','사건번호 ↓'].map(s => (
+              <select key={s} style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 6px', fontFamily:'inherit' }}>
+                <option>{s}</option>
+              </select>
+            ))}
+          </div>
+          <div style={{ display:'flex', justifyContent:'center', marginTop:4 }}>
+            <button style={{ height:32, padding:'0 36px', background:'#7a8a9e', color:'#fff', border:'none', borderRadius:3, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>조 회</button>
+          </div>
+        </div>
+
+        {/* 엑셀/완료사건 버튼 */}
+        <div style={{ display:'flex', justifyContent:'flex-end', gap:6, padding:'8px 14px', background:'#fff' }}>
+          <button style={{ height:28, padding:'0 12px', border:'1px solid #aaa', borderRadius:3, fontSize:11, background:'#fff', cursor:'pointer', color:'#555', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>📊 엑셀로 저장</button>
+          <button style={{ height:28, padding:'0 12px', border:'1px solid #aaa', borderRadius:3, fontSize:11, background:'#fff', cursor:'pointer', color:'#555', fontFamily:'inherit' }}>완료사건 지정</button>
+        </div>
+
+        {/* 테이블 */}
+        <div style={{ overflowX:'auto', background:'#fff' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', minWidth:1000 }}>
+            <thead>
+              <tr>
+                <th style={{ ...thS, width:30 }}><input type="checkbox" /></th>
+                <th style={thS}>법원</th>
+                <th style={thS}>사건번호</th>
+                <th style={thS}>재판부</th>
+                <th style={thS}>사건지위</th>
+                <th style={thS}>확정일자</th>
+                <th style={thS}>원고</th>
+                <th style={thS}>피고</th>
+                <th style={thS}>사건기록</th>
+                <th style={thS}>바로가기</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map(c => (
+                <tr key={c.id} style={{ borderBottom:'1px solid #eee' }}>
+                  <td style={tdS}><input type="checkbox" /></td>
+                  <td style={{ ...tdS, whiteSpace:'nowrap' }}>{c.court}</td>
+                  <td style={{ ...tdS, fontWeight:600, color:'#0057a8', textDecoration:'underline', cursor:'pointer' }}
+                    onClick={() => window.open(`/case-detail?id=${c.id}`, '_blank', 'width=1200,height=900')}>
+                    {c.caseNo}
+                  </td>
+                  <td style={{ ...tdS, fontSize:11 }}>{c.dept}</td>
+                  <td style={tdS}>{c.status}</td>
+                  <td style={{ ...tdS, whiteSpace:'nowrap' }}>{c.confirmedDate}</td>
+                  <td style={{ ...tdS, fontSize:11, maxWidth:100 }}>{c.plaintiff}</td>
+                  <td style={{ ...tdS, fontSize:11, maxWidth:100 }}>{c.defendant}</td>
+                  <td style={tdS}>
+                    {canView(c) && (
+                      <button onClick={() => window.open(`/case-detail?id=${c.id}`, '_blank', 'width=1200,height=900')}
+                        style={{ height:26, padding:'0 12px', border:'1px solid #0067c2', borderRadius:3, background:'#fff', color:'#0067c2', fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                        열람
+                      </button>
+                    )}
+                  </td>
+                  <td style={tdS}>
+                    <button style={{ height:26, padding:'0 10px', border:'1px solid #aaa', borderRadius:3, background:'#fff', color:'#555', fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>메뉴선택</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 페이지네이션 */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 14px', background:'#fff', borderTop:'1px solid #eee' }}>
+          <span style={{ fontSize:12, color:'#555' }}>총 <strong>{CONFIRMED_CASES.length}</strong>건</span>
+          <div style={{ display:'flex', gap:2, alignItems:'center' }}>
+            <button onClick={() => setPage(1)} disabled={page===1} style={{ height:26, width:28, border:'1px solid #ccc', borderRadius:2, background:'#fff', cursor:'pointer', fontSize:11 }}>«</button>
+            <button onClick={() => setPage(Math.max(1,page-1))} disabled={page===1} style={{ height:26, width:28, border:'1px solid #ccc', borderRadius:2, background:'#fff', cursor:'pointer', fontSize:11 }}>‹</button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <button key={p} onClick={() => setPage(p)} style={{ height:26, minWidth:28, padding:'0 6px', border: p===page ? 'none' : '1px solid #ccc', borderRadius:2, background: p===page ? '#003366' : '#fff', color: p===page ? '#fff' : '#555', cursor:'pointer', fontSize:12, fontWeight: p===page ? 700 : 400 }}>{p}</button>
+            ))}
+            <button onClick={() => setPage(Math.min(totalPages,page+1))} disabled={page===totalPages} style={{ height:26, width:28, border:'1px solid #ccc', borderRadius:2, background:'#fff', cursor:'pointer', fontSize:11 }}>›</button>
+            <button onClick={() => setPage(totalPages)} disabled={page===totalPages} style={{ height:26, width:28, border:'1px solid #ccc', borderRadius:2, background:'#fff', cursor:'pointer', fontSize:11 }}>»</button>
+          </div>
+          <select style={{ height:26, border:'1px solid #ccc', borderRadius:3, fontSize:12, padding:'0 6px' }}>
+            <option>10개씩 보기</option>
+            <option>20개씩 보기</option>
+            <option>50개씩 보기</option>
+          </select>
+        </div>
+      </div>
+    )
+  }
+
   function renderContent() {
     switch (activePage) {
       case 'status': return <StatusContent />
@@ -2544,6 +2708,7 @@ export default function MyPage() {
       case 'doc-history': return <DocHistoryContent />
       case 'delivery-detail': return <DeliveryDetailContent />
       case 'submit-detail': return <SubmitDetailContent />
+      case 'confirmed-cases': return <ConfirmedCasesContent />
       case 'completed-cases': return <CompletedCasesContent />
       case 'ecfs-reg': return <EcfsRegContent />
       case 'myinfo-user': return <MyInfoContent type="user" />
@@ -2579,7 +2744,7 @@ export default function MyPage() {
             <>
               <SbItem label="진행중사건" page="active-cases" />
               <SbItem label="관심사건" page="generic" title="관심사건" />
-              <SbItem label="확정된사건" page="generic" title="확정된사건" />
+              <SbItem label="확정된사건" page="confirmed-cases" />
               <SbItem label="완료된사건" page="completed-cases" title="완료된사건" />
             </>
           )}
