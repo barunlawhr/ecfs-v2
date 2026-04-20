@@ -1154,6 +1154,17 @@ export default function MyPage() {
     )
   }
 
+  // 사건번호 부호 → 서류제출 탭 라우트 매핑
+  function getSubmitRoute(caseNo: string): string {
+    // 사건번호에서 부호 추출: "2025가단7122" → "가단", "2025차전69142" → "차전"
+    const match = caseNo.match(/\d{4}([가-힣]+)/)
+    const code = match?.[1] || ''
+    if (['차전'].includes(code)) return '/submit/payment'
+    if (['카단','카합','카기'].includes(code)) return '/submit/petition'
+    // 가단, 가소, 가합, 머, 구단, 구합, 노 등 → 민사본안
+    return '/submit/civil'
+  }
+
   // ── ACTIVE CASES (진행중사건) ─────────────────────────────────
   // 진행중사건 mock 데이터 (실제 대법원 화면과 동일)
   interface MockCase { id: number; court: string; caseNum: string; division: string; status: string; filedDate: string; plaintiff: string; defendant: string; hearingDate: string; hearingPlace: string }
@@ -1362,7 +1373,7 @@ export default function MyPage() {
                         if (found) setViewDocCase({ caseNo: found.caseNum, court: found.court, dept: found.division, plaintiff: found.plaintiff, defendant: found.defendant, caseName: '' })
                         navTo('doc-history')
                       }
-                      else if (label === '소송서류제출') router.push('/apply?new=true')
+                      else if (label === '소송서류제출') router.push(getSubmitRoute(caseNum))
                       else if (label === '소송비용납부') navTo('pay')
                       else if (label === '알림서비스') navTo('alert-service')
                       else if (label === '관련사건등록') navTo('active-cases')
@@ -2811,7 +2822,7 @@ export default function MyPage() {
                       setCfMenuCase(null)
                       if (label === '사건기록열람') window.open(`/case-detail?id=${c.id}`, '_blank', 'width=1200,height=900')
                       else if (label === '제출/송달내역') openDocHistory(c)
-                      else if (label === '소송서류제출') router.push('/apply/answer')
+                      else if (label === '소송서류제출') router.push(getSubmitRoute(c.caseNo))
                       else if (label === '소송비용납부') navTo('pay')
                       else if (label === '알림서비스') navTo('alert-service')
                       else if (label === '관련사건등록') navTo('confirmed-cases')
