@@ -79,6 +79,7 @@ export default function Step5Submit({
         .single()
 
       if (insertError) throw new Error(insertError.message)
+      if (!inserted?.id) throw new Error('제출 기록 생성에 실패했습니다.')
       const recordId: string = inserted.id
 
       // Step 2: Call grading API
@@ -86,20 +87,27 @@ export default function Step5Submit({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ formData: data, sampleCase: effectiveCase }),
+        signal: AbortSignal.timeout(30_000),
       })
 
       if (gradeRes.ok) {
         const gradeResult = await gradeRes.json()
-
-        // Step 3: Update record with score and feedback
+        if (gradeResult.score != null && !gradeResult.isError) {
+          await supabase
+            .from('practice_records')
+            .update({
+              score: gradeResult.score,
+              feedback: gradeResult.feedback ?? '',
+              grade_breakdown: gradeResult.breakdown ?? null,
+              graded_at: new Date().toISOString(),
+            })
+            .eq('id', recordId)
+        }
+      } else {
+        // 채점 실패 시 기록에 표시 (제출 자체는 계속 진행)
         await supabase
           .from('practice_records')
-          .update({
-            score: gradeResult.score ?? 0,
-            feedback: gradeResult.feedback ?? '',
-            grade_breakdown: gradeResult.breakdown ?? null,
-            graded_at: new Date().toISOString(),
-          })
+          .update({ feedback: '채점 처리 중 오류가 발생했습니다. 관리자에게 문의하세요.' })
           .eq('id', recordId)
       }
 

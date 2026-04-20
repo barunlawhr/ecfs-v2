@@ -9,9 +9,8 @@ import { HARDCODED_ACCOUNTS } from '@/lib/auth'
 import type { SampleCase, Assignment, PracticeRecord } from '@/types'
 import { calculateScore, generateFeedback } from '@/lib/scoring'
 
-const SB_URL = 'https://ecmeafiajoksyeuisreh.supabase.co'
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjbWVhZmlham9rc3lldWlzcmVoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDA3MjYzOCwiZXhwIjoyMDg5NjQ4NjM4fQ.leU8zdVO_gby-lhQ1GfgVcynGfkP2tHQjAGp9kxRNJA'
-const SB_HDR = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' }
+import { SB_URL, SB_KEY, SB_HDR as _SB_HDR } from '@/lib/supabase'
+const SB_HDR = { ..._SB_HDR, 'Content-Type': 'application/json' }
 
 interface AccountRow {
   login_id: string

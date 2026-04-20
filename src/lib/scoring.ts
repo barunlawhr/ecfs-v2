@@ -25,10 +25,16 @@ export function ruleGrade(data: ComplaintFormData, answer?: SampleCase | null): 
   if (hasAddr) bd.parties += maxP - Math.floor(maxP * 0.4) * 2
   // 정답 이름 비교
   if (answer) {
-    if (hasW && answer.plaintiff && !norm(ps.find(p => p.role === '원고')?.name || '').includes(norm(answer.plaintiff).split(' ')[0]))
-      issues.push(`원고 이름이 정답(${answer.plaintiff})과 다릅니다.`)
-    if (hasD && answer.defendant && !norm(ps.find(p => p.role === '피고')?.name || '').includes(norm(answer.defendant).split(' ')[0]))
-      issues.push(`피고 이름이 정답(${answer.defendant})과 다릅니다.`)
+    if (hasW && answer.plaintiff) {
+      const expected = norm(answer.plaintiff).split(' ')[0] || norm(answer.plaintiff)
+      if (!norm(ps.find(p => p.role === '원고')?.name || '').includes(expected))
+        issues.push(`원고 이름이 정답(${answer.plaintiff})과 다릅니다.`)
+    }
+    if (hasD && answer.defendant) {
+      const expected = norm(answer.defendant).split(' ')[0] || norm(answer.defendant)
+      if (!norm(ps.find(p => p.role === '피고')?.name || '').includes(expected))
+        issues.push(`피고 이름이 정답(${answer.defendant})과 다릅니다.`)
+    }
   }
 
   // ── 청구취지 ──

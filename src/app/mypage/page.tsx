@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import MockBar from '@/components/layout/MockBar'
 import GnbNav from '@/components/layout/GnbNav'
@@ -9,9 +9,7 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { calculateScore, generateFeedback } from '@/lib/scoring'
 
-const SB_URL = 'https://ecmeafiajoksyeuisreh.supabase.co'
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjbWVhZmlham9rc3lldWlzcmVoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDA3MjYzOCwiZXhwIjoyMDg5NjQ4NjM4fQ.leU8zdVO_gby-lhQ1GfgVcynGfkP2tHQjAGp9kxRNJA'
-const SB_HDR = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
+import { SB_URL, SB_KEY, SB_HDR } from '@/lib/supabase'
 
 type ActivePage =
   | 'status'
@@ -141,11 +139,20 @@ export default function MyPage() {
     if (!loading && user?.role === 'admin') router.push('/admin')
   }, [user, loading, router])
 
+  const fetchControllerRef = useRef<AbortController | null>(null)
+
   useEffect(() => {
     if (!user) return
+    // 이전 fetch들을 abort하여 unmount/재실행 시 stale 업데이트 방지
+    fetchControllerRef.current?.abort()
+    fetchControllerRef.current = new AbortController()
+
     if (activePage === 'active-cases' || activePage === 'status') fetchAllCases()
     if (activePage === 'assigned-cases' || activePage === 'status') fetchAssignments()
     if (activePage === 'practice-records' || activePage === 'submitted-docs') fetchPracticeRecords()
+
+    return () => { fetchControllerRef.current?.abort() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activePage, user])
 
   async function fetchAllCases() {

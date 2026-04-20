@@ -18,6 +18,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result)
   } catch (err) {
     console.error('[Grade API]', err)
-    return NextResponse.json({ error: String(err), score: 0, feedback: '채점 오류' }, { status: 500 })
+    return NextResponse.json({ error: String(err), score: null, feedback: null, isError: true }, { status: 500 })
   }
 }

@@ -1,18 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import MockBar from '@/components/layout/MockBar';
 import GnbNav from '@/components/layout/GnbNav';
 import Footer from '@/components/layout/Footer';
-import StepBar from '@/components/apply/StepBar';
-import Step1Consent from '@/components/apply/Step1Consent';
-import Step2Parties from '@/components/apply/Step2Parties';
-import Step3WriteAnswer from '@/components/apply/Step3WriteAnswer';
-import Step4Attach from '@/components/apply/Step4Attach';
-import Step5SubmitAnswer from '@/components/apply/Step5SubmitAnswer';
 import { useAuth } from '@/context/AuthContext';
-import type { ComplaintFormData, SampleCase, Assignment } from '@/types';
+import { supabase } from '@/lib/supabase';
+import type { ComplaintFormData, Evidence, SampleCase, Assignment } from '@/types';
 
 const EMPTY_FORM: ComplaintFormData = {
   doc_type: 'answer',
@@ -28,13 +23,39 @@ const COURTS = [
   '창원지방법원','대구지방법원','제주지방법원',
 ];
 
-const CASE_TYPES = [
-  '가단','가합','나','다','라','마','머','카단','카합','타',
-];
+const CASE_TYPES = ['가단','가합','나','다','라','마','머','카단','카합','타'];
 
-const SIDEBAR_ITEMS = [
+const NAV_SIDEBAR_ITEMS = [
   '소장','답변서','준비서면','소취하서','이의신청서','주소보정서','항소장','개명허가신청서','재산목록보고서','후견사무보고서',
 ];
+
+// ── Styles ──
+const TEAL = '#0098a3';
+const INP: React.CSSProperties = { height: 28, padding: '0 7px', border: '1px solid #c8cdd6', borderRadius: 2, fontSize: 12, fontFamily: 'inherit', color: '#222', background: '#fff', outline: 'none', boxSizing: 'border-box' };
+const SEL: React.CSSProperties = { ...INP, cursor: 'pointer' };
+const TH: React.CSSProperties = { background: '#f5f7fb', width: 120, padding: '9px 12px', fontSize: 12, fontWeight: 600, color: '#333', textAlign: 'left', verticalAlign: 'middle', borderRight: '1px solid #e8edf4', whiteSpace: 'nowrap' };
+const TD: React.CSSProperties = { padding: '7px 12px', verticalAlign: 'middle' };
+
+function SecHd({ label, open, toggle }: { label: string; open: boolean; toggle: () => void }) {
+  return (
+    <div onClick={toggle} style={{ background: '#f2f5f8', borderBottom: open ? '1px solid #d0d8e4' : 'none', padding: '9px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+        <span style={{ color: TEAL, fontSize: 13 }}>○</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a' }}>{label}</span>
+      </div>
+      <div style={{ width: 18, height: 18, border: '1px solid #b0b8c8', borderRadius: 2, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#666' }}>
+        {open ? '▲' : '▼'}
+      </div>
+    </div>
+  );
+}
+
+interface DocOwner {
+  id: string;
+  type: string;
+  name: string;
+  userId: string;
+}
 
 export default function AnswerPage() {
   const { user, loading } = useAuth();
@@ -52,18 +73,41 @@ export default function AnswerPage() {
     partyName: '',
   });
 
-  // 답변서 작성 phase
-  const [step, setStep] = useState(0);
+  // 답변서 작성
   const [formData, setFormData] = useState<ComplaintFormData>(EMPTY_FORM);
   const [assignedCase, setAssignedCase] = useState<SampleCase | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submittedRecordId, setSubmittedRecordId] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
 
+  // 섹션 열기/닫기
+  const [open, setOpen] = useState({ s1: true, s2: true, s3: true, s4: true, s5: true, s6: true });
+  const [activeNav, setActiveNav] = useState('s1');
+  const toggle = (key: keyof typeof open) => setOpen(prev => ({ ...prev, [key]: !prev[key] }));
+
+  // 서류명의인
+  const [docOwners, setDocOwners] = useState<DocOwner[]>([]);
+
+  // 입증서류 입력 폼
+  const [evForm, setEvForm] = useState({ name: '', purpose: '' });
+
+  // 첨부서류
+  const [attachFiles, setAttachFiles] = useState<{ id: string; name: string; file?: File }[]>([]);
+
+  // 제출
+  const [submitting, setSubmitting] = useState(false);
+  const [grading, setGrading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [draftToast, setDraftToast] = useState(false);
+
+  // contentEditable ref
+  const causeRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!loading && !user) router.push('/');
   }, [user, loading, router]);
 
+  // 배정사건 로드
   useEffect(() => {
     if (!user) return;
     async function loadAssignments() {
@@ -88,7 +132,31 @@ export default function AnswerPage() {
         applyAndConfirm(parsed);
       }
     } catch { /* ignore */ }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 서류명의인: 로그인 사용자 자동 추가
+  useEffect(() => {
+    if (user && docOwners.length === 0) {
+      setDocOwners([{
+        id: crypto.randomUUID(),
+        type: '제출인',
+        name: user.name,
+        userId: user.id,
+      }]);
+    }
+  }, [user, docOwners.length]);
+
+  // Sync contentEditable
+  useEffect(() => {
+    if (causeRef.current && causeRef.current.innerText !== formData.claimCause) {
+      causeRef.current.innerText = formData.claimCause || '';
+    }
+  }, [formData.claimCause]);
+
+  function upd(partial: Partial<ComplaintFormData>) {
+    setFormData(prev => ({ ...prev, ...partial }));
+  }
 
   function applyAndConfirm(sc: SampleCase) {
     setAssignedCase(sc);
@@ -106,7 +174,6 @@ export default function AnswerPage() {
   }
 
   function handleCaseConfirm() {
-    // 사건확인: 배정된 사건에서 법원+당사자명으로 매칭 시도
     const match = assignments.find(a => {
       const sc = a.sample_cases;
       if (!sc) return false;
@@ -121,27 +188,148 @@ export default function AnswerPage() {
     if (match?.sample_cases) {
       applyAndConfirm(match.sample_cases);
     } else if (caseSearch.court) {
-      // 사건이 없더라도 입력 정보로 진행 허용
       const caseNum = `${caseSearch.year}${caseSearch.caseCode}${caseSearch.caseNum}`;
-      setFormData(prev => ({
-        ...prev,
-        court: caseSearch.court,
-        sogaType: caseNum,
-      }));
+      setFormData(prev => ({ ...prev, court: caseSearch.court, sogaType: caseNum }));
       setCaseConfirmed(true);
     } else {
       alert('법원을 선택해주세요.');
     }
   }
 
+  // ── 입증서류 ──
+  const evidencePrefix = '을';
+  const nextEvNumber = `${evidencePrefix} 제${formData.evidences.length + 1}호증`;
+
+  function handleAddEvidence() {
+    if (!evForm.name.trim()) { alert('서류명을 입력해주세요.'); return; }
+    const newEv: Evidence = {
+      id: crypto.randomUUID(),
+      number: nextEvNumber,
+      name: evForm.name.trim(),
+      purpose: evForm.purpose.trim(),
+    };
+    upd({ evidences: [...formData.evidences, newEv] });
+    setEvForm({ name: '', purpose: '' });
+  }
+
+  function handleDeleteEvidence(id: string) {
+    const filtered = formData.evidences.filter(e => e.id !== id);
+    const renumbered = filtered.map((e, i) => ({ ...e, number: `${evidencePrefix} 제${i + 1}호증` }));
+    upd({ evidences: renumbered });
+  }
+
+  // ── 서류명의인 ──
+  function handleDeleteDocOwner(id: string) {
+    setDocOwners(prev => prev.filter(o => o.id !== id));
+  }
+
+  // ── 임시저장 ──
+  function saveDraft() {
+    try {
+      const key = `ecfs_answer_draft_${user?.id}`;
+      localStorage.setItem(key, JSON.stringify({ formData, docOwners, assignedCase }));
+      setDraftToast(true);
+      setTimeout(() => setDraftToast(false), 2000);
+    } catch { alert('임시저장에 실패했습니다.'); }
+  }
+
+  // ── 작성완료 (제출) ──
+  async function handleSubmit() {
+    if (!user) return;
+    if (!formData.court) { alert('법원을 선택해주세요.'); return; }
+    if (!formData.claimPurpose.trim()) { alert('청구취지에 대한 답변을 입력해주세요.'); return; }
+
+    setSubmitting(true);
+    setSubmitError('');
+
+    try {
+      const record = {
+        student_id: user.id,
+        user_name: user.name,
+        doc_type: 'answer',
+        case_type: formData.caseCategory || formData.caseName,
+        court: formData.court,
+        plaintiff: formData.parties.find(p => p.role === '원고')?.name || '',
+        defendant: formData.parties.find(p => p.role === '피고')?.name || '',
+        has_agent: formData.hasAgent,
+        evidence_count: formData.evidences.length,
+        score: 0,
+        feedback: '채점 중...',
+        complaint_data: formData,
+        case_id: assignedCase?.id || null,
+      };
+
+      const { data: inserted, error: insertError } = await supabase
+        .from('practice_records')
+        .insert(record)
+        .select('id')
+        .single();
+
+      if (insertError) throw new Error(insertError.message);
+      if (!inserted?.id) throw new Error('제출 기록 생성에 실패했습니다.');
+      const recordId: string = inserted.id;
+
+      // 채점
+      setGrading(true);
+      const mockCase: SampleCase = {
+        id: assignedCase?.id || 'mock',
+        title: formData.caseName,
+        case_type: formData.caseCategory,
+        court: formData.court,
+        plaintiff: formData.parties.find(p => p.role === '원고')?.name || '원고',
+        defendant: formData.parties.find(p => p.role === '피고')?.name || '피고',
+        created_at: new Date().toISOString(),
+        ...(assignedCase || {}),
+      };
+
+      try {
+        const gradeRes = await fetch('/api/grade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ formData, sampleCase: mockCase, doc_type: 'answer' }),
+          signal: AbortSignal.timeout(30_000),
+        });
+        if (gradeRes.ok) {
+          const gradeResult = await gradeRes.json();
+          if (gradeResult.score != null && !gradeResult.isError) {
+            await supabase
+              .from('practice_records')
+              .update({
+                score: gradeResult.score,
+                feedback: gradeResult.feedback ?? '',
+                grade_breakdown: gradeResult.breakdown ?? null,
+                graded_at: new Date().toISOString(),
+              })
+              .eq('id', recordId);
+          }
+        }
+      } catch { /* 채점 실패해도 제출은 완료 */ }
+
+      setSubmittedRecordId(recordId);
+      setSubmitted(true);
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : '제출 중 오류가 발생했습니다.');
+    } finally {
+      setSubmitting(false);
+      setGrading(false);
+    }
+  }
+
   const handleReset = () => {
-    setStep(0);
     setFormData(EMPTY_FORM);
     setAssignedCase(null);
     setSubmitted(false);
     setSubmittedRecordId(null);
     setCaseConfirmed(false);
+    setDocOwners([]);
+    setAttachFiles([]);
+    setSubmitError('');
   };
+
+  function scrollTo(key: string) {
+    setActiveNav(key);
+    document.getElementById(`sec-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   if (loading || !user) {
     return (
@@ -151,8 +339,8 @@ export default function AnswerPage() {
     );
   }
 
-  const SEL: React.CSSProperties = { height: 34, padding: '0 10px', border: '1px solid #c8cdd6', borderRadius: 3, fontSize: 13, fontFamily: 'inherit', color: '#222', background: '#fff', cursor: 'pointer' };
-  const INP: React.CSSProperties = { height: 34, padding: '0 10px', border: '1px solid #c8cdd6', borderRadius: 3, fontSize: 13, fontFamily: 'inherit', color: '#222', background: '#fff' };
+  const SEARCH_SEL: React.CSSProperties = { height: 34, padding: '0 10px', border: '1px solid #c8cdd6', borderRadius: 3, fontSize: 13, fontFamily: 'inherit', color: '#222', background: '#fff', cursor: 'pointer' };
+  const SEARCH_INP: React.CSSProperties = { height: 34, padding: '0 10px', border: '1px solid #c8cdd6', borderRadius: 3, fontSize: 13, fontFamily: 'inherit', color: '#222', background: '#fff' };
 
   // ── 사건확인 Phase ──
   if (!caseConfirmed) {
@@ -161,7 +349,6 @@ export default function AnswerPage() {
         <MockBar />
         <GnbNav active="서류제출" />
 
-        {/* 브레드크럼 */}
         <div style={{ background: '#f7f9fc', borderBottom: '1px solid #e2e6ea' }}>
           <div style={{ maxWidth: 1160, margin: '0 auto', padding: '8px 20px', fontSize: 12, color: '#888', display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}>
             <span>홈</span><span>›</span><span>나홀로소송</span><span>›</span><span>소송서류작성</span><span>›</span>
@@ -182,7 +369,7 @@ export default function AnswerPage() {
               <div style={{ padding: '10px 16px', fontSize: 13, fontWeight: 700, color: '#1a4ea0', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between' }}>
                 <span>소송서류작성</span><span style={{ fontSize: 11 }}>∧</span>
               </div>
-              {SIDEBAR_ITEMS.map(item => (
+              {NAV_SIDEBAR_ITEMS.map(item => (
                 <div
                   key={item}
                   style={{
@@ -201,18 +388,15 @@ export default function AnswerPage() {
 
           {/* 메인 콘텐츠 */}
           <div style={{ flex: 1, padding: '20px 32px', minWidth: 0 }}>
-            {/* 제목 */}
             <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a1a2e', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 14, borderBottom: '1px solid #dde3ed' }}>
               <span style={{ color: '#0067c2', fontSize: 16 }}>●</span> 나홀로소송 (답변서)
             </h1>
 
-            {/* 사건확인 */}
             <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0067c2', margin: '0 0 8px' }}>사건확인</h2>
             <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>
               대상 사건을 검색하시고 기본정보를 확인하신 후 작성하시기 바랍니다.
             </p>
 
-            {/* 배정된 사건이 있으면 빠른 선택 표시 */}
             {assignments.length > 0 && (
               <div style={{ background: '#f0f7ff', border: '1px solid #c5d8f6', borderRadius: 6, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#1e40af' }}>
                 <strong>배정된 사건 바로 선택:</strong>
@@ -230,14 +414,13 @@ export default function AnswerPage() {
               </div>
             )}
 
-            {/* 사건 검색 폼 */}
             <div style={{ background: '#fff', border: '1px solid #dde3ed', borderRadius: 6, padding: '24px 32px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
                   <tr>
                     <td style={{ padding: '10px 0', width: 100, fontSize: 13, color: '#333', fontWeight: 600 }}>소송유형</td>
                     <td style={{ padding: '10px 0' }}>
-                      <select value={caseSearch.caseType} onChange={e => setCaseSearch(p => ({ ...p, caseType: e.target.value }))} style={{ ...SEL, width: 220 }}>
+                      <select value={caseSearch.caseType} onChange={e => setCaseSearch(p => ({ ...p, caseType: e.target.value }))} style={{ ...SEARCH_SEL, width: 220 }}>
                         <option value="민사">민사</option>
                         <option value="가사">가사</option>
                         <option value="행정">행정</option>
@@ -247,7 +430,7 @@ export default function AnswerPage() {
                   <tr>
                     <td style={{ padding: '10px 0', fontSize: 13, color: '#333', fontWeight: 600 }}>법원</td>
                     <td style={{ padding: '10px 0' }}>
-                      <select value={caseSearch.court} onChange={e => setCaseSearch(p => ({ ...p, court: e.target.value }))} style={{ ...SEL, width: 220 }}>
+                      <select value={caseSearch.court} onChange={e => setCaseSearch(p => ({ ...p, court: e.target.value }))} style={{ ...SEARCH_SEL, width: 220 }}>
                         <option value="">-- 법원 선택 --</option>
                         {COURTS.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
@@ -256,17 +439,17 @@ export default function AnswerPage() {
                   <tr>
                     <td style={{ padding: '10px 0', fontSize: 13, color: '#333', fontWeight: 600 }}>사건번호</td>
                     <td style={{ padding: '10px 0', display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <select value={caseSearch.year} onChange={e => setCaseSearch(p => ({ ...p, year: e.target.value }))} style={{ ...SEL, width: 80 }}>
+                      <select value={caseSearch.year} onChange={e => setCaseSearch(p => ({ ...p, year: e.target.value }))} style={{ ...SEARCH_SEL, width: 80 }}>
                         {[2026,2025,2024,2023,2022].map(y => <option key={y} value={String(y)}>{y}</option>)}
                       </select>
-                      <select value={caseSearch.caseCode} onChange={e => setCaseSearch(p => ({ ...p, caseCode: e.target.value }))} style={{ ...SEL, width: 70 }}>
+                      <select value={caseSearch.caseCode} onChange={e => setCaseSearch(p => ({ ...p, caseCode: e.target.value }))} style={{ ...SEARCH_SEL, width: 70 }}>
                         {CASE_TYPES.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                       <input
                         value={caseSearch.caseNum}
                         onChange={e => setCaseSearch(p => ({ ...p, caseNum: e.target.value.replace(/[^0-9]/g, '') }))}
                         placeholder=""
-                        style={{ ...INP, width: 120 }}
+                        style={{ ...SEARCH_INP, width: 120 }}
                       />
                     </td>
                   </tr>
@@ -285,7 +468,7 @@ export default function AnswerPage() {
                       <input
                         value={caseSearch.partyName}
                         onChange={e => setCaseSearch(p => ({ ...p, partyName: e.target.value }))}
-                        style={{ ...INP, width: 220 }}
+                        style={{ ...SEARCH_INP, width: 220 }}
                       />
                     </td>
                   </tr>
@@ -293,24 +476,16 @@ export default function AnswerPage() {
               </table>
             </div>
 
-            {/* 유의사항 */}
             <div style={{ background: '#f8f9fb', border: '1px solid #dde3ed', borderRadius: 6, padding: '20px 24px', marginTop: 24 }}>
               <h3 style={{ fontSize: 14, fontWeight: 700, color: '#333', margin: '0 0 10px' }}>유의사항</h3>
               <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: '#555', lineHeight: 2 }}>
                 <li>이 화면은 단순히 서류작성 편의를 제공하는 화면에 불과하므로, 작성한 서류는 프린터로 출력하여 법원에 방문하여 직접 제출하거나 우편제출 또는 전자소송포털의 [서류제출]기능을 통하여 전자제출을 하는 등 <strong style={{ color: '#c00' }}>반드시 별도의 법원 접수 절차가 필요</strong>합니다.</li>
-                <li>본 작성화면에서 제공하는 서비스는 나홀로 소송인이 소송서류를 보다 쉽게 작성할 수 있도록 지원하는 서비스에 불과하므로 이를 통해 작성된 서류의 소송 결과에 대해서 법원은 법적책임을 지지 않습니다. <strong style={{ color: '#c00' }}>복잡하고 어려운 사건의 경우에는 반드시 법률전문가의 도움을 받으시기 바랍니다.</strong></li>
+                <li>본 작성화면에서 제공하는 서비스는 나홀로 소송인이 소송서류를 보다 쉽게 작성할 수 있도록 지원하는 서비스에 불과하므로 이를 통해 작성된 서류의 소송 결과에 대해서 법원은 법적책임을 지지 않습니다.</li>
               </ul>
             </div>
 
-            {/* 확인 버튼 */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
-              <button
-                onClick={handleCaseConfirm}
-                style={{
-                  padding: '10px 40px', background: '#1a4ea0', color: '#fff', border: 'none',
-                  borderRadius: 4, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                }}
-              >
+              <button onClick={handleCaseConfirm} style={{ padding: '10px 40px', background: '#1a4ea0', color: '#fff', border: 'none', borderRadius: 4, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                 확인
               </button>
             </div>
@@ -322,24 +497,49 @@ export default function AnswerPage() {
     );
   }
 
-  // ── 답변서 작성 Phase (기존 Step flow) ──
+  // ── 제출 완료 ──
+  if (submitted) {
+    return (
+      <div style={{ margin: 0, padding: 0, fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif", minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#eef0f3', fontSize: 13 }}>
+        <MockBar />
+        <GnbNav active="서류제출" />
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', border: '1px solid #dde1e7', borderRadius: 8, padding: '48px 32px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, maxWidth: 560 }}>
+            <div style={{ fontSize: 64 }}>✅</div>
+            <h2 style={{ fontSize: 20, fontWeight: 'bold', color: '#1a3a6b', margin: 0 }}>답변서 제출이 완료되었습니다!</h2>
+            <div style={{ background: '#f0f7ff', border: '1px solid #c5d8f6', borderRadius: 6, padding: '14px 20px', maxWidth: 440, fontSize: 13, color: '#2952a3', lineHeight: 1.6 }}>
+              채점 결과는 <strong>나의전자소송 &gt; 나의 실습기록</strong>에서 확인하세요.
+              {submittedRecordId && <span style={{ display: 'block', marginTop: 6, color: '#888', fontSize: 12 }}>기록 ID: {submittedRecordId}</span>}
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 8 }}>
+              <button onClick={() => router.push('/mypage')} style={{ background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, padding: '10px 22px', fontSize: 14, cursor: 'pointer', fontWeight: 'bold' }}>나의 실습기록 확인하기</button>
+              <button onClick={handleReset} style={{ background: '#fff', color: '#1a3a6b', border: '1px solid #1a3a6b', borderRadius: 4, padding: '10px 22px', fontSize: 14, cursor: 'pointer' }}>새 답변서 작성하기</button>
+            </div>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  // ── 답변서 작성 Phase (사이드바 + 섹션) ──
+  const sideItems = [
+    { key: 's1', label: '사건기본정보' },
+    { key: 's2', label: '청구취지에 대한 답변' },
+    { key: 's3', label: '청구원인에 대한 답변' },
+    { key: 's4', label: '서류명의인' },
+    { key: 's5', label: '입증방법' },
+    { key: 's6', label: '첨부서류' },
+  ];
+
   return (
-    <div style={{ margin: 0, padding: 0, fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif", minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f0f2f5' }}>
+    <div style={{ margin: 0, padding: 0, fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif", minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#eef0f3', fontSize: 13 }}>
       <MockBar />
       <GnbNav active="서류제출" />
 
-      {/* 브레드크럼 */}
-      <div style={{ background: '#f7f9fc', borderBottom: '1px solid #e2e6ea' }}>
-        <div style={{ maxWidth: 980, margin: '0 auto', padding: '8px 20px', fontSize: 12, color: '#888', display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button onClick={() => router.push('/')} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: 0, fontSize: 12 }}>홈</button>
-          <span>›</span><span>나홀로소송</span><span>›</span><span>소송서류작성</span><span>›</span>
-          <span style={{ color: '#1a3a6b', fontWeight: 'bold' }}>답변서 작성</span>
-        </div>
-      </div>
-
-      {/* 사건 확인 완료 표시 */}
+      {/* 사건확인 완료 바 */}
       <div style={{ background: '#e8f4fb', borderBottom: '1px solid #b0d0eb' }}>
-        <div style={{ maxWidth: 980, margin: '0 auto', padding: '8px 20px', fontSize: 12, color: '#1a4a6b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ maxWidth: 1160, margin: '0 auto', padding: '8px 20px', fontSize: 12, color: '#1a4a6b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span>
             ✔ 사건확인 완료 — {formData.court} {formData.sogaType || ''} {assignedCase ? `(${assignedCase.title || assignedCase.case_type})` : ''}
           </span>
@@ -349,45 +549,348 @@ export default function AnswerPage() {
         </div>
       </div>
 
-      {/* Step bar */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #dde1e7', padding: '16px 0' }}>
-        <div style={{ maxWidth: 980, margin: '0 auto', padding: '0 20px' }}>
-          <StepBar step={step} />
-        </div>
-      </div>
+      {/* Page body */}
+      <div style={{ flex: 1, display: 'flex', maxWidth: 1160, margin: '0 auto', width: '100%', padding: '14px 10px 60px', boxSizing: 'border-box', gap: 12, alignItems: 'flex-start' }}>
 
-      {/* Content area */}
-      <div style={{ flex: 1 }}>
-        <div style={{ maxWidth: 980, margin: '0 auto', padding: '16px' }}>
-          {submitted ? (
-            <div style={{
-              background: '#fff', border: '1px solid #dde1e7', borderRadius: 8,
-              padding: '48px 32px', textAlign: 'center', display: 'flex',
-              flexDirection: 'column', alignItems: 'center', gap: 16,
-            }}>
-              <div style={{ fontSize: 64 }}>✅</div>
-              <h2 style={{ fontSize: 20, fontWeight: 'bold', color: '#1a3a6b', margin: 0 }}>답변서 제출이 완료되었습니다!</h2>
-              <div style={{ background: '#f0f7ff', border: '1px solid #c5d8f6', borderRadius: 6, padding: '14px 20px', maxWidth: 440, fontSize: 13, color: '#2952a3', lineHeight: 1.6 }}>
-                채점 결과는 <strong>나의전자소송 &gt; 나의 실습기록</strong>에서 확인하세요.
-                {submittedRecordId && <span style={{ display: 'block', marginTop: 6, color: '#888', fontSize: 12 }}>기록 ID: {submittedRecordId}</span>}
-              </div>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 8 }}>
-                <button onClick={() => router.push('/mypage')} style={{ background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, padding: '10px 22px', fontSize: 14, cursor: 'pointer', fontWeight: 'bold' }}>나의 실습기록 확인하기</button>
-                <button onClick={handleReset} style={{ background: '#fff', color: '#1a3a6b', border: '1px solid #1a3a6b', borderRadius: 4, padding: '10px 22px', fontSize: 14, cursor: 'pointer' }}>새 답변서 작성하기</button>
-              </div>
+        {/* ── Left Sidebar ── */}
+        <div style={{ width: 172, flexShrink: 0 }}>
+          <div style={{ background: TEAL, color: '#fff', padding: '9px 14px', fontWeight: 700, fontSize: 13, borderRadius: '3px 3px 0 0' }}>서류작성</div>
+          <div style={{ border: '1px solid #c8d4dc', borderTop: 'none', background: '#fff', borderRadius: '0 0 3px 3px', overflow: 'hidden' }}>
+            <div style={{ background: '#e6f7f8', borderBottom: '1px solid #c8dde0', padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 7 }}>
+              <div style={{ width: 18, height: 18, borderRadius: '50%', background: TEAL, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>1</div>
+              <span style={{ fontSize: 12, fontWeight: 700, color: TEAL }}>문서작성</span>
             </div>
-          ) : (
-            <>
-              {step === 0 && <Step1Consent onNext={() => setStep(1)} onCancel={() => setCaseConfirmed(false)} />}
-              {step === 1 && <Step2Parties data={formData} onChange={setFormData} onNext={() => setStep(2)} onBack={() => setStep(0)} assignedCase={assignedCase ?? undefined} defaultRole="피고" />}
-              {step === 2 && <Step3WriteAnswer data={formData} onChange={setFormData} onNext={() => setStep(3)} onBack={() => setStep(1)} assignedCase={assignedCase ?? undefined} />}
-              {step === 3 && <Step4Attach data={formData} onChange={setFormData} onNext={() => setStep(4)} onBack={() => setStep(2)} evidencePrefix="을" />}
-              {step === 4 && <Step5SubmitAnswer data={formData} onBack={() => setStep(3)} onSubmitComplete={(id: string) => { setSubmittedRecordId(id); setSubmitted(true); }} assignedCase={assignedCase ?? undefined} userId={user.id} userName={user.name} />}
-            </>
+            {sideItems.map(item => (
+              <div key={item.key} onClick={() => scrollTo(item.key)}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px 5px 26px', cursor: 'pointer', background: activeNav === item.key ? '#f0fafa' : '#fff', color: activeNav === item.key ? TEAL : '#555', fontSize: 11, borderBottom: '1px solid #edf0f3' }}
+                onMouseEnter={e => { if (activeNav !== item.key) e.currentTarget.style.background = '#f8fafb'; }}
+                onMouseLeave={e => { if (activeNav !== item.key) e.currentTarget.style.background = '#fff'; }}>
+                <span style={{ color: activeNav === item.key ? TEAL : '#bbb', fontSize: 9 }}>▸</span>
+                {item.label}
+              </div>
+            ))}
+            {[['2','최종문서확인'],['3','전자서명'],['4','소송비용납부'],['5','전자제출']].map(([num, label]) => (
+              <div key={num} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderBottom: '1px solid #e8ecf0', background: '#fff' }}>
+                <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#c8d4dc', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{num}</div>
+                <span style={{ fontSize: 12, color: '#999' }}>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Main Content ── */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Title row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: TEAL, fontSize: 15 }}>●</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#111' }}>민사서류 - 답변서</span>
+              {assignedCase && <span style={{ fontSize: 11, background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 20, fontWeight: 700 }}>배정: {assignedCase.title}</span>}
+            </div>
+            <div style={{ display: 'flex', gap: 5 }}>
+              <button onClick={() => setOpen({ s1:true,s2:true,s3:true,s4:true,s5:true,s6:true })} style={{ height: 26, padding: '0 10px', border: '1px solid #b8c4cc', borderRadius: 2, background: '#fff', color: '#555', fontSize: 11, cursor: 'pointer' }}>전체열기 ▼</button>
+              <button onClick={() => setOpen({ s1:false,s2:false,s3:false,s4:false,s5:false,s6:false })} style={{ height: 26, padding: '0 10px', border: '1px solid #b8c4cc', borderRadius: 2, background: '#fff', color: '#555', fontSize: 11, cursor: 'pointer' }}>전체닫기 ▲</button>
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', fontSize: 11, color: '#e53e3e', marginBottom: 6 }}>* 필수입력사항</div>
+
+          {/* ① 사건기본정보 */}
+          <div id="sec-s1" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
+            <SecHd label="① 사건기본정보" open={open.s1} toggle={() => toggle('s1')} />
+            {open.s1 && (
+              <div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #eaecf4' }}>
+                      <th style={TH}>사건명<span style={{ color: '#e53e3e' }}>*</span></th>
+                      <td style={TD}>
+                        <input type="text" value={formData.caseCategory || formData.caseName} onChange={e => upd({ caseCategory: e.target.value, caseName: e.target.value })} placeholder="예: 대여금, 손해배상(기)" style={{ ...INP, width: 360 }} />
+                      </td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #eaecf4' }}>
+                      <th style={TH}>법원<span style={{ color: '#e53e3e' }}>*</span></th>
+                      <td style={TD}>
+                        <select value={formData.court} onChange={e => upd({ court: e.target.value })} style={{ ...SEL, width: 260 }}>
+                          <option value="">-- 법원 선택 --</option>
+                          {COURTS.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #eaecf4' }}>
+                      <th style={TH}>사건번호</th>
+                      <td style={TD}>
+                        <input type="text" value={formData.sogaType} onChange={e => upd({ sogaType: e.target.value })} placeholder="예: 2024가단12345" style={{ ...INP, width: 300 }} />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ② 청구취지에 대한 답변 */}
+          <div id="sec-s2" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
+            <SecHd label="② 청구취지에 대한 답변" open={open.s2} toggle={() => toggle('s2')} />
+            {open.s2 && (
+              <div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr>
+                      <th style={{ ...TH, verticalAlign: 'top', paddingTop: 11, width: 120 }}>청구취지에 대한 답변<span style={{ color: '#e53e3e' }}>*</span></th>
+                      <td style={TD}>
+                        <div style={{ background: '#f0f7ff', border: '1px solid #c5d8f6', borderRadius: 4, padding: '8px 12px', fontSize: 11, color: '#1e40af', marginBottom: 8, lineHeight: 1.7 }}>
+                          <strong>예시:</strong> 1. 원고의 청구를 기각한다. 2. 소송비용은 원고가 부담한다. 라는 판결을 구합니다.
+                        </div>
+                        <textarea
+                          value={formData.claimPurpose}
+                          onChange={e => upd({ claimPurpose: e.target.value })}
+                          placeholder={`1. 원고의 청구를 기각한다.\n2. 소송비용은 원고가 부담한다.\n라는 판결을 구합니다.`}
+                          style={{ width: '100%', minHeight: 120, padding: '8px 10px', border: '1px solid #c8cdd6', borderRadius: 2, fontSize: 12, lineHeight: 1.7, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ③ 청구원인에 대한 답변 */}
+          <div id="sec-s3" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
+            <SecHd label="③ 청구원인에 대한 답변" open={open.s3} toggle={() => toggle('s3')} />
+            {open.s3 && (
+              <div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr>
+                      <th style={{ ...TH, verticalAlign: 'top', paddingTop: 11, width: 120 }}>청구원인에 대한 답변<span style={{ color: '#e53e3e' }}>*</span></th>
+                      <td style={TD}>
+                        <div
+                          ref={causeRef}
+                          contentEditable
+                          suppressContentEditableWarning
+                          onInput={e => upd({ claimCause: (e.target as HTMLDivElement).innerText })}
+                          data-placeholder="원고의 주장에 대한 반박 이유를 구체���으로 서술하세요..."
+                          style={{
+                            minHeight: 200, padding: '8px 10px', border: '1px solid #c8cdd6',
+                            borderRadius: 2, fontSize: 12, lineHeight: 1.8, outline: 'none',
+                            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                          }}
+                        />
+                        <style>{`
+                          [data-placeholder]:empty:before {
+                            content: attr(data-placeholder);
+                            color: #9ca3af;
+                            pointer-events: none;
+                          }
+                        `}</style>
+
+                        {assignedCase?.key_facts && (
+                          <div style={{ marginTop: 12, border: '1px solid #d1d5db', borderRadius: 4, overflow: 'hidden' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f3f4f6', cursor: 'pointer', userSelect: 'none', fontSize: 12 }}
+                              onClick={() => {/* toggle facts */}}>
+                              <span style={{ fontWeight: 600, color: '#374151' }}>참고 사실관계 (원고 주장)</span>
+                            </div>
+                            <div style={{ padding: '10px 12px', fontSize: 12, lineHeight: 1.8, color: '#374151', backgroundColor: '#fafafa', whiteSpace: 'pre-wrap' }}>
+                              {assignedCase.key_facts}
+                            </div>
+                          </div>
+                        )}
+
+                        <div style={{ marginTop: 8, fontSize: 11, color: '#888' }}>
+                          ※ 청구원인에 대한 답변은 원고 주장의 사실관계에 대하여 인정 여부 및 반박 사유를 구체적으로 작성하시기 바랍니다.
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ④ 서류명의인 */}
+          <div id="sec-s4" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
+            <SecHd label="④ 서류명의인" open={open.s4} toggle={() => toggle('s4')} />
+            {open.s4 && (
+              <div style={{ padding: '12px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: '#f5f7fb' }}>
+                      <th style={{ padding: '8px 12px', fontWeight: 700, borderBottom: '1px solid #d0d8e4', borderRight: '1px solid #e0e6ee', textAlign: 'center', width: 80 }}>구분</th>
+                      <th style={{ padding: '8px 12px', fontWeight: 700, borderBottom: '1px solid #d0d8e4', borderRight: '1px solid #e0e6ee', textAlign: 'center' }}>이름(사용자아이디)</th>
+                      <th style={{ padding: '8px 12px', fontWeight: 700, borderBottom: '1px solid #d0d8e4', textAlign: 'center', width: 60 }}>삭제</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {docOwners.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} style={{ padding: '16px', textAlign: 'center', color: '#999' }}>서류명의인이 없습니다.</td>
+                      </tr>
+                    ) : (
+                      docOwners.map(owner => (
+                        <tr key={owner.id} style={{ borderBottom: '1px solid #eaecf4' }}>
+                          <td style={{ padding: '8px 12px', textAlign: 'center', borderRight: '1px solid #eaecf4' }}>{owner.type}</td>
+                          <td style={{ padding: '8px 12px', borderRight: '1px solid #eaecf4' }}>
+                            {owner.name} ({owner.userId})
+                          </td>
+                          <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                            <button onClick={() => handleDeleteDocOwner(owner.id)} style={{ padding: '2px 8px', fontSize: 11, border: '1px solid #ef4444', borderRadius: 2, background: '#fff', color: '#ef4444', cursor: 'pointer' }}>
+                              삭제
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ⑤ 입증방법 */}
+          <div id="sec-s5" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
+            <SecHd label="⑤ 입증방법" open={open.s5} toggle={() => toggle('s5')} />
+            {open.s5 && (
+              <div style={{ padding: '12px' }}>
+                <div style={{ fontSize: 11, color: '#555', marginBottom: 10, lineHeight: 1.7 }}>
+                  <div>• 입증서류(증거)는 단순한 첨부서류와 구분하여 제출하여야 하며, 첨부서류는 별도의 파일로 다음 단계에서 제출하시기 바랍니다.</div>
+                </div>
+
+                {/* 서증 추가 폼 */}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'end', marginBottom: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 11, color: '#6b7280', display: 'block', marginBottom: 3 }}>서증번호</label>
+                    <input type="text" value={nextEvNumber} readOnly style={{ ...INP, width: 120, backgroundColor: '#e5e7eb', color: '#6b7280', cursor: 'not-allowed' }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 11, color: '#6b7280', display: 'block', marginBottom: 3 }}>서류명 <span style={{ color: '#e53e3e' }}>*</span></label>
+                    <input type="text" value={evForm.name} onChange={e => setEvForm(p => ({ ...p, name: e.target.value }))} onKeyDown={e => e.key === 'Enter' && handleAddEvidence()} placeholder="예: 차용증, 계약서 사본" style={{ ...INP, width: '100%' }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 11, color: '#6b7280', display: 'block', marginBottom: 3 }}>입증취지</label>
+                    <input type="text" value={evForm.purpose} onChange={e => setEvForm(p => ({ ...p, purpose: e.target.value }))} onKeyDown={e => e.key === 'Enter' && handleAddEvidence()} placeholder="예: 금전 차용 사실" style={{ ...INP, width: '100%' }} />
+                  </div>
+                  <button onClick={handleAddEvidence} style={{ height: 28, padding: '0 14px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>추가</button>
+                </div>
+
+                {/* 입증서류 목록 */}
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: '#f5f7fb' }}>
+                      {['서증부호','서류명','입증취지','삭제'].map(h => (
+                        <th key={h} style={{ padding: '7px 10px', fontWeight: 700, borderBottom: '1px solid #d0d8e4', borderRight: '1px solid #e0e6ee', textAlign: 'center', fontSize: 11 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {formData.evidences.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} style={{ padding: '16px', textAlign: 'center', color: '#999', fontSize: 11 }}>등록된 입증서류가 없습니다.</td>
+                      </tr>
+                    ) : (
+                      formData.evidences.map(ev => (
+                        <tr key={ev.id} style={{ borderBottom: '1px solid #eaecf4' }}>
+                          <td style={{ padding: '6px 10px', textAlign: 'center', fontWeight: 600, borderRight: '1px solid #eaecf4', width: 100 }}>{ev.number}</td>
+                          <td style={{ padding: '6px 10px', borderRight: '1px solid #eaecf4' }}>{ev.name}</td>
+                          <td style={{ padding: '6px 10px', borderRight: '1px solid #eaecf4', color: '#555' }}>{ev.purpose || '-'}</td>
+                          <td style={{ padding: '6px 10px', textAlign: 'center', width: 50 }}>
+                            <button onClick={() => handleDeleteEvidence(ev.id)} style={{ padding: '2px 8px', fontSize: 11, border: '1px solid #ef4444', borderRadius: 2, background: '#fff', color: '#ef4444', cursor: 'pointer' }}>삭제</button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ⑥ 첨부서류 */}
+          <div id="sec-s6" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
+            <SecHd label="⑥ 첨부서류" open={open.s6} toggle={() => toggle('s6')} />
+            {open.s6 && (
+              <div style={{ padding: '12px' }}>
+                <div style={{ fontSize: 11, color: '#555', marginBottom: 10, lineHeight: 1.7 }}>
+                  <div>• ��부서류로 제출한 문서는 증거로 사용될 수 없으며, 판결(결정) 등에 효력이 없습니다.</div>
+                  <div>• 소송대리허가신청서 및 기타 신청서는 답변서와 별도의 서류로 제출하여야 합니다.</div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <span style={{ fontSize: 11, color: '#333', fontWeight: 600 }}>파일첨부</span>
+                    <input
+                      type="file"
+                      accept=".hwp,.hwpx,.doc,.docx,.pdf,.txt,.bmp,.jpg,.jpeg,.gif,.tif,.tiff,.png"
+                      style={{ fontSize: 11 }}
+                      onChange={e => {
+                        const f = e.target.files?.[0];
+                        if (f) setAttachFiles(prev => [...prev, { id: crypto.randomUUID(), name: f.name, file: f }]);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                </div>
+
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: '#f5f7fb' }}>
+                      {['No.','파일명','삭제'].map(h => (
+                        <th key={h} style={{ padding: '7px 10px', fontWeight: 700, borderBottom: '1px solid #d0d8e4', borderRight: '1px solid #e0e6ee', textAlign: 'center', fontSize: 11 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {attachFiles.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} style={{ padding: '16px', textAlign: 'center', color: '#999', fontSize: 11 }}>첨부��� 파일이 없습니다.</td>
+                      </tr>
+                    ) : (
+                      attachFiles.map((f, i) => (
+                        <tr key={f.id} style={{ borderBottom: '1px solid #eaecf4' }}>
+                          <td style={{ padding: '6px 10px', textAlign: 'center', borderRight: '1px solid #eaecf4', width: 50 }}>{i + 1}</td>
+                          <td style={{ padding: '6px 10px', borderRight: '1px solid #eaecf4' }}>{f.name}</td>
+                          <td style={{ padding: '6px 10px', textAlign: 'center', width: 50 }}>
+                            <button onClick={() => setAttachFiles(prev => prev.filter(x => x.id !== f.id))} style={{ padding: '2px 8px', fontSize: 11, border: '1px solid #ef4444', borderRadius: 2, background: '#fff', color: '#ef4444', cursor: 'pointer' }}>삭제</button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+                <div style={{ marginTop: 6, fontSize: 11, color: '#888' }}>
+                  ※ 첨부가���한 파일 형식 : HWP, HWPX, DOC, DOCX, PDF, TXT, BMP, JPG, JPEG, GIF, TIF, TIFF, PNG (20MB까지)
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Error */}
+          {submitError && (
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 3, padding: '10px 14px', color: '#dc2626', fontSize: 12, marginBottom: 10 }}>⚠️ {submitError}</div>
           )}
+
+          {/* Bottom buttons */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button style={{ height: 32, padding: '0 16px', background: '#fff', border: '1px solid #999', color: '#555', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                파일첨부방식작성
+              </button>
+              <button onClick={saveDraft} style={{ height: 32, padding: '0 16px', background: '#fff', border: `1px solid ${TEAL}`, color: TEAL, borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                임시저장
+              </button>
+            </div>
+            <button onClick={handleSubmit} disabled={submitting} style={{ height: 34, padding: '0 24px', background: submitting ? '#7ab8bd' : TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+              {submitting ? (grading ? '🤖 AI 채점 중...' : '⏳ 제출 중...') : '작성완료 →'}
+            </button>
+          </div>
         </div>
       </div>
 
+      {draftToast && (
+        <div style={{ position: 'fixed', bottom: 32, right: 32, background: '#1a3a6b', color: '#fff', padding: '10px 20px', borderRadius: 6, fontSize: 13, fontWeight: 600, zIndex: 9999, boxShadow: '0 2px 12px rgba(0,0,0,.3)' }}>
+          ✓ 임시저장되었습니다
+        </div>
+      )}
       <Footer />
     </div>
   );

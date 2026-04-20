@@ -1,6 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ecmeafiajoksyeuisreh.supabase.co'
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjbWVhZmlham9rc3lldWlzcmVoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDA3MjYzOCwiZXhwIjoyMDg5NjQ4NjM4fQ.leU8zdVO_gby-lhQ1GfgVcynGfkP2tHQjAGp9kxRNJA'
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+if (!url || !key) {
+  throw new Error('[supabase] NEXT_PUBLIC_SUPABASE_URL 및 NEXT_PUBLIC_SUPABASE_ANON_KEY 환경변수가 필요합니다.')
+}
+
+export const SB_URL = url
+export const SB_KEY = key
+export const SB_HDR = { apikey: key, Authorization: `Bearer ${key}` } as const
 
 export const supabase = createClient(url, key)

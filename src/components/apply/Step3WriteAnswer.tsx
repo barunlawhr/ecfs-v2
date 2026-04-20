@@ -51,7 +51,7 @@ export default function Step3WriteAnswer({ data, onChange, onNext, onBack, assig
     if (causeRef.current && causeRef.current.innerText !== data.claimCause) {
       causeRef.current.innerText = data.claimCause || ''
     }
-  }, []) // Only on mount
+  }, [data.claimCause])
 
   const toggle = (key: SectionKey) => setOpen(prev => ({ ...prev, [key]: !prev[key] }))
 
