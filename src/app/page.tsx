@@ -181,10 +181,10 @@ export default function HomePage() {
                 <div>
                   <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>실습 안내</div>
                   <div style={{ fontSize: 19, fontWeight: 700, color: '#1a3a6b', lineHeight: 1.4, marginBottom: 10 }}>
-                    전자소송<br />실습 시스템
+                    [바른커리어]<br />전자소송모의실습
                   </div>
                   <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8 }}>
-                    이 시스템은 법원 전자소송 포털을<br />실습하기 위한 모의 환경입니다.<br />실제 법원 접수와 무관합니다.
+                    바른커리어 법률사무원<br />전자소송 실습 시스템입니다.<br />실제 법원 접수와 무관합니다.
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>

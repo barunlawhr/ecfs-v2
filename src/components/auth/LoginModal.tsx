@@ -32,7 +32,7 @@ export default function LoginModal({ onClose }: { onClose: () => void }) {
       <div style={{ background: '#fff', borderRadius: 6, width: 420, overflow: 'hidden', boxShadow: '0 16px 48px rgba(0,0,0,.25)' }}>
         {/* 헤더 */}
         <div style={{ background: 'linear-gradient(135deg,#003366,#006699)', color: '#fff', padding: '22px 24px', textAlign: 'center' }}>
-          <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>⚖ 전자소송 실습 시스템</div>
+          <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>⚖ [바른커리어] 전자소송모의실습사이트</div>
           <div style={{ fontSize: 12, opacity: 0.7 }}>실습 계정으로 로그인하여 소장 작성을 시작하세요</div>
         </div>
         {/* 바디 */}

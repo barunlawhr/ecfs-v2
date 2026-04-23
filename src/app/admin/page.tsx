@@ -81,24 +81,11 @@ export default function AdminPage() {
   const router = useRouter()
   const [activePanel, setActivePanel] = useState<Panel>('dashboard')
   const [toast, setToast] = useState<string | null>(null)
-  const [siteTitle, setSiteTitle] = useState('전자소송 실습 관리자')
+  const siteTitle = '[바른커리어] 전자소송모의실습 관리자'
 
   useEffect(() => {
     if (!loading && (!user || user.role !== 'admin')) router.push('/')
   }, [user, loading, router])
-
-  useEffect(() => {
-    const update = () => {
-      const name = localStorage.getItem('site_name')
-      if (name && name.trim()) {
-        setSiteTitle(name.trim() + ' 관리자')
-        document.title = name.trim()
-      }
-    }
-    update()
-    window.addEventListener('site-settings-updated' as keyof WindowEventMap, update)
-    return () => window.removeEventListener('site-settings-updated' as keyof WindowEventMap, update)
-  }, [])
 
   if (loading) {
     return (
@@ -178,7 +165,7 @@ export default function AdminPage() {
         <div style={{ background: '#fffbf0', border: '1px solid #f0e0b0', borderRadius: 8, padding: '16px 20px', color: '#7c5800' }}>
           <div style={{ fontWeight: 700, marginBottom: 6 }}>⚠️ 실습 모드 안내</div>
           <div style={{ fontSize: 13, lineHeight: 1.7 }}>
-            본 시스템은 <strong>전자소송 실습 전용 모의 플랫폼</strong>입니다. 실제 법원 접수 시스템과 무관하며, 작성된 소장 및 제출 내용은 법적 효력이 없습니다.<br />
+            본 시스템은 <strong>[바른커리어] 전자소송모의실습 관리자</strong>입니다. 실제 법원 접수 시스템과 무관하며, 작성된 소장 및 제출 내용은 법적 효력이 없습니다.<br />
             실습생이 소장을 제출하면 AI가 자동으로 채점하고 피드백을 제공합니다. 관리자는 사건을 배정하고 실습 현황을 모니터링할 수 있습니다.
           </div>
         </div>
@@ -1394,8 +1381,7 @@ export default function AdminPage() {
   // ─────────────────────────────────────────────
   function SettingsPanel() {
     // ── 1. 시스템 설정
-    const [siteName, setSiteName] = useState('')
-    const [mockBarText, setMockBarText] = useState('')
+    // siteName/mockBarText 제거됨 — 하드코딩으로 고정
     // ── 2. 실습 설정
     const [aiFeedback, setAiFeedback] = useState(true)
     const [scoreReveal, setScoreReveal] = useState('immediate')
@@ -1413,8 +1399,7 @@ export default function AdminPage() {
     const [csvLoading, setCsvLoading] = useState(false)
 
     useEffect(() => {
-      setSiteName(localStorage.getItem('site_name') || '')
-      setMockBarText(localStorage.getItem('mock_bar_text') || '')
+      // siteName/mockBarText 제거됨
       setAiFeedback(localStorage.getItem('ai_feedback_enabled') !== 'false')
       setScoreReveal(localStorage.getItem('score_reveal') || 'immediate')
       setSubmitLimit(localStorage.getItem('submit_limit') || 'unlimited')
@@ -1434,12 +1419,7 @@ export default function AdminPage() {
       setWeights(prev => ({ ...prev, [key]: val }))
     }
 
-    function saveSection1() {
-      localStorage.setItem('site_name', siteName)
-      localStorage.setItem('mock_bar_text', mockBarText)
-      window.dispatchEvent(new CustomEvent('site-settings-updated'))
-      showToast('시스템 설정이 저장되었습니다.')
-    }
+    // saveSection1 제거됨 — 사이트명/배너 하드코딩
 
     function saveSection2() {
       localStorage.setItem('ai_feedback_enabled', String(aiFeedback))
@@ -1525,19 +1505,13 @@ export default function AdminPage() {
       <div>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', marginBottom: 20 }}>⚙ 설정</h2>
 
-        {/* ── 1. 시스템 설정 */}
+        {/* ── 1. 시스템 설정 (하드코딩) */}
         <div style={sec}>
           <div style={secTitle}>🖥 시스템 설정</div>
-          <div style={{ marginBottom: 14 }}>
-            <label style={lbl}>실습 사이트 이름</label>
-            <input value={siteName} onChange={e => setSiteName(e.target.value)} placeholder="전자소송 실습 시스템" style={inp} />
+          <div style={{ fontSize: 13, color: '#333', lineHeight: 1.8 }}>
+            <div><strong>사이트 이름:</strong> [바른커리어] 전자소송모의실습사이트</div>
+            <div><strong>안내 배너:</strong> 하드코딩으로 고정 (변경 불가)</div>
           </div>
-          <div>
-            <label style={lbl}>실습 안내 바 문구</label>
-            <input value={mockBarText} onChange={e => setMockBarText(e.target.value)} placeholder="기본 안내 문구를 사용하려면 비워두세요" style={inp} />
-            <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>비워두면 기본 문구가 표시됩니다.</div>
-          </div>
-          <button onClick={saveSection1} style={saveBtn}>저장</button>
         </div>
 
         {/* ── 2. 실습 설정 */}

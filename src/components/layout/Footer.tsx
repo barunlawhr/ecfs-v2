@@ -8,7 +8,7 @@ export default function Footer() {
       </div>
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '10px 20px', display: 'flex', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 12, color: 'rgba(255,255,255,.45)' }}>이용 및 장애 문의 02) 3480-1715 (평일 9시~18시)</span>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,.3)' }}>COPYRIGHT © 대한민국 법원 전자소송포털. ALL RIGHTS RESERVED.</span>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,.3)' }}>COPYRIGHT © 바른커리어. ALL RIGHTS RESERVED.</span>
       </div>
     </footer>
   )

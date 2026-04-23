@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════
 //  ecfs-v2 공통 디자인 시스템
-//  전자소송포털 실습 사이트 — 공통 색상, 폰트, 레이아웃, 스타일 객체
+//  [바른커리어] 전자소송모의실습사이트 — 공통 색상, 폰트, 레이아웃, 스타일 객체
 // ══════════════════════════════════════════════════════════════
 
 // ── 주요 색상 ────────────────────────────────────────────────
@@ -153,7 +153,7 @@ export const MOCK_BANNER_STYLE: React.CSSProperties = {
   textAlign: 'center',
 }
 
-export const MOCK_BANNER_TEXT = '⚠️ 본 페이지는 전자소송 실습 모의 페이지입니다. 실제 법원 접수 시스템이 아니며, 작성된 내용은 법적 효력이 없습니다.'
+export const MOCK_BANNER_TEXT = '⚠️ [바른커리어] 전자소송모의실습사이트 — 실제 법원 접수 시스템이 아니며, 작성된 내용은 법적 효력이 없습니다.'
 
 // ══════════════════════════════════════════════════════════════
 //  Footer 정보
@@ -164,4 +164,4 @@ export const FOOTER_LINKS = [
 ] as const
 
 export const FOOTER_CONTACT = '이용 및 장애 문의: 02) 3480-1715 (평일 9시~18시)'
-export const FOOTER_COPYRIGHT = 'COPYRIGHT © 대한민국 법원 전자소송포털. ALL RIGHTS RESERVED.'
+export const FOOTER_COPYRIGHT = 'COPYRIGHT © 바른커리어. ALL RIGHTS RESERVED.'

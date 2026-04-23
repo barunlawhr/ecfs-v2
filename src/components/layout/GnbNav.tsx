@@ -396,8 +396,8 @@ export default function GnbNav({ active }: { active?: string }) {
               <span style={{ fontSize: '26px', lineHeight: '1', filter: 'brightness(0) invert(1)' }}>⚖</span>
             </div>
             <div>
-              <div style={{ fontSize: 10, color: '#0067c2', fontWeight: 600, letterSpacing: 0.5 }}>모의 전자소송포털</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#1a1a2e', letterSpacing: -0.5 }}>ECFS (전자사건접수시스템) 모의시스템</div>
+              <div style={{ fontSize: 10, color: '#0067c2', fontWeight: 600, letterSpacing: 0.5 }}>[바른커리어] 전자소송모의실습사이트</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#1a1a2e', letterSpacing: -0.5 }}>법률사무원 전자소송 실습 시스템</div>
             </div>
           </Link>
 

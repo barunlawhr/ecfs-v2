@@ -11,8 +11,8 @@ const notoSansKr = Noto_Sans_KR({
 })
 
 export const metadata: Metadata = {
-  title: '전자소송포털 - 대한민국 법원',
-  description: '전자소송 실습 시스템',
+  title: '[바른커리어] 전자소송모의실습사이트',
+  description: '바른커리어 법률사무원 전자소송 실습 시스템',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
