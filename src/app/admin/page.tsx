@@ -10,6 +10,7 @@ import type { SampleCase, Assignment, PracticeRecord } from '@/types'
 import { calculateScore, generateFeedback } from '@/lib/scoring'
 
 import { SB_URL, SB_KEY, SB_HDR as _SB_HDR } from '@/lib/supabase'
+import { COURTS } from '@/lib/constants'
 const SB_HDR = { ..._SB_HDR, 'Content-Type': 'application/json' }
 
 interface AccountRow {
@@ -45,13 +46,14 @@ function getAllAccounts(): AccountRow[] {
   return Object.values(merged)
 }
 
-type Panel = 'dashboard' | 'accounts' | 'cases' | 'assign' | 'records' | 'ecfs-cases' | 'settings'
+type Panel = 'dashboard' | 'accounts' | 'cases' | 'assign' | 'records' | 'corrections' | 'ecfs-cases' | 'settings'
 
 const PANEL_ITEMS: { key: Panel; icon: string; label: string }[] = [
   { key: 'dashboard', icon: '📊', label: '대시보드' },
   { key: 'accounts', icon: '👥', label: '계정 관리' },
   { key: 'cases', icon: '📋', label: '실습사건 관리' },
   { key: 'assign', icon: '🎯', label: '사건배정 관리' },
+  { key: 'corrections', icon: '📝', label: '보정명령 관리' },
   { key: 'records', icon: '📈', label: '실습/채점 현황' },
   { key: 'ecfs-cases', icon: '⚖️', label: '전자소송 가상사건' },
   { key: 'settings', icon: '⚙', label: '설정' },
@@ -539,122 +541,116 @@ export default function AdminPage() {
   }
 
   // ─────────────────────────────────────────────
-  // Cases Management Panel
+  // Cases Management Panel (practice_cases)
   // ─────────────────────────────────────────────
   function CasesPanel() {
-    const [cases, setCases] = useState<SampleCase[]>([])
-    const [casesLoading, setCasesLoading] = useState(true)
+    interface PCase {
+      id: string; case_number: string; case_type: string; case_name: string
+      court: string; division: string; plaintiff: string; defendant: string
+      sample_complaint: string; sample_answer: string; is_active: boolean; created_at: string
+    }
+    const CASE_TYPES = [
+      { value: 'civil', label: '민사' },
+      { value: 'attachment', label: '가압류/가처분' },
+      { value: 'injunction', label: '민사집행' },
+      { value: 'family', label: '가사' },
+    ]
+    const emptyForm = {
+      case_number: '', case_type: 'civil', case_name: '', court: COURTS[0] as string,
+      division: '', plaintiff: '', defendant: '', sample_complaint: '', sample_answer: '', is_active: true,
+    }
+
+    const [cases, setCases] = useState<PCase[]>([])
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState('')
     const [showModal, setShowModal] = useState(false)
     const [editId, setEditId] = useState<string | null>(null)
-    const [saving, setSaving] = useState(false)
-    const [deleteModal, setDeleteModal] = useState<{ id: string; title: string } | null>(null)
-    const [deleting, setDeleting] = useState(false)
-    const BLANK_FORM = { title: '', case_type: '대여금', court: '서울중앙지방법원', plaintiff: '', defendant: '', claim_amount: '', background: '', key_facts: '', evidence_hint: '', claim_purpose: '', claim_reason: '', difficulty: '보통' }
-    const [form, setForm] = useState(BLANK_FORM)
+    const [form, setForm] = useState({ ...emptyForm })
 
     const fetchCases = useCallback(async () => {
-      setCasesLoading(true)
-      const { data } = await supabase.from('sample_cases').select('*').order('created_at', { ascending: false })
-      setCases(data || [])
-      setCasesLoading(false)
+      setLoading(true); setError('')
+      const { data, error: err } = await supabase.from('practice_cases').select('*').order('created_at', { ascending: false })
+      if (err) { setError(err.message); setLoading(false); return }
+      setCases(data || []); setLoading(false)
     }, [])
 
     useEffect(() => { fetchCases() }, [fetchCases])
 
-    function openAdd() { setForm(BLANK_FORM); setEditId(null); setShowModal(true) }
-    function openEdit(c: SampleCase) {
-      setForm({
-        title: c.title, case_type: c.case_type, court: c.court,
-        plaintiff: c.plaintiff, defendant: c.defendant,
-        claim_amount: c.claim_amount ? String(c.claim_amount) : '',
-        background: c.background || '', key_facts: c.key_facts || '',
-        evidence_hint: c.evidence_hint || '', claim_purpose: c.claim_purpose || '',
-        claim_reason: c.claim_reason || '', difficulty: c.difficulty || '보통',
-      })
+    function openAdd() { setEditId(null); setForm({ ...emptyForm }); setShowModal(true) }
+    function openEdit(c: PCase) {
       setEditId(c.id)
+      setForm({
+        case_number: c.case_number || '', case_type: c.case_type || 'civil',
+        case_name: c.case_name || '', court: c.court || COURTS[0],
+        division: c.division || '', plaintiff: c.plaintiff || '',
+        defendant: c.defendant || '', sample_complaint: c.sample_complaint || '',
+        sample_answer: c.sample_answer || '', is_active: c.is_active ?? true,
+      })
       setShowModal(true)
     }
 
     async function handleSave() {
-      if (!form.title || !form.plaintiff || !form.defendant) {
-        alert('제목, 원고, 피고는 필수입니다.')
-        return
+      const payload = { ...form }
+      if (editId) {
+        const { error: err } = await supabase.from('practice_cases').update(payload).eq('id', editId)
+        if (err) { alert('수정 실패: ' + err.message); return }
+      } else {
+        const { error: err } = await supabase.from('practice_cases').insert([payload])
+        if (err) { alert('추가 실패: ' + err.message); return }
       }
-      setSaving(true)
-      const payload = {
-        title: form.title, case_type: form.case_type, court: form.court,
-        plaintiff: form.plaintiff, defendant: form.defendant,
-        claim_amount: form.claim_amount ? Number(form.claim_amount) : null,
-        background: form.background || null, key_facts: form.key_facts || null,
-        evidence_hint: form.evidence_hint || null, claim_purpose: form.claim_purpose || null,
-        claim_reason: form.claim_reason || null, difficulty: form.difficulty,
-      }
-      const { error } = editId
-        ? await supabase.from('sample_cases').update(payload).eq('id', editId)
-        : await supabase.from('sample_cases').insert({ ...payload, is_active: true })
-      setSaving(false)
-      if (error) { alert('저장 실패: ' + error.message); return }
-      setShowModal(false); setEditId(null); setForm(BLANK_FORM)
-      fetchCases()
+      setShowModal(false); fetchCases()
       showToast(editId ? '사건이 수정되었습니다.' : '사건이 추가되었습니다.')
     }
 
-    async function handleDelete() {
-      if (!deleteModal) return
-      setDeleting(true)
-      const { error } = await supabase.from('sample_cases').delete().eq('id', deleteModal.id)
-      setDeleting(false)
-      if (error) { alert('삭제 실패: ' + error.message); return }
-      setDeleteModal(null)
+    async function handleDelete(id: string) {
+      if (!confirm('정말 삭제하시겠습니까?')) return
+      const { error: err } = await supabase.from('practice_cases').delete().eq('id', id)
+      if (err) { alert('삭제 실패: ' + err.message); return }
       fetchCases()
       showToast('사건이 삭제되었습니다.')
     }
 
+    const caseLabelStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 600, color: '#333' }
+    const caseInp: React.CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #d0d8e8', borderRadius: 4, fontSize: 13, boxSizing: 'border-box' }
+    const caseSel: React.CSSProperties = { ...caseInp }
+
     return (
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', margin: 0 }}>📋 사건 관리</h2>
-          <button
-            onClick={openAdd}
-            style={{ padding: '8px 18px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
-          >
-            + 새 사건 추가
-          </button>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', margin: 0 }}>📋 실습사건 관리</h2>
+          <button onClick={openAdd} style={{ padding: '8px 18px', background: '#00a99d', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>+ 사건 추가</button>
         </div>
 
-        {casesLoading ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#0067c2' }}>로딩 중...</div>
+        {error && <div style={{ color: 'red', marginBottom: 12, fontSize: 13 }}>{error}</div>}
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>불러오는 중...</div>
+        ) : cases.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>등록된 사건이 없습니다.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, border: '1px solid #d0d8e4' }}>
               <thead>
                 <tr style={{ background: '#1a3a6b', color: '#fff' }}>
-                  {['제목', '유형', '법원', '원고', '피고', '난이도', '생성일', '수정', '삭제'].map(h => (
+                  {['사건번호', '유형', '사건명', '법원', '원고', '피고', '활성', '등록일', '작업'].map(h => (
                     <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {cases.length === 0 ? (
-                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: 30, color: '#999' }}>등록된 사건이 없습니다.</td></tr>
-                ) : cases.map((c, i) => (
-                  <tr key={c.id} style={{ background: i % 2 === 0 ? '#fff' : '#f8f9fb', borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '9px 12px', fontWeight: 600, color: '#1a3a6b', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</td>
-                    <td style={{ padding: '9px 12px' }}><span style={{ background: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>{c.case_type}</span></td>
-                    <td style={{ padding: '9px 12px', color: '#555', whiteSpace: 'nowrap' }}>{c.court}</td>
+                {cases.map((c, i) => (
+                  <tr key={c.id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: '1px solid #e0e6ee' }}>
+                    <td style={{ padding: '9px 12px' }}>{c.case_number}</td>
+                    <td style={{ padding: '9px 12px' }}>{CASE_TYPES.find(t => t.value === c.case_type)?.label || c.case_type}</td>
+                    <td style={{ padding: '9px 12px' }}>{c.case_name}</td>
+                    <td style={{ padding: '9px 12px' }}>{c.court}</td>
                     <td style={{ padding: '9px 12px' }}>{c.plaintiff}</td>
                     <td style={{ padding: '9px 12px' }}>{c.defendant}</td>
+                    <td style={{ padding: '9px 12px' }}>{c.is_active ? '✅' : '❌'}</td>
+                    <td style={{ padding: '9px 12px', color: '#888', whiteSpace: 'nowrap' }}>{c.created_at ? new Date(c.created_at).toLocaleDateString('ko-KR') : '-'}</td>
                     <td style={{ padding: '9px 12px' }}>
-                      <span style={{ color: c.difficulty === '어려움' ? '#dc2626' : c.difficulty === '쉬움' ? '#16a34a' : '#d97706', fontWeight: 600, fontSize: 12 }}>
-                        {c.difficulty || '보통'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '9px 12px', color: '#888', whiteSpace: 'nowrap' }}>{c.created_at?.slice(0, 10)}</td>
-                    <td style={{ padding: '9px 12px' }}>
-                      <button onClick={() => openEdit(c)} style={{ background: '#0067c2', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>수정</button>
-                    </td>
-                    <td style={{ padding: '9px 12px' }}>
-                      <button onClick={() => setDeleteModal({ id: c.id, title: c.title })} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>삭제</button>
+                      <button onClick={() => openEdit(c)} style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 3, padding: '4px 10px', fontSize: 11, cursor: 'pointer', marginRight: 4 }}>수정</button>
+                      <button onClick={() => handleDelete(c.id)} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 3, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>삭제</button>
                     </td>
                   </tr>
                 ))}
@@ -663,111 +659,39 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Add Case Modal */}
+        {/* Modal */}
         {showModal && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ background: '#fff', borderRadius: 12, width: 560, maxHeight: '90vh', overflow: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,.25)' }}>
-              <div style={{ background: '#1a3a6b', color: '#fff', padding: '14px 20px', borderRadius: '12px 12px 0 0', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 700, fontSize: 15 }}>{editId ? '사건 수정' : '새 사건 추가'}</span>
-                <button onClick={() => { setShowModal(false); setEditId(null); setForm(BLANK_FORM) }} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer' }}>×</button>
-              </div>
-              <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {[
-                  { label: '제목 *', key: 'title', type: 'text' },
-                  { label: '원고 *', key: 'plaintiff', type: 'text' },
-                  { label: '피고 *', key: 'defendant', type: 'text' },
-                  { label: '청구금액 (원)', key: 'claim_amount', type: 'number' },
-                  { label: '청구취지', key: 'claim_purpose', type: 'text' },
-                ].map(f => (
-                  <div key={f.key}>
-                    <label style={{ fontSize: 12, color: '#555', fontWeight: 600, display: 'block', marginBottom: 4 }}>{f.label}</label>
-                    <input
-                      type={f.type}
-                      value={(form as Record<string, string>)[f.key]}
-                      onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                      style={{ width: '100%', padding: '8px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }}
-                    />
-                  </div>
-                ))}
-                <div>
-                  <label style={{ fontSize: 12, color: '#555', fontWeight: 600, display: 'block', marginBottom: 4 }}>사건유형</label>
-                  <select value={form.case_type} onChange={e => setForm(prev => ({ ...prev, case_type: e.target.value }))} style={{ width: '100%', padding: '8px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13 }}>
-                    {CASE_TYPE_OPTIONS.map(o => <option key={o}>{o}</option>)}
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+            <div style={{ background: '#fff', borderRadius: 8, padding: 28, width: 540, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#1a3a6b', marginBottom: 18 }}>
+                {editId ? '사건 수정' : '사건 추가'}
+              </h2>
+              <div style={{ display: 'grid', gap: 12 }}>
+                <label style={caseLabelStyle}>사건번호<input style={caseInp} value={form.case_number} onChange={e => setForm({ ...form, case_number: e.target.value })} /></label>
+                <label style={caseLabelStyle}>유형
+                  <select style={caseSel} value={form.case_type} onChange={e => setForm({ ...form, case_type: e.target.value })}>
+                    {CASE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: '#555', fontWeight: 600, display: 'block', marginBottom: 4 }}>법원</label>
-                  <select value={form.court} onChange={e => setForm(prev => ({ ...prev, court: e.target.value }))} style={{ width: '100%', padding: '8px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13 }}>
-                    {COURT_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                </label>
+                <label style={caseLabelStyle}>사건명<input style={caseInp} value={form.case_name} onChange={e => setForm({ ...form, case_name: e.target.value })} /></label>
+                <label style={caseLabelStyle}>법원
+                  <select style={caseSel} value={form.court} onChange={e => setForm({ ...form, court: e.target.value })}>
+                    {COURTS.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: '#555', fontWeight: 600, display: 'block', marginBottom: 4 }}>난이도</label>
-                  <select value={form.difficulty} onChange={e => setForm(prev => ({ ...prev, difficulty: e.target.value }))} style={{ width: '100%', padding: '8px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13 }}>
-                    {['쉬움', '보통', '어려움'].map(o => <option key={o}>{o}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: '#555', fontWeight: 600, display: 'block', marginBottom: 4 }}>사건배경</label>
-                  <textarea
-                    value={form.background}
-                    onChange={e => setForm(prev => ({ ...prev, background: e.target.value }))}
-                    rows={3}
-                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: '#555', fontWeight: 600, display: 'block', marginBottom: 4 }}>주요 사실관계</label>
-                  <textarea
-                    value={form.key_facts}
-                    onChange={e => setForm(prev => ({ ...prev, key_facts: e.target.value }))}
-                    rows={4}
-                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: '#555', fontWeight: 600, display: 'block', marginBottom: 4 }}>입증서류 힌트</label>
-                  <textarea
-                    value={form.evidence_hint}
-                    onChange={e => setForm(prev => ({ ...prev, evidence_hint: e.target.value }))}
-                    rows={2}
-                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: '#555', fontWeight: 600, display: 'block', marginBottom: 4 }}>청구원인</label>
-                  <textarea
-                    value={form.claim_reason}
-                    onChange={e => setForm(prev => ({ ...prev, claim_reason: e.target.value }))}
-                    rows={3}
-                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                  <button onClick={() => { setShowModal(false); setEditId(null); setForm(BLANK_FORM) }} style={{ flex: 1, padding: '10px', border: '1px solid #ccc', background: '#f5f5f5', borderRadius: 6, fontSize: 13, cursor: 'pointer' }}>취소</button>
-                  <button onClick={handleSave} disabled={saving} style={{ flex: 2, padding: '10px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
-                    {saving ? '저장 중...' : editId ? '수정하기' : '저장하기'}
-                  </button>
-                </div>
+                </label>
+                <label style={caseLabelStyle}>부서<input style={caseInp} value={form.division} onChange={e => setForm({ ...form, division: e.target.value })} /></label>
+                <label style={caseLabelStyle}>원고<input style={caseInp} value={form.plaintiff} onChange={e => setForm({ ...form, plaintiff: e.target.value })} /></label>
+                <label style={caseLabelStyle}>피고<input style={caseInp} value={form.defendant} onChange={e => setForm({ ...form, defendant: e.target.value })} /></label>
+                <label style={caseLabelStyle}>소장 샘플<textarea style={{ ...caseInp, height: 80, padding: '6px 8px' }} value={form.sample_complaint} onChange={e => setForm({ ...form, sample_complaint: e.target.value })} /></label>
+                <label style={caseLabelStyle}>답변서 샘플<textarea style={{ ...caseInp, height: 80, padding: '6px 8px' }} value={form.sample_answer} onChange={e => setForm({ ...form, sample_answer: e.target.value })} /></label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                  <input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} />
+                  활성 상태
+                </label>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Delete Case Modal */}
-        {deleteModal && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ background: '#fff', borderRadius: 10, width: 380, boxShadow: '0 8px 32px rgba(0,0,0,.25)', overflow: 'hidden' }}>
-              <div style={{ background: '#dc2626', color: '#fff', padding: '14px 20px', fontWeight: 700, fontSize: 15 }}>⚠️ 사건 삭제</div>
-              <div style={{ padding: '24px 20px', fontSize: 14, color: '#333', lineHeight: 1.7 }}>
-                <strong>'{deleteModal.title}'</strong> 사건을 삭제하시겠습니까?<br />
-                <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>⚠️ 삭제 후 복구할 수 없습니다.</span>
-              </div>
-              <div style={{ display: 'flex', gap: 10, padding: '0 20px 20px' }}>
-                <button onClick={() => setDeleteModal(null)} style={{ flex: 1, padding: '10px', border: '1px solid #ccc', background: '#f5f5f5', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>취소</button>
-                <button onClick={handleDelete} disabled={deleting} style={{ flex: 1, padding: '10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.7 : 1 }}>
-                  {deleting ? '삭제 중...' : '삭제'}
-                </button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+                <button onClick={() => setShowModal(false)} style={{ background: '#e5e7eb', color: '#333', border: 'none', borderRadius: 4, padding: '8px 18px', fontSize: 13, cursor: 'pointer' }}>취소</button>
+                <button onClick={handleSave} style={{ background: '#00a99d', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{editId ? '수정' : '추가'}</button>
               </div>
             </div>
           </div>
@@ -777,237 +701,148 @@ export default function AdminPage() {
   }
 
   // ─────────────────────────────────────────────
-  // Assignment Panel
+  // Assignment Panel (case_assignments)
   // ─────────────────────────────────────────────
   function AssignPanel() {
-    const [cases, setCases] = useState<SampleCase[]>([])
-    const [selectedCase, setSelectedCase] = useState<string>('')
-    const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set())
-    const [assigning, setAssigning] = useState(false)
-    const [currentAssignments, setCurrentAssignments] = useState<(Assignment & { sample_cases?: SampleCase })[]>([])
+    interface APCase { id: string; case_number: string; case_name: string }
+    interface APAssignment { id: string; case_id: string; student_id: string; role: string; assigned_at: string; due_date: string | null; status: string }
+
+    const ASSIGN_STUDENT_LIST = Object.entries(HARDCODED_ACCOUNTS)
+      .filter(([, acc]) => acc.role === 'student')
+      .map(([id, acc]) => ({ id, name: acc.name }))
+
+    const [cases, setCases] = useState<APCase[]>([])
+    const [selectedCaseId, setSelectedCaseId] = useState('')
+    const [assignments, setAssignments] = useState<APAssignment[]>([])
     const [assignLoading, setAssignLoading] = useState(true)
+    const [assignError, setAssignError] = useState('')
 
-    const [dueDate, setDueDate] = useState('')
+    const [formStudentId, setFormStudentId] = useState(ASSIGN_STUDENT_LIST[0]?.id || '')
+    const [formRole, setFormRole] = useState('원고측')
+    const [formDueDate, setFormDueDate] = useState('')
 
-    function saveAssignmentLocal(userId: string, caseId: number, due: string) {
-      const key = 'ec_assignments'
-      const all = JSON.parse(localStorage.getItem(key) || '[]')
-      all.push({
-        id: Date.now(),
-        user_id: userId,
-        case_id: caseId,
-        due_date: due || null,
-        status: '미제출',
-        assigned_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      })
-      localStorage.setItem(key, JSON.stringify(all))
-    }
+    const fetchCases2 = useCallback(async () => {
+      const { data, error: err } = await supabase.from('practice_cases').select('id, case_number, case_name').order('created_at', { ascending: false })
+      if (err) { setAssignError(err.message); return }
+      setCases(data || [])
+      if (data && data.length > 0 && !selectedCaseId) setSelectedCaseId(data[0].id)
+    }, [selectedCaseId])
 
-    async function assignCase(userId: string, caseId: number, due: string) {
-      try {
-        const res = await fetch(`${SB_URL}/rest/v1/assignments`, {
-          method: 'POST',
-          headers: { ...SB_HDR, Prefer: 'return=minimal' },
-          body: JSON.stringify({ user_id: userId, case_id: caseId, due_date: due || null, status: '미제출' }),
-        })
-        if (!res.ok) {
-          // Supabase 실패 시 localStorage에 저장
-          saveAssignmentLocal(userId, caseId, due)
-        }
-      } catch {
-        saveAssignmentLocal(userId, caseId, due)
-      }
-      return true
-    }
-
-    const fetchData = useCallback(async () => {
+    const fetchAssignments = useCallback(async (cid: string) => {
+      if (!cid) { setAssignments([]); return }
       setAssignLoading(true)
-      const [casesData, assignData] = await Promise.all([
-        supabase.from('sample_cases').select('*').order('created_at', { ascending: false }).then(r => r.data || []),
-        fetch(`${SB_URL}/rest/v1/assignments?select=*&order=id.desc`, {
-          headers: SB_HDR,
-        }).then(r => r.json()).catch(() => []),
-      ])
-      // localStorage 데이터와 합치기
-      const localAssign: unknown[] = JSON.parse(localStorage.getItem('ec_assignments') || '[]')
-      const sbRows: unknown[] = Array.isArray(assignData) && !((assignData as {code?:string}[])[0]?.code) ? assignData : []
-      const merged = [...sbRows, ...localAssign]
-      // 중복 제거 (case_id + user_id 기준)
-      const seen = new Set<string>()
-      const deduped = merged.filter((a) => {
-        const key = `${(a as {user_id?:string}).user_id}-${(a as {case_id?:number}).case_id}`
-        if (seen.has(key)) return false
-        seen.add(key)
-        return true
-      })
-      setCases(casesData)
-      setCurrentAssignments(deduped as typeof currentAssignments)
-      setAssignLoading(false)
-    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+      const { data, error: err } = await supabase.from('case_assignments').select('*').eq('case_id', cid).order('assigned_at', { ascending: false })
+      if (err) { setAssignError(err.message); setAssignLoading(false); return }
+      setAssignments(data || []); setAssignLoading(false)
+    }, [])
 
-    useEffect(() => { fetchData() }, [fetchData])
-
-    function toggleStudent(id: string) {
-      setSelectedStudents(prev => {
-        const next = new Set(prev)
-        if (next.has(id)) next.delete(id)
-        else next.add(id)
-        return next
-      })
-    }
-
-    function toggleAll() {
-      if (selectedStudents.size === STUDENT_IDS.length) setSelectedStudents(new Set())
-      else setSelectedStudents(new Set(STUDENT_IDS))
-    }
-
-    async function deleteAssignment(id: string) {
-      await fetch(`${SB_URL}/rest/v1/assignments?id=eq.${id}`, {
-        method: 'DELETE',
-        headers: SB_HDR,
-      })
-      fetchData()
-    }
+    useEffect(() => { fetchCases2().then(() => setAssignLoading(false)) }, [fetchCases2])
+    useEffect(() => { if (selectedCaseId) fetchAssignments(selectedCaseId) }, [selectedCaseId, fetchAssignments])
 
     async function handleAssign() {
-      if (!selectedCase) { alert('사건을 선택해주세요.'); return }
-      if (selectedStudents.size === 0) { alert('학생을 선택해주세요.'); return }
-      setAssigning(true)
-      try {
-        let skipped = 0
-        for (const uid of Array.from(selectedStudents)) {
-          const isDup = currentAssignments.some(a =>
-            ((a as Assignment & { user_id?: string }).user_id || a.student_id) === uid &&
-            String(a.case_id) === selectedCase
-          )
-          if (isDup) { skipped++; continue }
-          await assignCase(uid, Number(selectedCase), dueDate)
-        }
-        const assigned = selectedStudents.size - skipped
-        if (assigned > 0) showToast(`${assigned}명에게 배정 완료!${skipped > 0 ? ` (${skipped}명 중복 제외)` : ''}`)
-        else alert(`모두 이미 배정된 사건입니다.`)
-        setSelectedStudents(new Set())
-        setSelectedCase('')
-        setDueDate('')
-        fetchData()
-      } catch (e) {
-        alert('배정 실패: ' + String(e))
-      } finally {
-        setAssigning(false)
-      }
+      if (!selectedCaseId || !formStudentId) { alert('사건과 학생을 선택하세요.'); return }
+      const payload = { case_id: selectedCaseId, student_id: formStudentId, role: formRole, due_date: formDueDate || null, status: 'assigned' }
+      const { error: err } = await supabase.from('case_assignments').insert([payload])
+      if (err) { alert('배정 실패: ' + err.message); return }
+      fetchAssignments(selectedCaseId)
+      showToast('배정 완료!')
     }
 
-    // Group assignments by user_id
-    const assignByStudent: Record<string, typeof currentAssignments> = {}
-    currentAssignments.forEach(a => {
-      const uid = (a as Assignment & { user_id?: string }).user_id || a.student_id
-      if (!assignByStudent[uid]) assignByStudent[uid] = []
-      assignByStudent[uid].push(a)
-    })
+    async function handleDeleteAssign(id: string) {
+      if (!confirm('배정을 삭제하시겠습니까?')) return
+      const { error: err } = await supabase.from('case_assignments').delete().eq('id', id)
+      if (err) { alert('삭제 실패: ' + err.message); return }
+      fetchAssignments(selectedCaseId)
+    }
+
+    function getStudentName2(sid: string): string {
+      const acc = HARDCODED_ACCOUNTS[sid]
+      return acc ? acc.name : sid
+    }
+
+    const assignInp: React.CSSProperties = { padding: '7px 10px', border: '1px solid #d0d8e8', borderRadius: 4, fontSize: 13, boxSizing: 'border-box' }
 
     return (
       <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', marginBottom: 20 }}>🎯 학생 배정</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', marginBottom: 20 }}>🎯 사건배정 관리</h2>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 28 }}>
-          {/* 사건 선택 */}
-          <div style={{ border: '1px solid #d0d8e8', borderRadius: 8, overflow: 'hidden' }}>
-            <div style={{ background: '#1a3a6b', color: '#fff', padding: '10px 16px', fontSize: 13, fontWeight: 700 }}>1. 사건 선택</div>
-            <div style={{ padding: 16 }}>
-              <select
-                value={selectedCase}
-                onChange={e => setSelectedCase(e.target.value)}
-                style={{ width: '100%', padding: '9px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13 }}
-              >
-                <option value="">-- 사건을 선택하세요 --</option>
-                {cases.map(c => (
-                  <option key={c.id} value={c.id}>{c.title} ({c.case_type})</option>
-                ))}
-              </select>
-              {selectedCase && (
-                <div style={{ marginTop: 10, padding: '10px 14px', background: '#f0f6ff', border: '1px solid #c8d8f0', borderRadius: 6, fontSize: 12, color: '#1a3a6b' }}>
-                  {(() => {
-                    const sc = cases.find(c => String(c.id) === selectedCase)
-                    return sc ? `${sc.plaintiff} vs ${sc.defendant} | ${sc.court}` : ''
-                  })()}
-                </div>
-              )}
-            </div>
-          </div>
+        {assignError && <div style={{ color: 'red', marginBottom: 12, fontSize: 13 }}>{assignError}</div>}
 
-          {/* 학생 선택 */}
-          <div style={{ border: '1px solid #d0d8e8', borderRadius: 8, overflow: 'hidden' }}>
-            <div style={{ background: '#1a3a6b', color: '#fff', padding: '10px 16px', fontSize: 13, fontWeight: 700 }}>2. 학생 선택</div>
-            <div style={{ padding: '10px 16px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#0067c2', marginBottom: 8, cursor: 'pointer' }}>
-                <input type="checkbox" checked={selectedStudents.size === STUDENT_IDS.length} onChange={toggleAll} />
-                전체 선택/해제
+        {/* Case selector */}
+        <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>사건 선택:</span>
+          <select style={{ ...assignInp, width: 360 }} value={selectedCaseId} onChange={e => setSelectedCaseId(e.target.value)}>
+            {cases.length === 0 && <option value="">사건 없음</option>}
+            {cases.map(c => <option key={c.id} value={c.id}>{c.case_number} - {c.case_name}</option>)}
+          </select>
+        </div>
+
+        {/* Assignment form */}
+        {selectedCaseId && (
+          <div style={{ background: '#fff', border: '1px solid #d0d8e4', borderRadius: 6, padding: 20, marginBottom: 24 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a3a6b', marginBottom: 14 }}>새 배정</h3>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 600, color: '#333' }}>
+                학생
+                <select style={{ ...assignInp, width: 160 }} value={formStudentId} onChange={e => setFormStudentId(e.target.value)}>
+                  {ASSIGN_STUDENT_LIST.map(s => <option key={s.id} value={s.id}>{s.name} ({s.id})</option>)}
+                </select>
               </label>
-              <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {STUDENT_IDS.map(id => {
-                  const acc = HARDCODED_ACCOUNTS[id]
-                  return (
-                    <label key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', padding: '3px 0' }}>
-                      <input type="checkbox" checked={selectedStudents.has(id)} onChange={() => toggleStudent(id)} />
-                      <span style={{ fontWeight: 600, color: '#1a3a6b' }}>{acc.name}</span>
-                      <span style={{ fontSize: 11, color: '#888' }}>({id})</span>
-                    </label>
-                  )
-                })}
-              </div>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 600, color: '#333' }}>
+                역할
+                <select style={{ ...assignInp, width: 120 }} value={formRole} onChange={e => setFormRole(e.target.value)}>
+                  <option value="원고측">원고측</option>
+                  <option value="피고측">피고측</option>
+                </select>
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 600, color: '#333' }}>
+                마감일
+                <input type="date" style={{ ...assignInp, width: 160 }} value={formDueDate} onChange={e => setFormDueDate(e.target.value)} />
+              </label>
+              <button onClick={handleAssign} style={{ background: '#00a99d', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer', height: 34 }}>배정</button>
             </div>
           </div>
-        </div>
+        )}
 
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 13, color: '#555', display: 'block', marginBottom: 4 }}>마감일 (선택)</label>
-          <input
-            type="date"
-            value={dueDate}
-            onChange={e => setDueDate(e.target.value)}
-            style={{ padding: '8px 12px', border: '1px solid #d0d8e8', borderRadius: 6, fontSize: 13 }}
-          />
-        </div>
-        <button
-          onClick={handleAssign}
-          disabled={assigning}
-          style={{ display: 'block', width: '100%', padding: '12px', background: assigning ? '#999' : 'linear-gradient(90deg,#1a3a6b,#2952a3)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: assigning ? 'not-allowed' : 'pointer', marginBottom: 28 }}
-        >
-          {assigning ? '배정 중...' : `🎯 ${selectedStudents.size}명에게 배정하기`}
-        </button>
-
-        {/* Current assignments table */}
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1a3a6b', marginBottom: 12 }}>현재 배정 현황</h3>
+        {/* Assignments table */}
         {assignLoading ? (
-          <div style={{ textAlign: 'center', padding: 30, color: '#999' }}>로딩 중...</div>
-        ) : Object.keys(assignByStudent).length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 30, color: '#999', border: '1px solid #eee', borderRadius: 8 }}>배정된 사건이 없습니다.</div>
+          <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>불러오는 중...</div>
+        ) : assignments.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>배정된 학생이 없습니다.</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {Object.entries(assignByStudent).map(([sid, asgns]) => {
-              const acc = HARDCODED_ACCOUNTS[sid]
-              return (
-                <div key={sid} style={{ border: '1px solid #d0d8e8', borderRadius: 8, overflow: 'hidden' }}>
-                  <div style={{ background: '#f0f4fc', padding: '8px 14px', fontSize: 13, fontWeight: 700, color: '#1a3a6b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span>{acc?.name || sid}</span>
-                    <span style={{ fontSize: 11, color: '#888', fontWeight: 400 }}>({sid}) — {asgns.length}건</span>
-                  </div>
-                  <div style={{ padding: '8px 14px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {asgns.map(a => (
-                      <span key={a.id} style={{ fontSize: 12, background: '#e8f0fc', color: '#1a3a6b', padding: '3px 10px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {cases.find(c => String(c.id) === String(a.case_id))?.title || a.case_id}
-                        <button
-                          onClick={() => deleteAssignment(a.id)}
-                          style={{ background: 'none', border: 'none', color: '#e53e3e', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }}
-                          title="배정 삭제"
-                        >×</button>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, border: '1px solid #d0d8e4' }}>
+              <thead>
+                <tr style={{ background: '#1a3a6b', color: '#fff' }}>
+                  {['학생ID', '학생이름', '역할', '배정일', '마감일', '상태', '작업'].map(h => (
+                    <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {assignments.map((a, i) => (
+                  <tr key={a.id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: '1px solid #e0e6ee' }}>
+                    <td style={{ padding: '9px 12px' }}>{a.student_id}</td>
+                    <td style={{ padding: '9px 12px' }}>{getStudentName2(a.student_id)}</td>
+                    <td style={{ padding: '9px 12px' }}>{a.role}</td>
+                    <td style={{ padding: '9px 12px' }}>{a.assigned_at ? new Date(a.assigned_at).toLocaleDateString('ko-KR') : '-'}</td>
+                    <td style={{ padding: '9px 12px' }}>{a.due_date ? new Date(a.due_date).toLocaleDateString('ko-KR') : '-'}</td>
+                    <td style={{ padding: '9px 12px' }}>
+                      <span style={{
+                        padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
+                        background: a.status === 'completed' ? '#d1fae5' : a.status === 'in_progress' ? '#dbeafe' : '#fef3c7',
+                        color: a.status === 'completed' ? '#065f46' : a.status === 'in_progress' ? '#1e40af' : '#92400e',
+                      }}>
+                        {a.status === 'completed' ? '완료' : a.status === 'in_progress' ? '진행중' : '배정됨'}
                       </span>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
+                    </td>
+                    <td style={{ padding: '9px 12px' }}>
+                      <button onClick={() => handleDeleteAssign(a.id)} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 3, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>삭제</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -1015,13 +850,39 @@ export default function AdminPage() {
   }
 
   // ─────────────────────────────────────────────
-  // Practice Records Panel
+  // Practice Records Panel (combined: practice_records + submissions)
   // ─────────────────────────────────────────────
   function RecordsPanel() {
+    const [recTab, setRecTab] = useState<'legacy' | 'submissions'>('legacy')
+
+    // ── Legacy practice_records ──
     const [records, setRecords] = useState<PracticeRecord[]>([])
     const [recLoading, setRecLoading] = useState(true)
     const [selectedStudent, setSelectedStudent] = useState<string | null>(null)
     const [regrading, setRegrading] = useState<Set<string>>(new Set())
+
+    // ── Submissions ──
+    interface SubRow { id: string; assignment_id: string; doc_type: string; submitted_at: string; rule_score: number | null; ai_score: number | null; final_score: number | null; feedback: string | null }
+    interface SubAMap { [id: string]: { student_id: string; case_id: string } }
+    interface SubCMap { [id: string]: { case_number: string; case_name: string } }
+
+    const [submissions, setSubmissions] = useState<SubRow[]>([])
+    const [subAMap, setSubAMap] = useState<SubAMap>({})
+    const [subCMap, setSubCMap] = useState<SubCMap>({})
+    const [subLoading, setSubLoading] = useState(true)
+    const [subFilter, setSubFilter] = useState('')
+
+    const SUB_STUDENT_LIST = Object.entries(HARDCODED_ACCOUNTS)
+      .filter(([, acc]) => acc.role === 'student')
+      .map(([id, acc]) => ({ id, name: acc.name }))
+
+    function subScoreColor(score: number | null): string {
+      if (score === null || score === undefined) return '#888'
+      if (score >= 90) return '#16a34a'
+      if (score >= 70) return '#2563eb'
+      if (score >= 50) return '#ea580c'
+      return '#dc2626'
+    }
 
     async function load() {
       setRecLoading(true)
@@ -1029,22 +890,36 @@ export default function AdminPage() {
         const res = await fetch('/api/admin/records')
         const json = await res.json()
         if (!res.ok) {
-          console.error('[RecordsPanel] API error:', json)
-          // fallback: try direct supabase
-          const { data, error } = await supabase.from('practice_records').select('*').order('created_at', { ascending: false })
-          if (error) console.error('[RecordsPanel] Supabase fallback error:', error)
+          const { data } = await supabase.from('practice_records').select('*').order('created_at', { ascending: false })
           setRecords(data || [])
         } else {
-          console.log('[RecordsPanel] loaded', json.data?.length, 'records, serviceKey:', json.usingServiceKey)
           setRecords(json.data || [])
         }
-      } catch (e) {
-        console.error('[RecordsPanel] load error:', e)
-      }
+      } catch { /* ignore */ }
       setRecLoading(false)
     }
 
+    const loadSubmissions = useCallback(async () => {
+      setSubLoading(true)
+      const { data: subs, error: subErr } = await supabase.from('submissions').select('*').order('submitted_at', { ascending: false })
+      if (subErr) { setSubLoading(false); return }
+      const assignmentIds = [...new Set((subs || []).map((s: SubRow) => s.assignment_id).filter(Boolean))]
+      let aMap: SubAMap = {}
+      if (assignmentIds.length > 0) {
+        const { data: assignments } = await supabase.from('case_assignments').select('id, student_id, case_id').in('id', assignmentIds)
+        if (assignments) for (const a of assignments) aMap[a.id] = { student_id: a.student_id, case_id: a.case_id }
+      }
+      const caseIds = [...new Set(Object.values(aMap).map(a => a.case_id).filter(Boolean))]
+      let cMap: SubCMap = {}
+      if (caseIds.length > 0) {
+        const { data: cases } = await supabase.from('practice_cases').select('id, case_number, case_name').in('id', caseIds)
+        if (cases) for (const c of cases) cMap[c.id] = { case_number: c.case_number, case_name: c.case_name }
+      }
+      setSubmissions(subs || []); setSubAMap(aMap); setSubCMap(cMap); setSubLoading(false)
+    }, [])
+
     useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { loadSubmissions() }, [loadSubmissions])
 
     async function regrade(r: PracticeRecord) {
       if (!r.complaint_data) { alert('저장된 소장 데이터가 없습니다.'); return }
@@ -1053,159 +928,166 @@ export default function AdminPage() {
         const { score, breakdown } = calculateScore(r.complaint_data)
         const feedback = generateFeedback(score, breakdown)
         const res = await fetch(`${SB_URL}/rest/v1/practice_records?id=eq.${r.id}`, {
-          method: 'PATCH',
-          headers: { ...SB_HDR, Prefer: 'return=minimal' },
+          method: 'PATCH', headers: { ...SB_HDR, Prefer: 'return=minimal' },
           body: JSON.stringify({ score, feedback, grade_breakdown: breakdown }),
         })
         if (!res.ok) throw new Error(await res.text())
-        await load()
-        showToast(`재채점 완료: ${score}점`)
-      } catch (e) {
-        alert('재채점 실패: ' + String(e))
-      } finally {
-        setRegrading(prev => { const n = new Set(prev); n.delete(r.id); return n })
-      }
+        await load(); showToast(`재채점 완료: ${score}점`)
+      } catch (e) { alert('재채점 실패: ' + String(e)) }
+      finally { setRegrading(prev => { const n = new Set(prev); n.delete(r.id); return n }) }
     }
 
     async function deleteRecord(id: string) {
       if (!confirm('이 실습기록을 삭제하시겠습니까?')) return
-      const res = await fetch(`${SB_URL}/rest/v1/practice_records?id=eq.${id}`, {
-        method: 'DELETE',
-        headers: SB_HDR,
-      })
+      const res = await fetch(`${SB_URL}/rest/v1/practice_records?id=eq.${id}`, { method: 'DELETE', headers: SB_HDR })
       if (res.ok) { await load(); showToast('삭제되었습니다.') }
       else alert('삭제 실패: ' + await res.text())
     }
 
     // Group by student
     const byStudent: Record<string, PracticeRecord[]> = {}
-    records.forEach(r => {
-      if (!byStudent[r.student_id]) byStudent[r.student_id] = []
-      byStudent[r.student_id].push(r)
-    })
+    records.forEach(r => { if (!byStudent[r.student_id]) byStudent[r.student_id] = []; byStudent[r.student_id].push(r) })
 
     const studentSummaries = STUDENT_IDS.map(id => {
-      const recs = byStudent[id] || []
-      const count = recs.length
+      const recs = byStudent[id] || []; const count = recs.length
       const avg = count > 0 ? Math.round(recs.reduce((s, r) => s + r.score, 0) / count) : 0
       const best = count > 0 ? Math.max(...recs.map(r => r.score)) : 0
-      const acc = HARDCODED_ACCOUNTS[id]
-      return { id, name: acc?.name || id, count, avg, best, recs }
+      return { id, name: HARDCODED_ACCOUNTS[id]?.name || id, count, avg, best, recs }
     }).filter(s => s.count > 0)
 
     const selectedRecs = selectedStudent ? byStudent[selectedStudent] || [] : []
     const selectedAcc = selectedStudent ? HARDCODED_ACCOUNTS[selectedStudent] : null
 
+    // Submissions helpers
+    function getSubStudentId(sub: SubRow): string { const a = subAMap[sub.assignment_id]; return a ? a.student_id : '-' }
+    function getSubStudentName(sid: string): string { const acc = HARDCODED_ACCOUNTS[sid]; return acc ? acc.name : sid }
+    function getSubCaseNumber(sub: SubRow): string { const a = subAMap[sub.assignment_id]; if (!a) return '-'; const c = subCMap[a.case_id]; return c ? c.case_number : '-' }
+    const filteredSubs = subFilter ? submissions.filter(s => getSubStudentId(s) === subFilter) : submissions
+
+    const tabStyle = (active: boolean): React.CSSProperties => ({
+      padding: '10px 24px', fontSize: 14, fontWeight: 700, cursor: 'pointer', border: 'none',
+      borderBottom: active ? '3px solid #1a3a6b' : '3px solid transparent',
+      background: active ? '#eef2fb' : 'transparent', color: active ? '#1a3a6b' : '#888',
+    })
+
     return (
       <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', marginBottom: 20 }}>📈 실습 현황</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', marginBottom: 16 }}>📈 실습/채점 현황</h2>
 
-        <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
-          💡 기록이 보이지 않으면 학생에게 <b>마이페이지 → 나의 실습기록 → 기록 동기화</b> 버튼을 클릭하도록 안내하세요.
+        {/* Tabs */}
+        <div style={{ display: 'flex', borderBottom: '1px solid #d0d8e8', marginBottom: 20 }}>
+          <button onClick={() => setRecTab('legacy')} style={tabStyle(recTab === 'legacy')}>📈 기존 실습기록</button>
+          <button onClick={() => setRecTab('submissions')} style={tabStyle(recTab === 'submissions')}>📊 신규 채점 현황</button>
         </div>
 
-        {recLoading ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#0067c2' }}>로딩 중...</div>
-        ) : studentSummaries.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>제출된 실습기록이 없습니다.<br /><span style={{ fontSize: 12 }}>학생이 마이페이지에서 기록 동기화를 해야 표시됩니다.</span></div>
-        ) : (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12, marginBottom: 24 }}>
-              {studentSummaries.map(s => (
-                <div
-                  key={s.id}
-                  onClick={() => setSelectedStudent(selectedStudent === s.id ? null : s.id)}
-                  style={{
-                    border: `2px solid ${selectedStudent === s.id ? '#0067c2' : '#d0d8e8'}`,
-                    borderRadius: 10,
-                    padding: '14px 16px',
-                    cursor: 'pointer',
-                    background: selectedStudent === s.id ? '#eef2fb' : '#fff',
-                    transition: 'all .15s',
-                    boxShadow: selectedStudent === s.id ? '0 2px 10px rgba(0,103,194,.15)' : 'none',
-                  }}
-                >
-                  <div style={{ fontWeight: 700, fontSize: 15, color: '#1a3a6b', marginBottom: 6 }}>{s.name}</div>
-                  <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>{s.id}</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#0067c2' }}>{s.count}</div>
-                      <div style={{ fontSize: 10, color: '#999' }}>제출</div>
+        {recTab === 'legacy' ? (
+          /* ── Legacy tab ── */
+          <div>
+            <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
+              💡 기록이 보이지 않으면 학생에게 <b>마이페이지 → 나의 실습기록 → 기록 동기화</b> 버튼을 클릭하도록 안내하세요.
+            </div>
+            {recLoading ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#0067c2' }}>로딩 중...</div>
+            ) : studentSummaries.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>제출된 실습기록이 없습니다.</div>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12, marginBottom: 24 }}>
+                  {studentSummaries.map(s => (
+                    <div key={s.id} onClick={() => setSelectedStudent(selectedStudent === s.id ? null : s.id)}
+                      style={{ border: `2px solid ${selectedStudent === s.id ? '#0067c2' : '#d0d8e8'}`, borderRadius: 10, padding: '14px 16px', cursor: 'pointer', background: selectedStudent === s.id ? '#eef2fb' : '#fff', transition: 'all .15s' }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: '#1a3a6b', marginBottom: 6 }}>{s.name}</div>
+                      <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>{s.id}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <div style={{ textAlign: 'center' }}><div style={{ fontSize: 18, fontWeight: 800, color: '#0067c2' }}>{s.count}</div><div style={{ fontSize: 10, color: '#999' }}>제출</div></div>
+                        <div style={{ textAlign: 'center' }}><div style={{ fontSize: 18, fontWeight: 800, color: s.avg >= 75 ? '#16a34a' : s.avg >= 60 ? '#d97706' : '#dc2626' }}>{s.avg}</div><div style={{ fontSize: 10, color: '#999' }}>평균</div></div>
+                        <div style={{ textAlign: 'center' }}><div style={{ fontSize: 18, fontWeight: 800, color: '#7c3aed' }}>{s.best}</div><div style={{ fontSize: 10, color: '#999' }}>최고</div></div>
+                      </div>
                     </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: s.avg >= 75 ? '#16a34a' : s.avg >= 60 ? '#d97706' : '#dc2626' }}>{s.avg}</div>
-                      <div style={{ fontSize: 10, color: '#999' }}>평균</div>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#7c3aed' }}>{s.best}</div>
-                      <div style={{ fontSize: 10, color: '#999' }}>최고</div>
+                  ))}
+                </div>
+                {selectedStudent && (
+                  <div>
+                    <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1a3a6b', marginBottom: 12 }}>{selectedAcc?.name} ({selectedStudent}) 상세 기록</h3>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                        <thead><tr style={{ background: '#1a3a6b', color: '#fff' }}>
+                          {['점수','사건유형','법원','원고','피고','피드백','제출일','재채점','삭제'].map(h => <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>)}
+                        </tr></thead>
+                        <tbody>
+                          {selectedRecs.map((r, i) => (
+                            <tr key={r.id} style={{ background: i % 2 === 0 ? '#fff' : '#f8f9fb', borderBottom: '1px solid #eee' }}>
+                              <td style={{ padding: '9px 12px' }}>
+                                <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: 6, fontWeight: 700, fontSize: 13,
+                                  background: r.score >= 90 ? '#dcfce7' : r.score >= 75 ? '#dbeafe' : r.score >= 60 ? '#fef3c7' : '#fee2e2',
+                                  color: r.score >= 90 ? '#16a34a' : r.score >= 75 ? '#2563eb' : r.score >= 60 ? '#d97706' : '#dc2626' }}>{r.score}</span>
+                              </td>
+                              <td style={{ padding: '9px 12px' }}>{r.case_type || '-'}</td>
+                              <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>{r.court || '-'}</td>
+                              <td style={{ padding: '9px 12px' }}>{r.plaintiff || '-'}</td>
+                              <td style={{ padding: '9px 12px' }}>{r.defendant || '-'}</td>
+                              <td style={{ padding: '9px 12px', maxWidth: 200 }}><span style={{ fontSize: 12, color: '#555', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.feedback || '-'}</span></td>
+                              <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: '#888' }}>{r.created_at?.slice(0, 10)}</td>
+                              <td style={{ padding: '9px 12px' }}>
+                                <button onClick={() => regrade(r)} disabled={regrading.has(r.id)}
+                                  style={{ height: 28, padding: '0 12px', background: regrading.has(r.id) ? '#ccc' : '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: regrading.has(r.id) ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+                                  {regrading.has(r.id) ? '채점중...' : '재채점'}
+                                </button>
+                              </td>
+                              <td style={{ padding: '9px 12px' }}>
+                                <button onClick={() => deleteRecord(r.id)} style={{ height: 28, padding: '0 12px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>삭제</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                </div>
-              ))}
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          /* ── Submissions tab ── */
+          <div>
+            <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>학생 필터:</span>
+              <select style={{ padding: '7px 10px', border: '1px solid #d0d8e8', borderRadius: 4, fontSize: 13, width: 200 }} value={subFilter} onChange={e => setSubFilter(e.target.value)}>
+                <option value="">전체</option>
+                {SUB_STUDENT_LIST.map(s => <option key={s.id} value={s.id}>{s.name} ({s.id})</option>)}
+              </select>
             </div>
-
-            {selectedStudent && (
-              <div>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1a3a6b', marginBottom: 12 }}>
-                  {selectedAcc?.name} ({selectedStudent}) 상세 기록
-                </h3>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: '#1a3a6b', color: '#fff' }}>
-                        {['점수', '사건유형', '법원', '원고', '피고', '피드백', '제출일', '재채점', '삭제'].map(h => (
-                          <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedRecs.map((r, i) => (
-                        <tr key={r.id} style={{ background: i % 2 === 0 ? '#fff' : '#f8f9fb', borderBottom: '1px solid #eee' }}>
-                          <td style={{ padding: '9px 12px' }}>
-                            <span style={{
-                              display: 'inline-block', padding: '2px 10px', borderRadius: 6, fontWeight: 700, fontSize: 13,
-                              background: r.score >= 90 ? '#dcfce7' : r.score >= 75 ? '#dbeafe' : r.score >= 60 ? '#fef3c7' : '#fee2e2',
-                              color: r.score >= 90 ? '#16a34a' : r.score >= 75 ? '#2563eb' : r.score >= 60 ? '#d97706' : '#dc2626',
-                            }}>
-                              {r.score}
-                            </span>
-                          </td>
-                          <td style={{ padding: '9px 12px' }}>{r.case_type || '-'}</td>
-                          <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>{r.court || '-'}</td>
-                          <td style={{ padding: '9px 12px' }}>{r.plaintiff || '-'}</td>
-                          <td style={{ padding: '9px 12px' }}>{r.defendant || '-'}</td>
-                          <td style={{ padding: '9px 12px', maxWidth: 200 }}>
-                            <span style={{ fontSize: 12, color: '#555', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                              {r.feedback || '-'}
-                            </span>
-                          </td>
-                          <td style={{ padding: '9px 12px', whiteSpace: 'nowrap', color: '#888' }}>{r.created_at?.slice(0, 10)}</td>
-                          <td style={{ padding: '9px 12px' }}>
-                            <button
-                              onClick={() => regrade(r)}
-                              disabled={regrading.has(r.id)}
-                              style={{ height: 28, padding: '0 12px', background: regrading.has(r.id) ? '#ccc' : '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: regrading.has(r.id) ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
-                            >
-                              {regrading.has(r.id) ? '채점중…' : '🔄 재채점'}
-                            </button>
-                          </td>
-                          <td style={{ padding: '9px 12px' }}>
-                            <button
-                              onClick={() => deleteRecord(r.id)}
-                              style={{ height: 28, padding: '0 12px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}
-                            >
-                              🗑 삭제
-                            </button>
-                          </td>
+            {subLoading ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>불러오는 중...</div>
+            ) : filteredSubs.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>제출된 서류가 없습니다.</div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, border: '1px solid #d0d8e4' }}>
+                  <thead><tr style={{ background: '#1a3a6b', color: '#fff' }}>
+                    {['학생','사건번호','서류유형','제출일','규칙점수','AI점수','최종점수','피드백'].map(h => <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {filteredSubs.map((s, i) => {
+                      const studentId = getSubStudentId(s)
+                      return (
+                        <tr key={s.id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: '1px solid #e0e6ee' }}>
+                          <td style={{ padding: '9px 12px' }}>{getSubStudentName(studentId)}</td>
+                          <td style={{ padding: '9px 12px' }}>{getSubCaseNumber(s)}</td>
+                          <td style={{ padding: '9px 12px' }}>{s.doc_type === 'complaint' ? '소장' : s.doc_type === 'answer' ? '답변서' : (s.doc_type || '-')}</td>
+                          <td style={{ padding: '9px 12px' }}>{s.submitted_at ? new Date(s.submitted_at).toLocaleDateString('ko-KR') : '-'}</td>
+                          <td style={{ padding: '9px 12px', color: subScoreColor(s.rule_score), fontWeight: 700 }}>{s.rule_score !== null && s.rule_score !== undefined ? s.rule_score : '-'}</td>
+                          <td style={{ padding: '9px 12px', color: subScoreColor(s.ai_score), fontWeight: 700 }}>{s.ai_score !== null && s.ai_score !== undefined ? s.ai_score : '-'}</td>
+                          <td style={{ padding: '9px 12px', color: subScoreColor(s.final_score), fontWeight: 700 }}>{s.final_score !== null && s.final_score !== undefined ? s.final_score : '-'}</td>
+                          <td style={{ padding: '9px 12px', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.feedback || '-'}</td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     )
@@ -1702,6 +1584,190 @@ export default function AdminPage() {
     )
   }
 
+  // ─────────────────────────────────────────────
+  // Corrections Panel (correction_orders)
+  // ─────────────────────────────────────────────
+  function CorrectionsPanel() {
+    interface CPCase { id: string; case_number: string; case_name: string }
+    interface CPAssignment { student_id: string; student_name: string }
+    interface CPOrder {
+      id: string; case_id: string; student_id: string; order_number: string
+      order_date: string; deadline: string; order_content: string; order_type: string
+      status: string; created_at: string
+      practice_cases?: { case_number: string; case_name: string }
+    }
+
+    const [cpCases, setCpCases] = useState<CPCase[]>([])
+    const [cpAssignments, setCpAssignments] = useState<CPAssignment[]>([])
+    const [cpOrders, setCpOrders] = useState<CPOrder[]>([])
+    const [cpCaseId, setCpCaseId] = useState('')
+    const [cpStudentId, setCpStudentId] = useState('')
+    const [cpOrderNumber, setCpOrderNumber] = useState('')
+    const [cpOrderDate, setCpOrderDate] = useState('')
+    const [cpDeadline, setCpDeadline] = useState('')
+    const [cpOrderContent, setCpOrderContent] = useState('')
+    const [cpOrderType, setCpOrderType] = useState('general')
+    const [cpSubmitting, setCpSubmitting] = useState(false)
+
+    useEffect(() => {
+      ;(async () => {
+        const { data } = await supabase.from('practice_cases').select('id, case_number, case_name').order('created_at', { ascending: false })
+        if (data) setCpCases(data)
+      })()
+    }, [])
+
+    useEffect(() => {
+      if (!cpCaseId) { setCpAssignments([]); return }
+      ;(async () => {
+        const { data } = await supabase.from('case_assignments').select('student_id, student_name').eq('case_id', cpCaseId)
+        if (data) setCpAssignments(data)
+      })()
+    }, [cpCaseId])
+
+    const fetchOrders = useCallback(async () => {
+      const { data } = await supabase.from('correction_orders').select('*, practice_cases(case_number, case_name)').order('created_at', { ascending: false })
+      if (data) setCpOrders(data as CPOrder[])
+    }, [])
+
+    useEffect(() => { fetchOrders() }, [fetchOrders])
+
+    const handleCpSubmit = async () => {
+      if (!cpCaseId || !cpStudentId || !cpOrderNumber || !cpOrderDate || !cpDeadline || !cpOrderContent) {
+        alert('모든 필드를 입력해주세요.'); return
+      }
+      setCpSubmitting(true)
+      const { error } = await supabase.from('correction_orders').insert({
+        case_id: cpCaseId, student_id: cpStudentId, order_number: cpOrderNumber,
+        order_date: cpOrderDate, deadline: cpDeadline, order_content: cpOrderContent,
+        order_type: cpOrderType, status: 'pending',
+      })
+      if (error) { alert('등록 실패: ' + error.message) }
+      else {
+        setCpOrderNumber(''); setCpOrderDate(''); setCpDeadline(''); setCpOrderContent(''); setCpOrderType('general')
+        fetchOrders(); showToast('보정명령이 등록되었습니다.')
+      }
+      setCpSubmitting(false)
+    }
+
+    const handleCpDelete = async (id: string) => {
+      if (!confirm('삭제하시겠습니까?')) return
+      await supabase.from('correction_orders').delete().eq('id', id)
+      fetchOrders(); showToast('삭제되었습니다.')
+    }
+
+    function dDay(deadline: string): string {
+      const diff = Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      if (diff > 0) return `D-${diff}`
+      if (diff === 0) return 'D-Day'
+      return `D+${Math.abs(diff)}`
+    }
+
+    const cpInp: React.CSSProperties = { height: 32, border: '1px solid #c8cdd6', borderRadius: 3, padding: '0 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' }
+    const cpLbl: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: '#333', marginBottom: 4, display: 'block' }
+
+    return (
+      <div>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', marginBottom: 20 }}>📝 보정명령 관리</h2>
+
+        {/* Form */}
+        <div style={{ background: '#fff', border: '1px solid #d8dce8', borderRadius: 6, padding: 20, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div>
+              <label style={cpLbl}>사건 선택</label>
+              <select value={cpCaseId} onChange={e => setCpCaseId(e.target.value)} style={{ ...cpInp, cursor: 'pointer' }}>
+                <option value="">-- 사건 선택 --</option>
+                {cpCases.map(c => <option key={c.id} value={c.id}>{c.case_number} {c.case_name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={cpLbl}>학생 선택</label>
+              <select value={cpStudentId} onChange={e => setCpStudentId(e.target.value)} style={{ ...cpInp, cursor: 'pointer' }}>
+                <option value="">-- 학생 선택 --</option>
+                {cpAssignments.map(a => <option key={a.student_id} value={a.student_id}>{a.student_name} ({a.student_id})</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={cpLbl}>보정명령번호</label>
+              <input type="text" value={cpOrderNumber} onChange={e => setCpOrderNumber(e.target.value)} placeholder="예: 보정명령 제1호" style={cpInp} />
+            </div>
+            <div>
+              <label style={cpLbl}>명령일자</label>
+              <input type="date" value={cpOrderDate} onChange={e => setCpOrderDate(e.target.value)} style={cpInp} />
+            </div>
+            <div>
+              <label style={cpLbl}>보정기한</label>
+              <input type="date" value={cpDeadline} onChange={e => setCpDeadline(e.target.value)} style={cpInp} />
+            </div>
+            <div>
+              <label style={cpLbl}>보정유형</label>
+              <div style={{ display: 'flex', gap: 16, paddingTop: 6 }}>
+                <label style={{ fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <input type="radio" name="cpOrderType" value="general" checked={cpOrderType === 'general'} onChange={() => setCpOrderType('general')} style={{ accentColor: '#00a99d' }} />
+                  일반보정
+                </label>
+                <label style={{ fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <input type="radio" name="cpOrderType" value="address" checked={cpOrderType === 'address'} onChange={() => setCpOrderType('address')} style={{ accentColor: '#00a99d' }} />
+                  주소보정
+                </label>
+              </div>
+            </div>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <label style={cpLbl}>명령내용</label>
+            <textarea value={cpOrderContent} onChange={e => setCpOrderContent(e.target.value)} placeholder="보정명령 내용을 입력하세요..." style={{ ...cpInp, height: 80, padding: '8px 10px', resize: 'vertical' }} />
+          </div>
+          <div style={{ textAlign: 'right', marginTop: 14 }}>
+            <button onClick={handleCpSubmit} disabled={cpSubmitting} style={{ height: 34, padding: '0 28px', background: cpSubmitting ? '#aaa' : '#00a99d', color: '#fff', border: 'none', borderRadius: 3, fontSize: 13, fontWeight: 700, cursor: cpSubmitting ? 'not-allowed' : 'pointer' }}>
+              {cpSubmitting ? '등록 중...' : '등록'}
+            </button>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div style={{ background: '#fff', border: '1px solid #d8dce8', borderRadius: 6, overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: '#f0f3f8' }}>
+                {['사건번호', '학생', '명령번호', '기한', '유형', '상태', '삭제'].map(h => (
+                  <th key={h} style={{ padding: '10px 12px', fontWeight: 700, borderBottom: '2px solid #003366', textAlign: 'center', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {cpOrders.length === 0 && (
+                <tr><td colSpan={7} style={{ padding: 20, textAlign: 'center', color: '#888' }}>등록된 보정명령이 없습니다.</td></tr>
+              )}
+              {cpOrders.map(o => (
+                <tr key={o.id} style={{ borderBottom: '1px solid #eee' }}>
+                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>{o.practice_cases?.case_number || '-'}</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>{o.student_id}</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>{o.order_number}</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                    {o.deadline}
+                    <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: new Date(o.deadline) < new Date() ? '#dc2626' : '#0067c2' }}>
+                      ({dDay(o.deadline)})
+                    </span>
+                  </td>
+                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>{o.order_type === 'address' ? '주소보정' : '일반보정'}</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                    {o.status === 'pending' ? (
+                      <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: 10, background: '#fff5f5', color: '#e53e3e', fontSize: 11, fontWeight: 700, border: '1px solid #feb2b2' }}>미보정</span>
+                    ) : (
+                      <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: 10, background: '#f0fff4', color: '#38a169', fontSize: 11, fontWeight: 700, border: '1px solid #9ae6b4' }}>보정완료</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                    <button onClick={() => handleCpDelete(o.id)} style={{ padding: '3px 10px', fontSize: 11, background: '#fff', border: '1px solid #e53e3e', color: '#e53e3e', borderRadius: 3, cursor: 'pointer' }}>삭제</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
   function renderPanel() {
     switch (activePanel) {
       case 'dashboard': return <DashboardPanel />
@@ -1709,6 +1775,7 @@ export default function AdminPage() {
       case 'cases': return <CasesPanel />
       case 'assign': return <AssignPanel />
       case 'records': return <RecordsPanel />
+      case 'corrections': return <CorrectionsPanel />
       case 'ecfs-cases': return <EcfsCasesPanel />
       case 'settings': return <SettingsPanel />
       default: return <DashboardPanel />
@@ -1737,56 +1804,28 @@ export default function AdminPage() {
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {/* Left sidebar */}
         <aside style={{ width: 220, flexShrink: 0, background: '#0d2244', display: 'flex', flexDirection: 'column', paddingTop: 16 }}>
-          {PANEL_ITEMS.map(item => {
-            // cases/assign/records는 신규 페이지로 라우팅
-            const routeMap: Record<string, string> = {
-              cases: '/admin/cases',
-              assign: '/admin/assignments',
-              records: '/admin/scores',
-            }
-            const href = routeMap[item.key]
-            return (
-              <div
-                key={item.key}
-                onClick={() => href ? router.push(href) : setActivePanel(item.key)}
-                style={{
-                  padding: '12px 20px',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: activePanel === item.key && !href ? '#fff' : 'rgba(255,255,255,.6)',
-                  background: activePanel === item.key && !href ? 'rgba(255,255,255,.12)' : 'transparent',
-                  borderLeft: activePanel === item.key && !href ? '3px solid #b8922a' : '3px solid transparent',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  transition: 'all .15s',
-                }}
-              >
-                <span style={{ fontSize: 16 }}>{item.icon}</span>
-                {item.label}
-                {href && <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.4 }}>→</span>}
-              </div>
-            )
-          })}
-
-          {/* 보정명령 관리 */}
-          <div
-            onClick={() => router.push('/admin/corrections')}
-            style={{
-              padding: '12px 20px', fontSize: 14, fontWeight: 600,
-              color: 'rgba(255,255,255,.6)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 10,
-              borderLeft: '3px solid transparent',
-              transition: 'all .15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255,255,255,.08)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,.6)'; e.currentTarget.style.background = 'transparent' }}
-          >
-            <span style={{ fontSize: 16 }}>📝</span>
-            보정명령 관리
-            <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.4 }}>→</span>
-          </div>
+          {PANEL_ITEMS.map(item => (
+            <div
+              key={item.key}
+              onClick={() => setActivePanel(item.key)}
+              style={{
+                padding: '12px 20px',
+                fontSize: 14,
+                fontWeight: 600,
+                color: activePanel === item.key ? '#fff' : 'rgba(255,255,255,.6)',
+                background: activePanel === item.key ? 'rgba(255,255,255,.12)' : 'transparent',
+                borderLeft: activePanel === item.key ? '3px solid #b8922a' : '3px solid transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                transition: 'all .15s',
+              }}
+            >
+              <span style={{ fontSize: 16 }}>{item.icon}</span>
+              {item.label}
+            </div>
+          ))}
 
           <div style={{ marginTop: 'auto', padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,.1)' }}>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', lineHeight: 1.6 }}>
