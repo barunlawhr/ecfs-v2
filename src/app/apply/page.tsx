@@ -24,24 +24,7 @@ const CASE_NAMES = [
   '재권조사확정재판에 대한 이의의 소','채무부존재확인','청구이의','추심금',
   '토지','토지인도','해고무효확인','회사에 관한 소송','기타',
 ];
-const COURTS = [
-  '서울회생법원','서울중앙지방법원','서울동부지방법원','서울남부지방법원','서울북부지방법원','서울서부지방법원',
-  '의정부지방법원','의정부지법 고양지원','파주시법원','포천시법원','의정부지법 남양주지원',
-  '동두천시법원','가평군법원','연천군법원','철원군법원',
-  '인천지방법원','인천지법 부천지원','김포시법원','강화군법원',
-  '수원지방법원','수원지법 성남지원','수원지법 여주지원','수원지법 평택지원','수원지법 안산지원','수원지법 안양지원',
-  '춘천지방법원','춘천지법 강릉지원','춘천지법 원주지원','춘천지법 속초지원','춘천지법 영월지원',
-  '청주지방법원','청주지법 충주지원','청주지법 제천지원','청주지법 영동지원',
-  '대전지방법원','대전지법 홍성지원','대전지법 논산지원','대전지법 천안지원','대전지법 서산지원','대전지법 공주지원',
-  '전주지방법원','전주지법 군산지원','전주지법 정읍지원','전주지법 남원지원',
-  '광주지방법원','광주지법 목포지원','광주지법 장흥지원','광주지법 순천지원','광주지법 해남지원',
-  '부산지방법원','부산지법 동부지원','부산지법 서부지원',
-  '울산지방법원',
-  '창원지방법원','창원지법 마산지원','창원지법 진주지원','창원지법 통영지원','창원지법 밀양지원','창원지법 거창지원',
-  '대구지방법원','대구지법 서부지원','대구지법 안동지원','대구지법 경주지원','대구지법 포항지원',
-  '대구지법 김천지원','대구지법 상주지원','대구지법 의성지원','대구지법 영덕지원',
-  '제주지방법원',
-];
+// COURTS → @/lib/constants에서 import
 
 function getCaseTitle(name: string): string {
   if (!name) return '';
@@ -77,8 +60,7 @@ function toKoreanNum(n: number): string {
   }
   return result;
 }
-const TEAL = '#0098a3';
-const TEAL_DARK = '#007a84';
+import { TEAL, TEAL_DARK, INP as _INP, SEL as _SEL, TH as _TH, TD as _TD, COURTS } from '@/lib/constants';
 const EMAIL_DOMAINS = ['naver.com','gmail.com','daum.net','hanmail.net','nate.com','직접입력'];
 
 const EMPTY: ComplaintFormData = {
@@ -161,11 +143,11 @@ const EMPTY_AGENT: AgentLocal = {
 };
 
 
-// ── Shared styles ──────────────────────────────────────────────
-const INP: React.CSSProperties = { height: 28, padding: '0 7px', border: '1px solid #c8cdd6', borderRadius: 2, fontSize: 12, fontFamily: 'inherit', color: '#222', background: '#fff', outline: 'none', boxSizing: 'border-box' };
+// ── Shared styles (constants 기반 오버라이드) ──────────────────
+const INP: React.CSSProperties = { ..._INP, padding: '0 7px', boxSizing: 'border-box' };
 const SEL: React.CSSProperties = { ...INP, cursor: 'pointer' };
-const TH: React.CSSProperties = { background: '#f5f7fb', width: 120, padding: '9px 12px', fontSize: 12, fontWeight: 600, color: '#333', textAlign: 'left', verticalAlign: 'middle', borderRight: '1px solid #e8edf4', whiteSpace: 'nowrap' };
-const TD: React.CSSProperties = { padding: '7px 12px', verticalAlign: 'middle' };
+const TH: React.CSSProperties = { ..._TH, width: 120, padding: '9px 12px', fontWeight: 600, color: '#333', verticalAlign: 'middle', borderRight: '1px solid #e8edf4' };
+const TD: React.CSSProperties = { ..._TD, padding: '7px 12px' };
 
 function SecHd({ label, open, toggle }: { label: string; open: boolean; toggle: () => void }) {
   return (
