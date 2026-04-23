@@ -1,108 +1,133 @@
 // ══════════════════════════════════════════════════════════════
-//  서류 유형 정의 (Document Type Configuration)
+//  민사 서류 7종 Config
 // ══════════════════════════════════════════════════════════════
 
-export interface DocumentSection {
-  key: string
-  label: string
-  required: boolean
-}
+export type SectionType =
+  | 'caseInfo'          // 사건기본정보
+  | 'parties'           // 당사자
+  | 'representative'    // 대리인
+  | 'claimPurpose'      // 청구취지
+  | 'claimReason'       // 청구원인
+  | 'answerPurpose'     // 청구취지에 대한 답변
+  | 'answerReason'      // 청구원인에 대한 답변
+  | 'signatory'         // 서류명의인
+  | 'content'           // 내용 (준비서면용)
+  | 'evidence'          // 입증서류/입증방법
+  | 'dateInfo'          // 기일정보 (기일변경용)
+  | 'changeReason'      // 변경사유
+  | 'correctionOrder'   // 보정명령내용
+  | 'correctionContent' // 보정내용
+  | 'appealPurpose'     // 항소취지
+  | 'appealReason'      // 항소이유
+  | 'originalJudgment'  // 원심판결정보
+  | 'changePurpose'     // 변경 청구취지
+  | 'attachments'       // 첨부서류
 
-export interface DocumentType {
-  key: string
-  label: string
-  labelShort: string
-  sections: DocumentSection[]
+export interface DocumentConfig {
+  title: string
+  subtitle: string
+  sections: SectionType[]
   hasCost: boolean
-  defaultEvidencePrefix: '갑' | '을' | '병'
-  description: string
+  hasEvidence: boolean
+  /** 기본 서증 부호 */
+  defaultPrefix: '갑' | '을' | '병'
+  /** 사이드바 섹션 라벨 (sections 순서에 매칭) */
+  sectionLabels: string[]
 }
 
-// ── 서류 유형별 섹션 정의 ──
+/** 섹션 타입 → 사이드바 표시 라벨 기본값 */
+export const SECTION_LABELS: Record<SectionType, string> = {
+  caseInfo: '사건기본정보',
+  parties: '당사자',
+  representative: '대리인',
+  claimPurpose: '청구취지',
+  claimReason: '청구원인',
+  answerPurpose: '청구취지에 대한 답변',
+  answerReason: '청구원인에 대한 답변',
+  signatory: '서류명의인',
+  content: '내용',
+  evidence: '입증서류',
+  dateInfo: '기일정보',
+  changeReason: '변경사유',
+  correctionOrder: '보정명령내용',
+  correctionContent: '보정내용',
+  appealPurpose: '항소취지',
+  appealReason: '항소이유',
+  originalJudgment: '원심판결정보',
+  changePurpose: '변경 청구취지',
+  attachments: '첨부서류',
+}
 
-const SEC_CASE_INFO: DocumentSection = { key: 'caseInfo', label: '사건기본정보', required: true }
-const SEC_PARTIES: DocumentSection = { key: 'parties', label: '당사자', required: true }
-const SEC_AGENT: DocumentSection = { key: 'agent', label: '대리인', required: false }
-const SEC_DOC_OWNER: DocumentSection = { key: 'docOwner', label: '서류명의인', required: true }
-const SEC_CLAIM_PURPOSE: DocumentSection = { key: 'claimPurpose', label: '청구취지', required: true }
-const SEC_CLAIM_CAUSE: DocumentSection = { key: 'claimCause', label: '청구원인', required: true }
-const SEC_ANSWER_PURPOSE: DocumentSection = { key: 'answerPurpose', label: '청구취지에 대한 답변', required: true }
-const SEC_ANSWER_CAUSE: DocumentSection = { key: 'answerCause', label: '청구원인에 대한 답변', required: true }
-const SEC_CONTENT: DocumentSection = { key: 'content', label: '내용', required: true }
-const SEC_CHANGE_REASON: DocumentSection = { key: 'changeReason', label: '변경사유', required: true }
-const SEC_CORRECTION: DocumentSection = { key: 'correction', label: '보정내용', required: true }
-const SEC_APPEAL_PURPOSE: DocumentSection = { key: 'appealPurpose', label: '항소취지', required: true }
-const SEC_APPEAL_REASON: DocumentSection = { key: 'appealReason', label: '항소이유', required: true }
-const SEC_EVIDENCE: DocumentSection = { key: 'evidence', label: '입증서류', required: false }
-const SEC_EVIDENCE_METHOD: DocumentSection = { key: 'evidenceMethod', label: '입증방법', required: false }
-const SEC_ATTACHMENT: DocumentSection = { key: 'attachment', label: '첨부서류', required: false }
-
-// ── 서류 유형 정의 ──
-
-export const DOCUMENT_TYPES: Record<string, DocumentType> = {
+export const DOCUMENT_CONFIGS: Record<string, DocumentConfig> = {
   complaint: {
-    key: 'complaint',
-    label: '소장',
-    labelShort: '소장',
-    sections: [SEC_CASE_INFO, SEC_PARTIES, SEC_AGENT, SEC_CLAIM_PURPOSE, SEC_CLAIM_CAUSE, SEC_EVIDENCE, SEC_ATTACHMENT],
+    title: '소장',
+    subtitle: '소장',
+    sections: ['caseInfo', 'parties', 'representative', 'claimPurpose', 'claimReason', 'evidence', 'attachments'],
+    sectionLabels: ['사건기본정보', '당사자', '대리인', '청구취지', '청구원인', '입증서류', '첨부서류'],
     hasCost: true,
-    defaultEvidencePrefix: '갑',
-    description: '민사소송을 제기하는 최초 서류',
+    hasEvidence: true,
+    defaultPrefix: '갑',
   },
   answer: {
-    key: 'answer',
-    label: '답변서(청구취지/원인)',
-    labelShort: '답변서',
-    sections: [SEC_CASE_INFO, SEC_ANSWER_PURPOSE, SEC_ANSWER_CAUSE, SEC_DOC_OWNER, SEC_EVIDENCE_METHOD, SEC_ATTACHMENT],
+    title: '답변서',
+    subtitle: '답변서(청구취지/원인)',
+    sections: ['caseInfo', 'answerPurpose', 'answerReason', 'signatory', 'evidence', 'attachments'],
+    sectionLabels: ['사건기본정보', '청구취지에 대한 답변', '청구원인에 대한 답변', '서류명의인', '입증방법', '첨부서류'],
     hasCost: false,
-    defaultEvidencePrefix: '을',
-    description: '소장에 대한 피고측 답변 서류',
+    hasEvidence: true,
+    defaultPrefix: '을',
   },
   brief: {
-    key: 'brief',
-    label: '준비서면',
-    labelShort: '준비서면',
-    sections: [SEC_CASE_INFO, SEC_DOC_OWNER, SEC_CONTENT, SEC_EVIDENCE_METHOD, SEC_ATTACHMENT],
+    title: '준비서면',
+    subtitle: '준비서면',
+    sections: ['caseInfo', 'signatory', 'content', 'evidence', 'attachments'],
+    sectionLabels: ['사건기본정보', '서류명의인', '내용', '입증방법', '첨부서류'],
     hasCost: false,
-    defaultEvidencePrefix: '갑',
-    description: '변론기일 전 주장과 증거를 정리하는 서류',
+    hasEvidence: true,
+    defaultPrefix: '갑',
   },
   dateChange: {
-    key: 'dateChange',
-    label: '기일변경신청서',
-    labelShort: '기일변경',
-    sections: [SEC_CASE_INFO, SEC_DOC_OWNER, SEC_CHANGE_REASON, SEC_ATTACHMENT],
+    title: '기일변경신청서',
+    subtitle: '기일변경신청서',
+    sections: ['caseInfo', 'signatory', 'dateInfo', 'changeReason', 'attachments'],
+    sectionLabels: ['사건기본정보', '서류명의인', '기일정보', '변경사유', '첨부서류'],
     hasCost: false,
-    defaultEvidencePrefix: '갑',
-    description: '변론기일 변경을 신청하는 서류',
+    hasEvidence: false,
+    defaultPrefix: '갑',
   },
   correction: {
-    key: 'correction',
-    label: '보정서',
-    labelShort: '보정서',
-    sections: [SEC_CASE_INFO, SEC_DOC_OWNER, SEC_CORRECTION, SEC_ATTACHMENT],
+    title: '보정서',
+    subtitle: '보정서',
+    sections: ['caseInfo', 'signatory', 'correctionOrder', 'correctionContent', 'attachments'],
+    sectionLabels: ['사건기본정보', '서류명의인', '보정명령내용', '보정내용', '첨부서류'],
     hasCost: false,
-    defaultEvidencePrefix: '갑',
-    description: '법원의 보정명령에 따라 제출하는 서류',
+    hasEvidence: false,
+    defaultPrefix: '갑',
   },
   appeal: {
-    key: 'appeal',
-    label: '항소장',
-    labelShort: '항소장',
-    sections: [SEC_CASE_INFO, SEC_PARTIES, SEC_AGENT, SEC_APPEAL_PURPOSE, SEC_APPEAL_REASON, SEC_ATTACHMENT],
+    title: '항소장',
+    subtitle: '항소장',
+    sections: ['caseInfo', 'parties', 'representative', 'originalJudgment', 'appealPurpose', 'appealReason', 'evidence', 'attachments'],
+    sectionLabels: ['사건기본정보', '당사자', '대리인', '원심판결정보', '항소취지', '항소이유', '입증서류', '첨부서류'],
     hasCost: true,
-    defaultEvidencePrefix: '갑',
-    description: '1심 판결에 불복하여 항소하는 서류',
+    hasEvidence: true,
+    defaultPrefix: '갑',
+  },
+  claimChange: {
+    title: '청구취지 및 청구원인 변경신청서',
+    subtitle: '청구취지 및 청구원인 변경신청서',
+    sections: ['caseInfo', 'signatory', 'claimPurpose', 'changePurpose', 'changeReason', 'attachments'],
+    sectionLabels: ['사건기본정보', '서류명의인', '기존 청구취지', '변경 청구취지', '변경이유', '첨부서류'],
+    hasCost: false,
+    hasEvidence: false,
+    defaultPrefix: '갑',
   },
 }
 
-/** 서류 유형 키 목록 */
-export type DocTypeKey = keyof typeof DOCUMENT_TYPES
+export type DocTypeKey = keyof typeof DOCUMENT_CONFIGS
 
-/** 서류 유형 목록 (배열) */
-export const DOCUMENT_TYPE_LIST = Object.values(DOCUMENT_TYPES)
-
-/** 서류 유형 키로 조회 */
-export function getDocumentType(key: string): DocumentType | undefined {
-  return DOCUMENT_TYPES[key]
+export function getDocConfig(key: string): DocumentConfig | undefined {
+  return DOCUMENT_CONFIGS[key]
 }
+
+export const DOC_TYPE_LIST = Object.entries(DOCUMENT_CONFIGS).map(([key, config]) => ({ key, ...config }))

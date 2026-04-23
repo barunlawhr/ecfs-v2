@@ -77,19 +77,24 @@ CREATE TABLE IF NOT EXISTS scores (
 
 CREATE INDEX IF NOT EXISTS idx_scores_submission ON scores (submission_id);
 
--- ── RLS (Row Level Security) 비활성화 (실습용) ───────────────
--- 실습 프로젝트이므로 RLS를 비활성화합니다.
--- 프로덕션에서는 반드시 RLS를 활성화하세요.
-ALTER TABLE practice_cases ENABLE ROW LEVEL SECURITY;
-ALTER TABLE case_assignments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE submissions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE scores ENABLE ROW LEVEL SECURITY;
-
--- 모든 사용자에게 전체 접근 허용 (실습용)
-CREATE POLICY IF NOT EXISTS "allow_all_practice_cases" ON practice_cases FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_all_case_assignments" ON case_assignments FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_all_submissions" ON submissions FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_all_scores" ON scores FOR ALL USING (true) WITH CHECK (true);
+    -- ── RLS (Row Level Security) ───────────────────────────────                                            
+    ALTER TABLE practice_cases ENABLE ROW LEVEL SECURITY;                                                     
+    ALTER TABLE case_assignments ENABLE ROW LEVEL SECURITY;                                                   
+    ALTER TABLE submissions ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE scores ENABLE ROW LEVEL SECURITY;                      
+                                                                                                      
+    -- 모든 사용자에게 전체 접근 허용 (실습용)                                                        
+    DROP POLICY IF EXISTS "allow_all_practice_cases" ON practice_cases;    
+    CREATE POLICY "allow_all_practice_cases" ON practice_cases FOR ALL USING (true) WITH CHECK (true);    
+                                                                                                          
+    DROP POLICY IF EXISTS "allow_all_case_assignments" ON case_assignments;
+    CREATE POLICY "allow_all_case_assignments" ON case_assignments FOR ALL USING (true) WITH CHECK (true);
+                                                                                                
+    DROP POLICY IF EXISTS "allow_all_submissions" ON submissions;
+    CREATE POLICY "allow_all_submissions" ON submissions FOR ALL USING (true) WITH CHECK (true);
+                                                                                      
+    DROP POLICY IF EXISTS "allow_all_scores" ON scores;                                    
+    CREATE POLICY "allow_all_scores" ON scores FOR ALL USING (true) WITH CHECK (true);
 
 -- ══════════════════════════════════════════════════════════════
 --  샘플 데이터 (테스트용)

@@ -13,20 +13,23 @@ const APPLY = '/apply?new=true'
 const ANSWER = '/apply/answer'
 const S = '#'
 
+// 동적 라우트 기반 서류 경로
+const DOC = (type: string) => `/apply/${type}`
+
 const FREQUENT = [
   { label: '답변서(청구취지/원인)', href: ANSWER },
   { label: '소장', href: APPLY },
-  { label: '준비서면', href: S },
+  { label: '준비서면', href: DOC('brief') },
   { label: '반소장', href: S },
   { label: '증인신청서', href: S },
-  { label: '항소장', href: S },
+  { label: '항소장', href: DOC('appeal') },
   { label: '주소보정서(특별송달,공시송달,봉인집행신청,주소불명이전송달신청서)', href: S },
-  { label: '보정서', href: S },
+  { label: '보정서', href: DOC('correction') },
   { label: '소송위임장', href: S },
   { label: '소취하서', href: S },
-  { label: '기일변경신청서', href: S },
+  { label: '기일변경신청서', href: DOC('dateChange') },
   { label: '소송대리허가신청 및 소송위임장', href: S },
-  { label: '청구취지 및 청구원인변경신청서', href: S },
+  { label: '청구취지 및 청구원인변경신청서', href: DOC('claimChange') },
   { label: '항고장', href: S },
 ]
 
@@ -44,7 +47,7 @@ const SECTIONS = [
     title: '주요서면',
     note: '※ 소장처럼 작성 후에 제출해야 하는 서류',
     items: [
-      { label: '준비서면', href: S }, { label: '변론요지서', href: S },
+      { label: '준비서면', href: DOC('brief') }, { label: '변론요지서', href: S },
       { label: '독립당사자참가신청서', href: S }, { label: '반소장', href: S },
       { label: '조정신청서', href: S }, { label: '참고서면', href: S },
       { label: '기일내참고서면(증거자료 포함)', href: S },
@@ -74,7 +77,7 @@ const SECTIONS = [
     note: null,
     items: [
       { label: '주소보정서(특별송달,공시송달,봉인집행신청,주소불명이전송달신청서)', href: S },
-      { label: '공시송달신청서', href: S }, { label: '보정서', href: S },
+      { label: '공시송달신청서', href: S }, { label: '보정서', href: DOC('correction') },
       { label: '보정서(가처분)', href: S }, { label: '반송달확인신청서', href: S },
       { label: '송달장소변경신고서', href: S }, { label: '보관중인서류 수령확인서', href: S },
       { label: '영치동의서', href: S },
@@ -102,7 +105,7 @@ const SECTIONS = [
   {
     title: '기일 및 변론 관련',
     note: '※ 기타 기일관련 서류',
-    items: [{ label: '기일변경신청서', href: S }, { label: '기일지정신청서', href: S }],
+    items: [{ label: '기일변경신청서', href: DOC('dateChange') }, { label: '기일지정신청서', href: S }],
   },
   {
     title: '기일 및 진행관련 신청',
@@ -125,7 +128,7 @@ const SECTIONS = [
       { label: '소장', href: APPLY }, { label: '소장(간이절차)', href: S },
       { label: '소취하서', href: S }, { label: '소장에 갈음하는 화해신청서', href: S },
       { label: '기타서류', href: S }, { label: '소송대리허가신청 및 소송위임장', href: S },
-      { label: '청구취지 및 청구원인변경신청서', href: S },
+      { label: '청구취지 및 청구원인변경신청서', href: DOC('claimChange') },
       { label: '조정에 갈음하는 결정에 대한 이의신청서', href: S },
       { label: '화해권고결정에 대한 이의신청서', href: S },
       { label: '답변서(청구취지/원인)', href: ANSWER }, { label: '취하신청서', href: S },
@@ -136,7 +139,7 @@ const SECTIONS = [
     title: '항소 관련',
     note: null,
     items: [
-      { label: '항소장', href: S }, { label: '항소취하서', href: S },
+      { label: '항소장', href: DOC('appeal') }, { label: '항소취하서', href: S },
       { label: '항소이유서', href: S }, { label: '항소심사실조회신청서', href: S },
       { label: '부대항소장', href: S }, { label: '취하신청서(항소)', href: S },
       { label: '항소이유서 제출기간 연장신청서', href: S }, { label: '항고장', href: S },
@@ -172,7 +175,7 @@ export default function CivilMainPage() {
 
   const go = (href: string) => {
     if (href === S) { alert('실습 모드에서는 지원되지 않습니다.'); return }
-    if (!user && (href === APPLY || href === ANSWER)) { setShowLogin(true); return }
+    if (!user && href !== S) { setShowLogin(true); return }
     router.push(href)
   }
 

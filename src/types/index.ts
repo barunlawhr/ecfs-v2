@@ -119,3 +119,82 @@ export interface GradeResult {
   feedback: string
   breakdown: GradeBreakdown
 }
+
+/** 통합 서류 작성 폼 데이터 (모든 서류 유형의 슈퍼셋) */
+export interface DocumentFormData {
+  // 사건기본정보 (공통)
+  caseNo: string
+  court: string
+  division: string
+  caseName: string
+  caseCategory: string
+  plaintiff: string
+  defendant: string
+  // 소장 전용
+  claimType: string       // 재산권/비재산권
+  sogaType: string        // 금액/토지/불능
+  soga: string            // 소가
+  // 당사자
+  parties: Party[]
+  // 대리인
+  hasAgent: boolean
+  agentType?: string
+  agentName?: string
+  // 청구취지/원인
+  claimPurpose: string
+  claimReason: string
+  // 답변서
+  answerPurpose: string
+  answerReason: string
+  // 준비서면
+  content: string
+  // 서류명의인
+  docOwners: { id: string; type: string; name: string; userId: string }[]
+  // 입증서류
+  evidences: Evidence[]
+  // 기일변경
+  currentHearingDate: string
+  currentHearingPlace: string
+  changeReasonType: string
+  changeReasonDetail: string
+  preferredDate1: string
+  preferredDate2: string
+  // 보정서
+  correctionOrderNo: string
+  correctionOrderDate: string
+  correctionDeadline: string
+  correctionOrderContent: string
+  correctionContent: string
+  // 항소장
+  originalCourt: string
+  originalCaseNo: string
+  judgmentDate: string
+  judgmentContent: string
+  appealPurpose: string
+  appealReason: string
+  // 청구취지변경
+  previousClaimPurpose: string
+  newClaimPurpose: string
+  changeReason: string
+}
+
+/** DocumentFormData 초기값 */
+export const EMPTY_DOC_FORM: DocumentFormData = {
+  caseNo: '', court: '', division: '', caseName: '', caseCategory: '',
+  plaintiff: '', defendant: '',
+  claimType: '재산권', sogaType: '금액', soga: '',
+  parties: [], hasAgent: false, agentType: undefined, agentName: undefined,
+  claimPurpose: '', claimReason: '',
+  answerPurpose: '', answerReason: '',
+  content: '',
+  docOwners: [],
+  evidences: [],
+  currentHearingDate: '', currentHearingPlace: '',
+  changeReasonType: '', changeReasonDetail: '',
+  preferredDate1: '', preferredDate2: '',
+  correctionOrderNo: '', correctionOrderDate: '', correctionDeadline: '',
+  correctionOrderContent: '', correctionContent: '',
+  originalCourt: '', originalCaseNo: '', judgmentDate: '', judgmentContent: '',
+  appealPurpose: '', appealReason: '',
+  previousClaimPurpose: '', newClaimPurpose: '', changeReason: '',
+}
