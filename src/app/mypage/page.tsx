@@ -32,6 +32,7 @@ type ActivePage =
   | 'doc-history'
   | 'delivery-detail'
   | 'submit-detail'
+  | 'my-submissions'
   | 'generic'
 
 interface Assignment {
@@ -2611,6 +2612,114 @@ export default function MyPage() {
     )
   }
 
+  // ── 나의 제출기록 (submissions 테이블) ──────────────────────
+  const MySubmissionsContent = () => {
+    interface SubmissionRow { id: string; doc_type: string; submitted_at: string; rule_score: number | null; ai_score: number | null; final_score: number | null; feedback: string; case_number?: string; case_name?: string; role?: string }
+    const [subs, setSubs] = useState<SubmissionRow[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+      if (!user) return
+      ;(async () => {
+        setLoading(true)
+        try {
+          // 1. case_assignments에서 내 배정 조회
+          const { data: assigns } = await supabase
+            .from('case_assignments')
+            .select('id, case_id, role')
+            .eq('student_id', user.id)
+          if (!assigns || assigns.length === 0) { setSubs([]); return }
+
+          // 2. submissions 조회
+          const assignIds = assigns.map(a => a.id)
+          const { data: submissions } = await supabase
+            .from('submissions')
+            .select('*')
+            .in('assignment_id', assignIds)
+            .order('submitted_at', { ascending: false })
+
+          if (!submissions) { setSubs([]); return }
+
+          // 3. practice_cases 조회
+          const caseIds = [...new Set(assigns.map(a => a.case_id))]
+          const { data: cases } = await supabase
+            .from('practice_cases')
+            .select('id, case_number, case_name')
+            .in('id', caseIds)
+          const caseMap = new Map((cases || []).map(c => [c.id, c]))
+          const assignMap = new Map(assigns.map(a => [a.id, a]))
+
+          const rows: SubmissionRow[] = submissions.map(s => {
+            const assign = assignMap.get(s.assignment_id)
+            const cs = assign ? caseMap.get(assign.case_id) : undefined
+            return {
+              id: s.id,
+              doc_type: s.doc_type,
+              submitted_at: s.submitted_at,
+              rule_score: s.rule_score,
+              ai_score: s.ai_score,
+              final_score: s.final_score,
+              feedback: s.feedback || '',
+              case_number: cs?.case_number || '-',
+              case_name: cs?.case_name || '-',
+              role: assign?.role === 'defendant' ? '피고측' : '원고측',
+            }
+          })
+          setSubs(rows)
+        } catch { setSubs([]) }
+        finally { setLoading(false) }
+      })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user])
+
+    const docTypeLabel: Record<string, string> = { complaint: '소장', answer: '답변서', brief: '준비서면', dateChange: '기일변경신청서', correction: '보정서', appeal: '항소장' }
+    const scoreColor = (s: number | null) => s == null ? '#999' : s >= 90 ? '#15803d' : s >= 70 ? '#1e40af' : s >= 50 ? '#92400e' : '#dc2626'
+    const scoreBg = (s: number | null) => s == null ? '#f5f5f5' : s >= 90 ? '#f0fdf4' : s >= 70 ? '#eff6ff' : s >= 50 ? '#fffbeb' : '#fef2f2'
+    const tdS: React.CSSProperties = { padding:'7px 10px', fontSize:12, borderBottom:'1px solid #eee', verticalAlign:'middle', textAlign:'center' }
+
+    return (
+      <div>
+        <PageHd title="나의 제출기록" actions={<ActBtn label="🖨 출력" />} />
+        {loading ? (
+          <div style={{ textAlign:'center', padding:60, color:'#999' }}>⏳ 불러오는 중...</div>
+        ) : subs.length === 0 ? (
+          <div style={{ textAlign:'center', padding:60, background:'#fff', border:'1px solid #dde0e8', borderTop:'none' }}>
+            <div style={{ fontSize:48, marginBottom:16 }}>📄</div>
+            <div style={{ fontSize:16, fontWeight:700, color:'#003366', marginBottom:8 }}>제출된 서류가 없습니다</div>
+            <div style={{ fontSize:13, color:'#888' }}>배정된 사건에서 서류를 작성하고 제출하면 여기에 표시됩니다.</div>
+          </div>
+        ) : (
+          <div style={{ background:'#fff', overflowX:'auto' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse' }}>
+              <thead>
+                <tr style={{ background:'#f0f3f8', borderBottom:'2px solid #003366' }}>
+                  {['사건번호','사건명','서류유형','역할','제출일','규칙점수','AI점수','최종점수','피드백'].map(h => (
+                    <th key={h} style={{ padding:'8px 10px', fontWeight:600, fontSize:11, color:'#333', textAlign:'center', whiteSpace:'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {subs.map(s => (
+                  <tr key={s.id}>
+                    <td style={{ ...tdS, fontWeight:600, color:'#0057a8' }}>{s.case_number}</td>
+                    <td style={tdS}>{s.case_name}</td>
+                    <td style={tdS}>{docTypeLabel[s.doc_type] || s.doc_type}</td>
+                    <td style={tdS}>{s.role}</td>
+                    <td style={{ ...tdS, whiteSpace:'nowrap' }}>{s.submitted_at ? new Date(s.submitted_at).toLocaleDateString('ko-KR') : '-'}</td>
+                    <td style={{ ...tdS, fontWeight:700, color: scoreColor(s.rule_score), background: scoreBg(s.rule_score) }}>{s.rule_score ?? '-'}</td>
+                    <td style={{ ...tdS, fontWeight:700, color: scoreColor(s.ai_score), background: scoreBg(s.ai_score) }}>{s.ai_score ?? '-'}</td>
+                    <td style={{ ...tdS, fontWeight:700, color: scoreColor(s.final_score), background: scoreBg(s.final_score), fontSize:14 }}>{s.final_score ?? '-'}</td>
+                    <td style={{ ...tdS, textAlign:'left', fontSize:11, maxWidth:200 }}>{s.feedback || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // ── 확정된사건 ─────────────────────────────────────────────
   const ConfirmedCasesContent = () => {
     const CONFIRMED_CASES = [
@@ -2868,6 +2977,7 @@ export default function MyPage() {
       case 'delivery-detail': return <DeliveryDetailContent />
       case 'submit-detail': return <SubmitDetailContent />
       case 'confirmed-cases': return <ConfirmedCasesContent />
+      case 'my-submissions': return <MySubmissionsContent />
       case 'completed-cases': return <CompletedCasesContent />
       case 'ecfs-reg': return <EcfsRegContent />
       case 'myinfo-user': return <MyInfoContent type="user" />
@@ -2997,6 +3107,7 @@ export default function MyPage() {
             <>
               <SbItem label="📋 배정된 실습사건" page="assigned-cases" />
               <SbItem label="나의 실습기록" page="practice-records" />
+              <SbItem label="📄 나의 제출기록" page="my-submissions" />
               <SbItem label="제출서류 확인" page="submitted-docs" />
             </>
           )}
