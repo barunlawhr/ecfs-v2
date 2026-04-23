@@ -1589,7 +1589,7 @@ export default function AdminPage() {
   // ─────────────────────────────────────────────
   function CorrectionsPanel() {
     interface CPCase { id: string; case_number: string; case_name: string }
-    interface CPAssignment { student_id: string; student_name: string }
+    interface CPAssignment { student_id: string }
     interface CPOrder {
       id: string; case_id: string; student_id: string; order_number: string
       order_date: string; deadline: string; order_content: string; order_type: string
@@ -1619,8 +1619,12 @@ export default function AdminPage() {
     useEffect(() => {
       if (!cpCaseId) { setCpAssignments([]); return }
       ;(async () => {
-        const { data } = await supabase.from('case_assignments').select('student_id, student_name').eq('case_id', cpCaseId)
-        if (data) setCpAssignments(data)
+        const { data } = await supabase.from('case_assignments').select('student_id').eq('case_id', cpCaseId)
+        if (data) {
+          // 중복 student_id 제거
+          const unique = [...new Map(data.map(d => [d.student_id, d])).values()]
+          setCpAssignments(unique)
+        }
       })()
     }, [cpCaseId])
 
@@ -1683,7 +1687,8 @@ export default function AdminPage() {
               <label style={cpLbl}>학생 선택</label>
               <select value={cpStudentId} onChange={e => setCpStudentId(e.target.value)} style={{ ...cpInp, cursor: 'pointer' }}>
                 <option value="">-- 학생 선택 --</option>
-                {cpAssignments.map(a => <option key={a.student_id} value={a.student_id}>{a.student_name} ({a.student_id})</option>)}
+                {cpAssignments.length === 0 && cpCaseId && <option value="">배정된 학생 없음</option>}
+                {cpAssignments.map(a => <option key={a.student_id} value={a.student_id}>{HARDCODED_ACCOUNTS[a.student_id]?.name || a.student_id} ({a.student_id})</option>)}
               </select>
             </div>
             <div>
@@ -1740,7 +1745,7 @@ export default function AdminPage() {
               {cpOrders.map(o => (
                 <tr key={o.id} style={{ borderBottom: '1px solid #eee' }}>
                   <td style={{ padding: '8px 12px', textAlign: 'center' }}>{o.practice_cases?.case_number || '-'}</td>
-                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>{o.student_id}</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>{HARDCODED_ACCOUNTS[o.student_id]?.name || o.student_id}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'center' }}>{o.order_number}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                     {o.deadline}
