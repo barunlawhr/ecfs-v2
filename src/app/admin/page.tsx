@@ -109,6 +109,9 @@ export default function AdminPage() {
       avgScore: 0,
       weekCount: 0,
       assignmentCount: 0,
+      caseCount: 0,
+      correctionPending: 0,
+      submissionCount: 0,
       loaded: false,
     })
 
@@ -118,9 +121,12 @@ export default function AdminPage() {
         monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
         monday.setHours(0, 0, 0, 0)
 
-        const [prJson, assignRes] = await Promise.all([
+        const [prJson, assignRes, casesRes, correctionsRes, submissionsRes] = await Promise.all([
           fetch('/api/admin/records').then(r => r.json()).catch(() => ({ data: [] })),
-          fetch(`${SB_URL}/rest/v1/assignments?select=id`, { headers: SB_HDR }).then(r => r.json()),
+          supabase.from('case_assignments').select('id'),
+          supabase.from('practice_cases').select('id').eq('is_active', true),
+          supabase.from('correction_orders').select('id').eq('status', 'pending'),
+          supabase.from('submissions').select('id'),
         ])
 
         const records = prJson.data || []
@@ -132,7 +138,10 @@ export default function AdminPage() {
           practiceCount: total,
           avgScore: avg,
           weekCount: week,
-          assignmentCount: Array.isArray(assignRes) ? assignRes.length : 0,
+          assignmentCount: assignRes.data?.length || 0,
+          caseCount: casesRes.data?.length || 0,
+          correctionPending: correctionsRes.data?.length || 0,
+          submissionCount: submissionsRes.data?.length || 0,
           loaded: true,
         })
       }
@@ -145,28 +154,60 @@ export default function AdminPage() {
     const cards = [
       { label: '전체 계정', value: totalAccounts, color: '#1a3a6b', bg: '#eef2fb' },
       { label: '실습생 수', value: studentCount, color: '#0067c2', bg: '#dbeafe' },
-      { label: '총 실습기록', value: stats.loaded ? stats.practiceCount : '-', color: '#7c3aed', bg: '#f3e8ff' },
+      { label: '실습사건', value: stats.loaded ? stats.caseCount : '-', color: '#7c3aed', bg: '#f3e8ff' },
+      { label: '사건배정', value: stats.loaded ? stats.assignmentCount : '-', color: '#dc2626', bg: '#fee2e2' },
+      { label: '총 제출', value: stats.loaded ? stats.practiceCount + stats.submissionCount : '-', color: '#d97706', bg: '#fef3c7' },
       { label: '평균 점수', value: stats.loaded ? `${stats.avgScore}점` : '-', color: '#16a34a', bg: '#dcfce7' },
-      { label: '이번 주 제출', value: stats.loaded ? stats.weekCount : '-', color: '#d97706', bg: '#fef3c7' },
-      { label: '배정된 사건', value: stats.loaded ? stats.assignmentCount : '-', color: '#dc2626', bg: '#fee2e2' },
+      { label: '이번 주 제출', value: stats.loaded ? stats.weekCount : '-', color: '#0891b2', bg: '#e0f7fa' },
+      { label: '미보정', value: stats.loaded ? stats.correctionPending : '-', color: '#e53e3e', bg: '#fef2f2' },
+    ]
+
+    const quickLinks = [
+      { icon: '📋', label: '실습사건 관리', desc: '사건 추가/수정/삭제', href: '/admin/cases', color: '#7c3aed' },
+      { icon: '🎯', label: '사건배정 관리', desc: '학생별 사건 배정', href: '/admin/assignments', color: '#0067c2' },
+      { icon: '📝', label: '보정명령 관리', desc: '보정명령 등록/확인', href: '/admin/corrections', color: '#e53e3e' },
+      { icon: '📊', label: '채점 현황', desc: '학생별 점수 확인', href: '/admin/scores', color: '#16a34a' },
     ]
 
     return (
       <div>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', marginBottom: 20 }}>📊 대시보드</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 24 }}>
+
+        {/* 통계 카드 */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
           {cards.map(c => (
-            <div key={c.label} style={{ background: c.bg, border: `1px solid ${c.color}22`, borderRadius: 10, padding: '20px', textAlign: 'center' }}>
-              <div style={{ fontSize: 32, fontWeight: 800, color: c.color }}>{c.value}</div>
-              <div style={{ fontSize: 13, color: '#555', marginTop: 6 }}>{c.label}</div>
+            <div key={c.label} style={{ background: c.bg, border: `1px solid ${c.color}22`, borderRadius: 10, padding: '16px', textAlign: 'center' }}>
+              <div style={{ fontSize: 28, fontWeight: 800, color: c.color }}>{c.value}</div>
+              <div style={{ fontSize: 12, color: '#555', marginTop: 4 }}>{c.label}</div>
             </div>
           ))}
         </div>
+
+        {/* 빠른 이동 */}
+        <div style={{ marginBottom: 24 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#333', marginBottom: 12 }}>⚡ 빠른 이동</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+            {quickLinks.map(q => (
+              <div
+                key={q.href}
+                onClick={() => router.push(q.href)}
+                style={{ background: '#fff', border: '1px solid #e0e6ee', borderRadius: 10, padding: '20px', cursor: 'pointer', transition: 'all .15s' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = q.color; e.currentTarget.style.boxShadow = `0 4px 12px ${q.color}22` }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#e0e6ee'; e.currentTarget.style.boxShadow = 'none' }}
+              >
+                <div style={{ fontSize: 28, marginBottom: 8 }}>{q.icon}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: q.color, marginBottom: 4 }}>{q.label}</div>
+                <div style={{ fontSize: 11, color: '#888' }}>{q.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div style={{ background: '#fffbf0', border: '1px solid #f0e0b0', borderRadius: 8, padding: '16px 20px', color: '#7c5800' }}>
           <div style={{ fontWeight: 700, marginBottom: 6 }}>⚠️ 실습 모드 안내</div>
           <div style={{ fontSize: 13, lineHeight: 1.7 }}>
             본 시스템은 <strong>[바른커리어] 전자소송모의실습 관리자</strong>입니다. 실제 법원 접수 시스템과 무관하며, 작성된 소장 및 제출 내용은 법적 효력이 없습니다.<br />
-            실습생이 소장을 제출하면 AI가 자동으로 채점하고 피드백을 제공합니다. 관리자는 사건을 배정하고 실습 현황을 모니터링할 수 있습니다.
+            실습생이 서류를 제출하면 AI가 자동으로 채점하고 피드백을 제공합니다. 관리자는 사건을 배정하고 실습 현황을 모니터링할 수 있습니다.
           </div>
         </div>
       </div>
@@ -1746,10 +1787,38 @@ export default function AdminPage() {
             </div>
           ))}
 
+          {/* 구분선 + 신규 관리 페이지 링크 */}
+          <div style={{ padding: '12px 20px 4px', marginTop: 8 }}>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>신규 관리</div>
+          </div>
+          {[
+            { icon: '📋', label: '실습사건 관리', href: '/admin/cases' },
+            { icon: '🎯', label: '사건배정 관리', href: '/admin/assignments' },
+            { icon: '📝', label: '보정명령 관리', href: '/admin/corrections' },
+            { icon: '📊', label: '채점 현황', href: '/admin/scores' },
+          ].map(item => (
+            <div
+              key={item.href}
+              onClick={() => router.push(item.href)}
+              style={{
+                padding: '10px 20px', fontSize: 13, fontWeight: 500,
+                color: 'rgba(255,255,255,.55)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 10,
+                borderLeft: '3px solid transparent',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255,255,255,.06)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,.55)'; e.currentTarget.style.background = 'transparent' }}
+            >
+              <span style={{ fontSize: 14 }}>{item.icon}</span>
+              {item.label}
+              <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.5 }}>→</span>
+            </div>
+          ))}
+
           <div style={{ marginTop: 'auto', padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,.1)' }}>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', lineHeight: 1.6 }}>
-              전자소송 실습 관리자<br />
-              실습 전용 시스템
+              [바른커리어] 관리자<br />
+              전자소송모의실습
             </div>
           </div>
         </aside>
