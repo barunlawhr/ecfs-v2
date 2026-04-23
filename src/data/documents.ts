@@ -21,6 +21,7 @@ export type SectionType =
   | 'appealReason'      // 항소이유
   | 'originalJudgment'  // 원심판결정보
   | 'changePurpose'     // 변경 청구취지
+  | 'addressCorrectionContent' // 주소보정 전용
   | 'attachments'       // 첨부서류
 
 export interface DocumentConfig {
@@ -55,6 +56,7 @@ export const SECTION_LABELS: Record<SectionType, string> = {
   appealReason: '항소이유',
   originalJudgment: '원심판결정보',
   changePurpose: '변경 청구취지',
+  addressCorrectionContent: '주소보정내용',
   attachments: '첨부서류',
 }
 
@@ -98,8 +100,17 @@ export const DOCUMENT_CONFIGS: Record<string, DocumentConfig> = {
   correction: {
     title: '보정서',
     subtitle: '보정서',
-    sections: ['caseInfo', 'signatory', 'correctionOrder', 'correctionContent', 'attachments'],
-    sectionLabels: ['사건기본정보', '서류명의인', '보정명령내용', '보정내용', '첨부서류'],
+    sections: ['caseInfo', 'signatory', 'correctionOrder', 'correctionContent', 'evidence', 'attachments'],
+    sectionLabels: ['사건기본정보', '서류명의인', '보정명령내용', '보정내용', '입증방법', '첨부서류'],
+    hasCost: false,
+    hasEvidence: true,
+    defaultPrefix: '갑',
+  },
+  addressCorrection: {
+    title: '주소보정서',
+    subtitle: '주소보정서(특별송달,공시송달,일반송달신청)',
+    sections: ['caseInfo', 'signatory', 'correctionOrder', 'addressCorrectionContent', 'attachments'],
+    sectionLabels: ['사건기본정보', '서류명의인', '보정명령내용', '주소보정내용', '첨부서류'],
     hasCost: false,
     hasEvidence: false,
     defaultPrefix: '갑',

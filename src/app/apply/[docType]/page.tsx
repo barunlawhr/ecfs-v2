@@ -27,6 +27,7 @@ import OriginalJudgmentSection from '@/components/apply/sections/OriginalJudgmen
 import AppealPurposeSection from '@/components/apply/sections/AppealPurposeSection'
 import AppealReasonSection from '@/components/apply/sections/AppealReasonSection'
 import ChangePurposeSection from '@/components/apply/sections/ChangePurposeSection'
+import AddressCorrectionContentSection from '@/components/apply/sections/AddressCorrectionContentSection'
 
 // ── Section → Component 매핑 ──
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -49,6 +50,7 @@ const SECTION_COMPONENTS: Record<SectionType, React.ComponentType<any>> = {
   appealReason: AppealReasonSection,
   originalJudgment: OriginalJudgmentSection,
   changePurpose: ChangePurposeSection,
+  addressCorrectionContent: AddressCorrectionContentSection,
   attachments: AttachmentsSection,
 }
 
@@ -84,6 +86,10 @@ function DocTypePage({ params }: { params: Promise<{ docType: string }> }) {
   // caseId로 배정된 사건 로드
   useEffect(() => {
     const caseId = searchParams.get('caseId')
+    const orderId = searchParams.get('orderId')
+    if (orderId) {
+      setFormData(prev => ({ ...prev, orderId } as DocumentFormData))
+    }
     if (!caseId) return
     ;(async () => {
       const { data } = await supabase.from('practice_cases').select('*').eq('id', caseId).single()

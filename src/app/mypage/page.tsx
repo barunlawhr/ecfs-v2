@@ -33,6 +33,7 @@ type ActivePage =
   | 'delivery-detail'
   | 'submit-detail'
   | 'my-submissions'
+  | 'correction-list'
   | 'generic'
 
 interface Assignment {
@@ -2960,6 +2961,89 @@ export default function MyPage() {
     )
   }
 
+  function CorrectionListContent() {
+    const [orders, setOrders] = useState<{id:string; case_id:string; order_number:string; order_date:string; deadline:string; order_type:string; status:string; order_content:string; practice_cases?:{case_number:string; case_name:string}}[]>([])
+    const [clLoading, setClLoading] = useState(true)
+
+    useEffect(() => {
+      if (!user) return
+      ;(async () => {
+        const { data } = await supabase
+          .from('correction_orders')
+          .select('*, practice_cases(case_number, case_name)')
+          .eq('student_id', user.id)
+          .order('created_at', { ascending: false })
+        if (data) setOrders(data)
+        setClLoading(false)
+      })()
+    }, [])
+
+    function getDday(deadline: string): { label: string; color: string } {
+      const today = new Date(); today.setHours(0,0,0,0)
+      const dl = new Date(deadline); dl.setHours(0,0,0,0)
+      const diff = Math.ceil((dl.getTime() - today.getTime()) / (1000*60*60*24))
+      if (diff < 0) return { label: `D+${Math.abs(diff)} (초과)`, color: '#e53e3e' }
+      if (diff === 0) return { label: 'D-Day', color: '#e53e3e' }
+      if (diff <= 3) return { label: `D-${diff}`, color: '#e53e3e' }
+      if (diff <= 7) return { label: `D-${diff}`, color: '#dd6b20' }
+      return { label: `D-${diff}`, color: '#38a169' }
+    }
+
+    return (
+      <div>
+        <PageHd title="보정/미보정내역(독촉)" />
+        <div style={{ background: '#fff', padding: 16 }}>
+          {clLoading ? (
+            <div style={{ textAlign: 'center', padding: 40, color: '#888', fontSize: 13 }}>로딩 중...</div>
+          ) : orders.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, color: '#888', fontSize: 13 }}>보정명령 내역이 없습니다.</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, border: '1px solid #d0d8e4' }}>
+              <thead>
+                <tr style={{ background: '#f0f3f8' }}>
+                  {['사건번호', '사건명', '명령번호', '명령일자', '보정기한', '상태', '작업'].map(h => (
+                    <th key={h} style={{ padding: '10px 10px', fontWeight: 700, borderBottom: '2px solid #003366', textAlign: 'center', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map(o => {
+                  const dday = getDday(o.deadline)
+                  return (
+                    <tr key={o.id} style={{ borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>{o.practice_cases?.case_number || '-'}</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>{o.practice_cases?.case_name || '-'}</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>{o.order_number}</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>{o.order_date}</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                        {o.deadline}{' '}
+                        <span style={{ color: dday.color, fontWeight: 700, marginLeft: 4, fontSize: 11 }}>{dday.label}</span>
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                        {o.status === 'pending' ? (
+                          <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: 10, background: '#fff5f5', color: '#e53e3e', fontSize: 11, fontWeight: 700, border: '1px solid #feb2b2' }}>미보정</span>
+                        ) : (
+                          <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: 10, background: '#f0fff4', color: '#38a169', fontSize: 11, fontWeight: 700, border: '1px solid #9ae6b4' }}>보정완료</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                        {o.order_type === 'address' ? (
+                          <button onClick={() => router.push(`/apply/addressCorrection?caseId=${o.case_id}&orderId=${o.id}`)} style={{ padding: '4px 12px', fontSize: 11, background: '#fff', border: '1px solid #00a99d', color: '#00a99d', borderRadius: 3, cursor: 'pointer', fontWeight: 600 }}>주소보정서작성</button>
+                        ) : (
+                          <button onClick={() => router.push(`/apply/correction?caseId=${o.case_id}&orderId=${o.id}`)} style={{ padding: '4px 12px', fontSize: 11, background: '#fff', border: '1px solid #1a3a6b', color: '#1a3a6b', borderRadius: 3, cursor: 'pointer', fontWeight: 600 }}>보정서작성</button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   function renderContent() {
     switch (activePage) {
       case 'status': return <StatusContent />
@@ -2978,6 +3062,7 @@ export default function MyPage() {
       case 'submit-detail': return <SubmitDetailContent />
       case 'confirmed-cases': return <ConfirmedCasesContent />
       case 'my-submissions': return <MySubmissionsContent />
+      case 'correction-list': return <CorrectionListContent />
       case 'completed-cases': return <CompletedCasesContent />
       case 'ecfs-reg': return <EcfsRegContent />
       case 'myinfo-user': return <MyInfoContent type="user" />
@@ -3026,7 +3111,7 @@ export default function MyPage() {
               <SbItem label="사건별게시판" page="generic" title="사건별게시판" />
               <SbItem label="문서송부확인" page="generic" title="문서송부확인" />
               <SbItem label="서증인부(문서송부)" page="generic" title="서증인부(문서송부)" />
-              <SbItem label="보정/미보정내역(독촉)" page="generic" title="보정/미보정내역(독촉)" />
+              <SbItem label="보정/미보정내역(독촉)" page="correction-list" />
               <SbItem label="증거의견입력" page="generic" title="증거의견입력" />
             </>
           )}
