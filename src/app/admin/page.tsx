@@ -50,9 +50,9 @@ type Panel = 'dashboard' | 'accounts' | 'cases' | 'assign' | 'records' | 'ecfs-c
 const PANEL_ITEMS: { key: Panel; icon: string; label: string }[] = [
   { key: 'dashboard', icon: '📊', label: '대시보드' },
   { key: 'accounts', icon: '👥', label: '계정 관리' },
-  { key: 'cases', icon: '📋', label: '사건 관리' },
-  { key: 'assign', icon: '🎯', label: '학생 배정' },
-  { key: 'records', icon: '📈', label: '실습 현황' },
+  { key: 'cases', icon: '📋', label: '실습사건 관리' },
+  { key: 'assign', icon: '🎯', label: '사건배정 관리' },
+  { key: 'records', icon: '📈', label: '실습/채점 현황' },
   { key: 'ecfs-cases', icon: '⚖️', label: '전자소송 가상사건' },
   { key: 'settings', icon: '⚙', label: '설정' },
 ]
@@ -162,13 +162,6 @@ export default function AdminPage() {
       { label: '미보정', value: stats.loaded ? stats.correctionPending : '-', color: '#e53e3e', bg: '#fef2f2' },
     ]
 
-    const quickLinks = [
-      { icon: '📋', label: '실습사건 관리', desc: '사건 추가/수정/삭제', href: '/admin/cases', color: '#7c3aed' },
-      { icon: '🎯', label: '사건배정 관리', desc: '학생별 사건 배정', href: '/admin/assignments', color: '#0067c2' },
-      { icon: '📝', label: '보정명령 관리', desc: '보정명령 등록/확인', href: '/admin/corrections', color: '#e53e3e' },
-      { icon: '📊', label: '채점 현황', desc: '학생별 점수 확인', href: '/admin/scores', color: '#16a34a' },
-    ]
-
     return (
       <div>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a3a6b', marginBottom: 20 }}>📊 대시보드</h2>
@@ -181,26 +174,6 @@ export default function AdminPage() {
               <div style={{ fontSize: 12, color: '#555', marginTop: 4 }}>{c.label}</div>
             </div>
           ))}
-        </div>
-
-        {/* 빠른 이동 */}
-        <div style={{ marginBottom: 24 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#333', marginBottom: 12 }}>⚡ 빠른 이동</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
-            {quickLinks.map(q => (
-              <div
-                key={q.href}
-                onClick={() => router.push(q.href)}
-                style={{ background: '#fff', border: '1px solid #e0e6ee', borderRadius: 10, padding: '20px', cursor: 'pointer', transition: 'all .15s' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = q.color; e.currentTarget.style.boxShadow = `0 4px 12px ${q.color}22` }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = '#e0e6ee'; e.currentTarget.style.boxShadow = 'none' }}
-              >
-                <div style={{ fontSize: 28, marginBottom: 8 }}>{q.icon}</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: q.color, marginBottom: 4 }}>{q.label}</div>
-                <div style={{ fontSize: 11, color: '#888' }}>{q.desc}</div>
-              </div>
-            ))}
-          </div>
         </div>
 
         <div style={{ background: '#fffbf0', border: '1px solid #f0e0b0', borderRadius: 8, padding: '16px 20px', color: '#7c5800' }}>
@@ -1764,56 +1737,56 @@ export default function AdminPage() {
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {/* Left sidebar */}
         <aside style={{ width: 220, flexShrink: 0, background: '#0d2244', display: 'flex', flexDirection: 'column', paddingTop: 16 }}>
-          {PANEL_ITEMS.map(item => (
-            <div
-              key={item.key}
-              onClick={() => setActivePanel(item.key)}
-              style={{
-                padding: '12px 20px',
-                fontSize: 14,
-                fontWeight: 600,
-                color: activePanel === item.key ? '#fff' : 'rgba(255,255,255,.6)',
-                background: activePanel === item.key ? 'rgba(255,255,255,.12)' : 'transparent',
-                borderLeft: activePanel === item.key ? '3px solid #b8922a' : '3px solid transparent',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                transition: 'all .15s',
-              }}
-            >
-              <span style={{ fontSize: 16 }}>{item.icon}</span>
-              {item.label}
-            </div>
-          ))}
+          {PANEL_ITEMS.map(item => {
+            // cases/assign/records는 신규 페이지로 라우팅
+            const routeMap: Record<string, string> = {
+              cases: '/admin/cases',
+              assign: '/admin/assignments',
+              records: '/admin/scores',
+            }
+            const href = routeMap[item.key]
+            return (
+              <div
+                key={item.key}
+                onClick={() => href ? router.push(href) : setActivePanel(item.key)}
+                style={{
+                  padding: '12px 20px',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: activePanel === item.key && !href ? '#fff' : 'rgba(255,255,255,.6)',
+                  background: activePanel === item.key && !href ? 'rgba(255,255,255,.12)' : 'transparent',
+                  borderLeft: activePanel === item.key && !href ? '3px solid #b8922a' : '3px solid transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  transition: 'all .15s',
+                }}
+              >
+                <span style={{ fontSize: 16 }}>{item.icon}</span>
+                {item.label}
+                {href && <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.4 }}>→</span>}
+              </div>
+            )
+          })}
 
-          {/* 구분선 + 신규 관리 페이지 링크 */}
-          <div style={{ padding: '12px 20px 4px', marginTop: 8 }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>신규 관리</div>
+          {/* 보정명령 관리 */}
+          <div
+            onClick={() => router.push('/admin/corrections')}
+            style={{
+              padding: '12px 20px', fontSize: 14, fontWeight: 600,
+              color: 'rgba(255,255,255,.6)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 10,
+              borderLeft: '3px solid transparent',
+              transition: 'all .15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255,255,255,.08)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,.6)'; e.currentTarget.style.background = 'transparent' }}
+          >
+            <span style={{ fontSize: 16 }}>📝</span>
+            보정명령 관리
+            <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.4 }}>→</span>
           </div>
-          {[
-            { icon: '📋', label: '실습사건 관리', href: '/admin/cases' },
-            { icon: '🎯', label: '사건배정 관리', href: '/admin/assignments' },
-            { icon: '📝', label: '보정명령 관리', href: '/admin/corrections' },
-            { icon: '📊', label: '채점 현황', href: '/admin/scores' },
-          ].map(item => (
-            <div
-              key={item.href}
-              onClick={() => router.push(item.href)}
-              style={{
-                padding: '10px 20px', fontSize: 13, fontWeight: 500,
-                color: 'rgba(255,255,255,.55)', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 10,
-                borderLeft: '3px solid transparent',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255,255,255,.06)' }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,.55)'; e.currentTarget.style.background = 'transparent' }}
-            >
-              <span style={{ fontSize: 14 }}>{item.icon}</span>
-              {item.label}
-              <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.5 }}>→</span>
-            </div>
-          ))}
 
           <div style={{ marginTop: 'auto', padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,.1)' }}>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', lineHeight: 1.6 }}>
