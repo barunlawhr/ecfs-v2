@@ -1589,7 +1589,11 @@ export default function AdminPage() {
   // ─────────────────────────────────────────────
   function CorrectionsPanel() {
     interface CPCase { id: string; case_number: string; case_name: string }
-    interface CPAssignment { student_id: string }
+    // 학생 목록: 배정된 학생 우선, 없으면 전체 학생 표시
+    const allStudents = Object.entries(HARDCODED_ACCOUNTS)
+      .filter(([, acc]) => acc.role === 'student')
+      .map(([id, acc]) => ({ id, name: acc.name }))
+
     interface CPOrder {
       id: string; case_id: string; student_id: string; order_number: string
       order_date: string; deadline: string; order_content: string; order_type: string
@@ -1598,7 +1602,7 @@ export default function AdminPage() {
     }
 
     const [cpCases, setCpCases] = useState<CPCase[]>([])
-    const [cpAssignments, setCpAssignments] = useState<CPAssignment[]>([])
+    const [cpAssignedStudents, setCpAssignedStudents] = useState<string[]>([])
     const [cpOrders, setCpOrders] = useState<CPOrder[]>([])
     const [cpCaseId, setCpCaseId] = useState('')
     const [cpStudentId, setCpStudentId] = useState('')
@@ -1617,16 +1621,17 @@ export default function AdminPage() {
     }, [])
 
     useEffect(() => {
-      if (!cpCaseId) { setCpAssignments([]); return }
+      if (!cpCaseId) { setCpAssignedStudents([]); return }
       ;(async () => {
         const { data } = await supabase.from('case_assignments').select('student_id').eq('case_id', cpCaseId)
         if (data) {
-          // 중복 student_id 제거
-          const unique = [...new Map(data.map(d => [d.student_id, d])).values()]
-          setCpAssignments(unique)
+          const ids = [...new Set(data.map(d => d.student_id))]
+          setCpAssignedStudents(ids)
+          // 첫 번째 배정 학생 자동 선택
+          if (ids.length > 0 && !ids.includes(cpStudentId)) setCpStudentId(ids[0])
         }
       })()
-    }, [cpCaseId])
+    }, [cpCaseId]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const fetchOrders = useCallback(async () => {
       const { data } = await supabase.from('correction_orders').select('*, practice_cases(case_number, case_name)').order('created_at', { ascending: false })
@@ -1687,8 +1692,14 @@ export default function AdminPage() {
               <label style={cpLbl}>학생 선택</label>
               <select value={cpStudentId} onChange={e => setCpStudentId(e.target.value)} style={{ ...cpInp, cursor: 'pointer' }}>
                 <option value="">-- 학생 선택 --</option>
-                {cpAssignments.length === 0 && cpCaseId && <option value="">배정된 학생 없음</option>}
-                {cpAssignments.map(a => <option key={a.student_id} value={a.student_id}>{HARDCODED_ACCOUNTS[a.student_id]?.name || a.student_id} ({a.student_id})</option>)}
+                {cpAssignedStudents.length > 0 && (
+                  <optgroup label="배정된 학생">
+                    {cpAssignedStudents.map(sid => <option key={sid} value={sid}>{HARDCODED_ACCOUNTS[sid]?.name || sid} ({sid})</option>)}
+                  </optgroup>
+                )}
+                <optgroup label="전체 학생">
+                  {allStudents.filter(s => !cpAssignedStudents.includes(s.id)).map(s => <option key={s.id} value={s.id}>{s.name} ({s.id})</option>)}
+                </optgroup>
               </select>
             </div>
             <div>
