@@ -6,6 +6,7 @@ import MockBar from '@/components/layout/MockBar';
 import GnbNav from '@/components/layout/GnbNav';
 import Footer from '@/components/layout/Footer';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 // ── Constants ─────────────────────────────────────────────────
 const TEAL = '#0098a3';
@@ -163,6 +164,7 @@ export default function AnswerPage() {
 
   // Step 4
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Cause file
   const [causeFileName, setCauseFileName] = useState<string | null>(null);
@@ -179,6 +181,96 @@ export default function AnswerPage() {
       setDocOwners([{ id: crypto.randomUUID(), type: '원고 소송대리인', name: `변호사 ${user.name}`, userId: user.id }]);
     }
   });
+
+  // ── 문서제출 (Supabase 저장) ──
+  async function handleFinalSubmit() {
+    if (!user || submitting) return;
+    setSubmitting(true);
+    try {
+      const record = {
+        student_id: user.id,
+        user_name: user.name,
+        doc_type: 'answer',
+        case_type: caseName || '답변서(청구취지/원인)',
+        court: court,
+        plaintiff: plaintiff,
+        defendant: defendant,
+        has_agent: false,
+        evidence_count: evidenceRows.length,
+        score: 0,
+        feedback: '채점 중...',
+        complaint_data: {
+          doc_type: 'answer',
+          caseNo,
+          court,
+          division,
+          caseName,
+          plaintiff,
+          defendant,
+          claimPurpose: answerPurpose,
+          claimCause: answerCause,
+          evidences: evidenceRows.map(r => ({ number: `${r.서증부호} 제${r.서증번호}호증`, name: r.서류명 })),
+          attachments: attachRows.map(r => ({ name: r.서류명, file: r.파일명 })),
+          docOwners,
+        },
+        case_id: null,
+      };
+
+      const { data: inserted, error: insertError } = await supabase
+        .from('practice_records')
+        .insert(record)
+        .select('id')
+        .single();
+
+      if (insertError) throw new Error(insertError.message);
+      if (!inserted?.id) throw new Error('제출 기록 생성에 실패했습니다.');
+
+      // 채점 시도
+      try {
+        const gradeRes = await fetch('/api/grade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            formData: {
+              doc_type: 'answer',
+              caseCategory: caseName,
+              caseName,
+              court,
+              claimPurpose: answerPurpose,
+              claimCause: answerCause,
+              parties: [
+                { id: '1', role: '원고', name: plaintiff, addr: '' },
+                { id: '2', role: '피고', name: defendant, addr: '' },
+              ],
+              evidences: evidenceRows.map(r => ({ id: r.id, number: `을 제${r.서증번호}호증`, name: r.서류명, purpose: '' })),
+              hasAgent: false,
+              claimType: '',
+              sogaType: '',
+              soga: '',
+            },
+            sampleCase: { id: '0', title: caseName, case_type: caseName, court, plaintiff, defendant, created_at: new Date().toISOString() },
+            doc_type: 'answer',
+          }),
+          signal: AbortSignal.timeout(30_000),
+        });
+        if (gradeRes.ok) {
+          const gradeResult = await gradeRes.json();
+          if (gradeResult.score != null && !gradeResult.isError) {
+            await supabase
+              .from('practice_records')
+              .update({ score: gradeResult.score, feedback: gradeResult.feedback ?? '', grade_breakdown: gradeResult.breakdown ?? null, graded_at: new Date().toISOString() })
+              .eq('id', inserted.id);
+          }
+        }
+      } catch { /* 채점 실패해도 제출은 완료 */ }
+
+      setShowSubmitModal(true);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '제출 중 오류가 발생했습니다.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   // ── Helpers ──
   function scrollTo(key: string) {
@@ -1282,8 +1374,8 @@ export default function AnswerPage() {
                 <button onClick={() => setStep(3)} style={{ height: 32, padding: '0 16px', background: '#fff', border: '1px solid #aaa', color: '#555', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                   이전으로가기
                 </button>
-                <button onClick={() => setShowSubmitModal(true)} style={{ height: 34, padding: '0 24px', background: NAVY, color: '#fff', border: 'none', borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  문서제출
+                <button onClick={handleFinalSubmit} disabled={submitting} style={{ height: 34, padding: '0 24px', background: submitting ? '#7a8a9e' : NAVY, color: '#fff', border: 'none', borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+                  {submitting ? '⏳ 제출 중...' : '문서제출'}
                 </button>
               </div>
             </>
