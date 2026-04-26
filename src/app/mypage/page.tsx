@@ -38,6 +38,7 @@ type ActivePage =
 
 interface Assignment {
   id: number
+  case_id?: string
   student_id: string
   status: string
   assigned_at: string
@@ -703,10 +704,10 @@ export default function MyPage() {
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4, gap: 8 }}>
-                    <button onClick={() => goToApply(c)} style={{ height: 38, padding: '0 22px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    <button onClick={() => a.case_id ? router.push(`/apply/complaint?caseId=${a.case_id}`) : goToApply(c)} style={{ height: 38, padding: '0 22px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                       📝 소장 작성하기 →
                     </button>
-                    <button onClick={() => { sessionStorage.setItem('assigned_case', JSON.stringify(c)); router.push('/answer'); }} style={{ height: 38, padding: '0 22px', background: '#fff', color: '#1a3a6b', border: '1px solid #1a3a6b', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    <button onClick={() => router.push(`/apply/answer?caseId=${a.case_id}`)} style={{ height: 38, padding: '0 22px', background: '#fff', color: '#1a3a6b', border: '1px solid #1a3a6b', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                       📋 답변서 작성하기 →
                     </button>
                   </div>
