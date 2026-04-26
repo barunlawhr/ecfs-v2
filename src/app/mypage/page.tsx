@@ -186,23 +186,34 @@ export default function MyPage() {
     setAssignError(null)
     const debugLines: string[] = [`user.id = ${user.id}`]
     try {
-      // 1단계: Supabase user_id 조회
-      let sbRows: Record<string, unknown>[] = []
-      const res = await fetch(
-        `${SB_URL}/rest/v1/assignments?user_id=eq.${encodeURIComponent(user.id)}&select=*`,
-        { headers: SB_HDR }
-      )
-      const d = await res.json()
-      debugLines.push(`Supabase 응답 (status ${res.status}): ${JSON.stringify(d).slice(0, 300)}`)
-      if (Array.isArray(d) && !(d[0]?.code)) sbRows = d
+      // ── 소스 1: 기존 assignments 테이블 (user_id → sample_cases) ──
+      let oldRows: Record<string, unknown>[] = []
+      try {
+        const res = await fetch(
+          `${SB_URL}/rest/v1/assignments?user_id=eq.${encodeURIComponent(user.id)}&select=*`,
+          { headers: SB_HDR }
+        )
+        const d = await res.json()
+        if (Array.isArray(d) && !(d[0]?.code)) oldRows = d
+        debugLines.push(`기존 assignments: ${oldRows.length}건`)
+      } catch { /* ignore */ }
 
-      // 2단계: localStorage
+      // ── 소스 2: 신규 case_assignments 테이블 (student_id → practice_cases) ──
+      let newRows: Record<string, unknown>[] = []
+      try {
+        const { data } = await supabase.from('case_assignments').select('*').eq('student_id', user.id)
+        if (data) newRows = data
+        debugLines.push(`신규 case_assignments: ${newRows.length}건`)
+      } catch { /* ignore */ }
+
+      // ── 소스 3: localStorage ──
       const localAll: Record<string, unknown>[] = JSON.parse(localStorage.getItem('ec_assignments') || '[]')
       const localRows = localAll.filter(r => r.user_id === user.id || r.student_id === user.id)
-      debugLines.push(`localStorage 건수: ${localRows.length}`)
+      debugLines.push(`localStorage: ${localRows.length}건`)
 
+      // ── 중복 제거 (case_id 기준) ──
       const seen = new Set<string>()
-      const combined = [...sbRows, ...localRows].filter(r => {
+      const combined = [...oldRows, ...newRows, ...localRows].filter(r => {
         const key = `${r.user_id || r.student_id}-${r.case_id}`
         if (seen.has(key)) return false
         seen.add(key)
@@ -211,10 +222,11 @@ export default function MyPage() {
       debugLines.push(`합계: ${combined.length}건`)
       setAssignDebug(debugLines.join('\n'))
 
-      // 3단계: case_id로 sample_cases 별도 조회
+      // ── case_id로 sample_cases + practice_cases 조회 ──
       const caseIds = [...new Set(combined.map(r => r.case_id).filter(Boolean))]
-      let caseMap: Record<string | number, unknown> = {}
+      const caseMap: Record<string | number, unknown> = {}
       if (caseIds.length > 0) {
+        // sample_cases (기존)
         try {
           const caseRes = await fetch(
             `${SB_URL}/rest/v1/sample_cases?id=in.(${caseIds.join(',')})&select=*`,
@@ -223,6 +235,27 @@ export default function MyPage() {
           const cases = await caseRes.json()
           if (Array.isArray(cases)) {
             cases.forEach((c: Record<string, unknown>) => { caseMap[c.id as string | number] = c })
+          }
+        } catch { /* ignore */ }
+
+        // practice_cases (신규)
+        try {
+          const { data: pcases } = await supabase.from('practice_cases').select('*').in('id', caseIds)
+          if (pcases) {
+            pcases.forEach(c => {
+              // practice_cases를 sample_cases 형태로 변환
+              caseMap[c.id] = {
+                id: c.id,
+                title: c.case_name,
+                case_type: c.case_type,
+                court: c.court,
+                plaintiff: c.plaintiff,
+                defendant: c.defendant,
+                background: '',
+                key_facts: '',
+                created_at: c.created_at,
+              }
+            })
           }
         } catch { /* ignore */ }
       }
