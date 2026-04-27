@@ -56,6 +56,10 @@ interface Assignment {
     background?: string
     key_facts?: string
     difficulty?: string
+    case_facts?: string
+    assignment_type?: string
+    case_number?: string
+    case_name?: string
   }
 }
 
@@ -125,6 +129,7 @@ export default function MyPage() {
   })
 
   const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [factsModal, setFactsModal] = useState<{caseNo: string; caseName: string; facts: string} | null>(null)
   const [assignmentsLoading, setAssignmentsLoading] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
   const [assignDebug, setAssignDebug] = useState<string>('')
@@ -269,6 +274,10 @@ export default function MyPage() {
                 defendant: c.defendant,
                 background: '',
                 key_facts: '',
+                case_facts: c.case_facts || '',
+                assignment_type: c.assignment_type || 'both',
+                difficulty: c.difficulty || 'basic',
+                case_number: c.case_number || '',
                 created_at: c.created_at,
               }
             })
@@ -690,7 +699,16 @@ export default function MyPage() {
                     <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{c.title || '(제목 없음)'}</div>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,.65)', marginTop: 3 }}>[{c.case_type || '민사'}] {c.court || ''}</div>
                   </div>
-                  <span style={{ background: statusBg, color: statusColor, padding: '4px 12px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>{statusLabel}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ background: statusBg, color: statusColor, padding: '4px 12px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>{statusLabel}</span>
+                    {c.difficulty && c.difficulty !== 'basic' && (
+                      <span style={{ background: c.difficulty === 'advanced' ? '#fef2f2' : '#fffbeb',
+                        color: c.difficulty === 'advanced' ? '#dc2626' : '#d97706',
+                        padding:'3px 10px', borderRadius:12, fontSize:10, fontWeight:700 }}>
+                        {c.difficulty === 'advanced' ? '고급' : '중급'}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div style={{ padding: '16px 20px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginBottom: 12 }}>
@@ -718,18 +736,50 @@ export default function MyPage() {
                       <div style={{ fontSize: 12, color: '#555', lineHeight: 1.9, whiteSpace: 'pre-wrap' }}>{c.facts || c.key_facts}</div>
                     </div>
                   )}
+                  {(c.case_facts || c.facts) && (
+                    <button onClick={() => setFactsModal({ caseNo: c.case_number || '', caseName: c.title || c.case_name || '', facts: c.case_facts || c.facts || '' })}
+                      style={{ height:32, padding:'0 14px', background:'#f0f7ff', color:'#003366', border:'1px solid #c8ddf5', borderRadius:4, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', marginBottom:8, display:'block' }}>
+                      📄 사건개요 보기
+                    </button>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4, gap: 8 }}>
-                    <button onClick={() => a.case_id ? router.push(`/apply/complaint?caseId=${a.case_id}`) : goToApply(c)} style={{ height: 38, padding: '0 22px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                      📝 소장 작성하기 →
-                    </button>
-                    <button onClick={() => router.push(`/apply/answer?caseId=${a.case_id}`)} style={{ height: 38, padding: '0 22px', background: '#fff', color: '#1a3a6b', border: '1px solid #1a3a6b', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                      📋 답변서 작성하기 →
-                    </button>
+                    {(c.assignment_type !== 'answer_only') && (
+                      <button onClick={() => a.case_id ? router.push(`/apply/complaint?caseId=${a.case_id}`) : goToApply(c)} style={{ height: 38, padding: '0 22px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        📝 소장 작성하기 →
+                      </button>
+                    )}
+                    {(c.assignment_type !== 'complaint_only') && (
+                      <button onClick={() => router.push(`/apply/answer?caseId=${a.case_id}`)} style={{ height: 38, padding: '0 22px', background: '#fff', color: '#1a3a6b', border: '1px solid #1a3a6b', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        📋 답변서 작성하기 →
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
             )
           })}
+        </div>
+      )}
+      {factsModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.45)', zIndex:5000, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ background:'#fff', width:560, borderRadius:8, overflow:'hidden', boxShadow:'0 8px 32px rgba(0,0,0,.25)' }}>
+            <div style={{ background:'#1a3a6b', color:'#fff', padding:'14px 20px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ fontWeight:700, fontSize:15 }}>사건개요</span>
+              <button onClick={()=>setFactsModal(null)} style={{ background:'none', border:'none', color:'#fff', fontSize:20, cursor:'pointer' }}>✕</button>
+            </div>
+            <div style={{ padding:'20px' }}>
+              <div style={{ fontSize:13, color:'#555', marginBottom:12 }}>
+                <strong>사건번호:</strong> {factsModal.caseNo}<br/>
+                <strong>사건명:</strong> {factsModal.caseName}
+              </div>
+              <div style={{ background:'#f7f8fc', border:'1px solid #e0e6ee', borderRadius:6, padding:'16px', fontSize:13, color:'#333', lineHeight:1.9, whiteSpace:'pre-wrap' }}>
+                {factsModal.facts}
+              </div>
+              <div style={{ marginTop:12, fontSize:11, color:'#888' }}>
+                ※ 위 내용을 바탕으로 서류를 작성하시기 바랍니다.
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

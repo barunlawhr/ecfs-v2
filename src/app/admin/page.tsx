@@ -549,6 +549,9 @@ export default function AdminPage() {
       id: string; case_number: string; case_type: string; case_name: string
       court: string; division: string; plaintiff: string; defendant: string
       sample_complaint: string; sample_answer: string; is_active: boolean; created_at: string
+      assignment_type: string; difficulty: string; case_facts: string
+      sample_claim_purpose: string; sample_claim_reason: string
+      sample_answer_purpose: string; sample_answer_reason: string
     }
     const CASE_TYPES = [
       { value: 'civil', label: '민사' },
@@ -559,6 +562,9 @@ export default function AdminPage() {
     const emptyForm = {
       case_number: '', case_type: 'civil', case_name: '', court: COURTS[0] as string,
       division: '', plaintiff: '', defendant: '', sample_complaint: '', sample_answer: '', is_active: true,
+      assignment_type: 'both', difficulty: 'basic', case_facts: '',
+      sample_claim_purpose: '', sample_claim_reason: '',
+      sample_answer_purpose: '', sample_answer_reason: '',
     }
 
     const [cases, setCases] = useState<PCase[]>([])
@@ -586,6 +592,10 @@ export default function AdminPage() {
         division: c.division || '', plaintiff: c.plaintiff || '',
         defendant: c.defendant || '', sample_complaint: c.sample_complaint || '',
         sample_answer: c.sample_answer || '', is_active: c.is_active ?? true,
+        assignment_type: c.assignment_type || 'both', difficulty: c.difficulty || 'basic',
+        case_facts: c.case_facts || '',
+        sample_claim_purpose: c.sample_claim_purpose || '', sample_claim_reason: c.sample_claim_reason || '',
+        sample_answer_purpose: c.sample_answer_purpose || '', sample_answer_reason: c.sample_answer_reason || '',
       })
       setShowModal(true)
     }
@@ -633,7 +643,7 @@ export default function AdminPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, border: '1px solid #d0d8e4' }}>
               <thead>
                 <tr style={{ background: '#1a3a6b', color: '#fff' }}>
-                  {['사건번호', '유형', '사건명', '법원', '원고', '피고', '활성', '등록일', '작업'].map(h => (
+                  {['사건번호', '유형', '사건명', '법원', '원고', '피고', '배정유형', '난이도', '활성', '등록일', '작업'].map(h => (
                     <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -647,6 +657,8 @@ export default function AdminPage() {
                     <td style={{ padding: '9px 12px' }}>{c.court}</td>
                     <td style={{ padding: '9px 12px' }}>{c.plaintiff}</td>
                     <td style={{ padding: '9px 12px' }}>{c.defendant}</td>
+                    <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>{c.assignment_type === 'complaint_only' ? '소장만' : c.assignment_type === 'answer_only' ? '답변서만' : '소장+답변서'}</td>
+                    <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>{c.difficulty === 'advanced' ? '고급' : c.difficulty === 'intermediate' ? '중급' : '기초'}</td>
                     <td style={{ padding: '9px 12px' }}>{c.is_active ? '✅' : '❌'}</td>
                     <td style={{ padding: '9px 12px', color: '#888', whiteSpace: 'nowrap' }}>{c.created_at ? new Date(c.created_at).toLocaleDateString('ko-KR') : '-'}</td>
                     <td style={{ padding: '9px 12px' }}>
@@ -683,8 +695,35 @@ export default function AdminPage() {
                 <label style={caseLabelStyle}>부서<input style={caseInp} value={form.division} onChange={e => setForm({ ...form, division: e.target.value })} /></label>
                 <label style={caseLabelStyle}>원고<input style={caseInp} value={form.plaintiff} onChange={e => setForm({ ...form, plaintiff: e.target.value })} /></label>
                 <label style={caseLabelStyle}>피고<input style={caseInp} value={form.defendant} onChange={e => setForm({ ...form, defendant: e.target.value })} /></label>
+                <div style={caseLabelStyle}>배정유형
+                  <div style={{ display: 'flex', gap: 16, fontSize: 13 }}>
+                    {[{ v: 'complaint_only', l: '소장만' }, { v: 'answer_only', l: '답변서만' }, { v: 'both', l: '소장+답변서' }].map(o => (
+                      <label key={o.v} style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: 400 }}>
+                        <input type="radio" name="assignment_type" checked={form.assignment_type === o.v} onChange={() => setForm({ ...form, assignment_type: o.v })} />{o.l}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div style={caseLabelStyle}>난이도
+                  <div style={{ display: 'flex', gap: 16, fontSize: 13 }}>
+                    {[{ v: 'basic', l: '기초' }, { v: 'intermediate', l: '중급' }, { v: 'advanced', l: '고급' }].map(o => (
+                      <label key={o.v} style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: 400 }}>
+                        <input type="radio" name="difficulty" checked={form.difficulty === o.v} onChange={() => setForm({ ...form, difficulty: o.v })} />{o.l}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <label style={caseLabelStyle}>사건개요 (학생에게 공개)<textarea style={{ ...caseInp, height: 100, padding: '6px 8px' }} value={form.case_facts} onChange={e => setForm({ ...form, case_facts: e.target.value })} /></label>
                 <label style={caseLabelStyle}>소장 샘플<textarea style={{ ...caseInp, height: 80, padding: '6px 8px' }} value={form.sample_complaint} onChange={e => setForm({ ...form, sample_complaint: e.target.value })} /></label>
                 <label style={caseLabelStyle}>답변서 샘플<textarea style={{ ...caseInp, height: 80, padding: '6px 8px' }} value={form.sample_answer} onChange={e => setForm({ ...form, sample_answer: e.target.value })} /></label>
+                <label style={caseLabelStyle}>모범 청구취지 (채점용)<textarea style={{ ...caseInp, height: 80, padding: '6px 8px' }} value={form.sample_claim_purpose} onChange={e => setForm({ ...form, sample_claim_purpose: e.target.value })} /></label>
+                <label style={caseLabelStyle}>모범 청구원인 (채점용)<textarea style={{ ...caseInp, height: 80, padding: '6px 8px' }} value={form.sample_claim_reason} onChange={e => setForm({ ...form, sample_claim_reason: e.target.value })} /></label>
+                {form.assignment_type !== 'complaint_only' && (
+                  <>
+                    <label style={caseLabelStyle}>모범 답변취지 (채점용)<textarea style={{ ...caseInp, height: 80, padding: '6px 8px' }} value={form.sample_answer_purpose} onChange={e => setForm({ ...form, sample_answer_purpose: e.target.value })} /></label>
+                    <label style={caseLabelStyle}>모범 답변이유 (채점용)<textarea style={{ ...caseInp, height: 80, padding: '6px 8px' }} value={form.sample_answer_reason} onChange={e => setForm({ ...form, sample_answer_reason: e.target.value })} /></label>
+                  </>
+                )}
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
                   <input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} />
                   활성 상태
@@ -706,7 +745,7 @@ export default function AdminPage() {
   // ─────────────────────────────────────────────
   function AssignPanel() {
     interface APCase { id: string; case_number: string; case_name: string }
-    interface APAssignment { id: string; case_id: string; student_id: string; role: string; assigned_at: string; due_date: string | null; status: string }
+    interface APAssignment { id: string; case_id: string; student_id: string; role: string; assigned_at: string; due_date: string | null; status: string; doc_type?: string }
 
     const ASSIGN_STUDENT_LIST = Object.entries(HARDCODED_ACCOUNTS)
       .filter(([, acc]) => acc.role === 'student')
@@ -720,6 +759,7 @@ export default function AdminPage() {
 
     const [formStudentId, setFormStudentId] = useState(ASSIGN_STUDENT_LIST[0]?.id || '')
     const [formRole, setFormRole] = useState('원고측')
+    const [formDocType, setFormDocType] = useState('complaint')
     const [formDueDate, setFormDueDate] = useState('')
 
     const fetchCases2 = useCallback(async () => {
@@ -742,7 +782,7 @@ export default function AdminPage() {
 
     async function handleAssign() {
       if (!selectedCaseId || !formStudentId) { alert('사건과 학생을 선택하세요.'); return }
-      const payload = { case_id: selectedCaseId, student_id: formStudentId, role: formRole, due_date: formDueDate || null, status: 'assigned' }
+      const payload = { case_id: selectedCaseId, student_id: formStudentId, role: formRole, doc_type: formDocType, due_date: formDueDate || null, status: 'assigned' }
       const { error: err } = await supabase.from('case_assignments').insert([payload])
       if (err) { alert('배정 실패: ' + err.message); return }
       fetchAssignments(selectedCaseId)
@@ -796,6 +836,17 @@ export default function AdminPage() {
                   <option value="피고측">피고측</option>
                 </select>
               </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 600, color: '#333' }}>
+                서류유형
+                <div style={{ display: 'flex', gap: 12, fontSize: 13, fontWeight: 400 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <input type="radio" name="ap_doc_type" checked={formDocType === 'complaint'} onChange={() => setFormDocType('complaint')} />소장 작성
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <input type="radio" name="ap_doc_type" checked={formDocType === 'answer'} onChange={() => setFormDocType('answer')} />답변서 작성
+                  </label>
+                </div>
+              </div>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 600, color: '#333' }}>
                 마감일
                 <input type="date" style={{ ...assignInp, width: 160 }} value={formDueDate} onChange={e => setFormDueDate(e.target.value)} />
@@ -815,7 +866,7 @@ export default function AdminPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, border: '1px solid #d0d8e4' }}>
               <thead>
                 <tr style={{ background: '#1a3a6b', color: '#fff' }}>
-                  {['학생ID', '학생이름', '역할', '배정일', '마감일', '상태', '작업'].map(h => (
+                  {['학생ID', '학생이름', '역할', '서류유형', '배정일', '마감일', '상태', '작업'].map(h => (
                     <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -826,6 +877,7 @@ export default function AdminPage() {
                     <td style={{ padding: '9px 12px' }}>{a.student_id}</td>
                     <td style={{ padding: '9px 12px' }}>{getStudentName2(a.student_id)}</td>
                     <td style={{ padding: '9px 12px' }}>{a.role}</td>
+                    <td style={{ padding: '9px 12px' }}>{a.doc_type === 'answer' ? '답변서' : '소장'}</td>
                     <td style={{ padding: '9px 12px' }}>{a.assigned_at ? new Date(a.assigned_at).toLocaleDateString('ko-KR') : '-'}</td>
                     <td style={{ padding: '9px 12px' }}>{a.due_date ? new Date(a.due_date).toLocaleDateString('ko-KR') : '-'}</td>
                     <td style={{ padding: '9px 12px' }}>
