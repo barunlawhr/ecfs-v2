@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useRef, useCallback, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import MockBar from '@/components/layout/MockBar';
 import GnbNav from '@/components/layout/GnbNav';
 import Footer from '@/components/layout/Footer';
@@ -89,9 +89,18 @@ interface UploadedFile {
 }
 
 // ── Main Page ──────────────────────────────────────────────────
-export default function AnswerPage() {
+export default function AnswerPageWrapper() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>로딩 중...</div>}>
+      <AnswerPage />
+    </Suspense>
+  );
+}
+
+function AnswerPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Step management
   const [step, setStep] = useState(1);
@@ -158,6 +167,25 @@ export default function AnswerPage() {
   // Purpose file
   const [purposeFileName, setPurposeFileName] = useState<string | null>(null);
   const purposeFileRef = useRef<HTMLInputElement>(null);
+
+  // caseId로 배정된 사건 정보 자동 로드
+  const [caseLoaded, setCaseLoaded] = useState(false);
+  useEffect(() => {
+    const caseId = searchParams.get('caseId');
+    if (!caseId || caseLoaded) return;
+    (async () => {
+      const { data } = await supabase.from('practice_cases').select('*').eq('id', caseId).single();
+      if (data) {
+        setCaseNo(data.case_number || '');
+        setCourt(data.court || '');
+        setDivision(data.division || '');
+        setCaseName(data.case_name || '');
+        setPlaintiff(data.plaintiff || '');
+        setDefendant(data.defendant || '');
+        setCaseLoaded(true);
+      }
+    })();
+  }, [searchParams, caseLoaded]);
 
   // Initialize doc owners with user
   useState(() => {
@@ -429,55 +457,66 @@ export default function AnswerPage() {
               <div id="sec-s1" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
                 <SecHd label="① 사건기본정보" open={open.s1} toggle={() => toggle('s1')} />
                 {open.s1 && (
-                  <div>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <div style={{ padding: '12px 14px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4', fontSize: 12 }}>
                       <tbody>
                         <tr style={{ borderBottom: '1px solid #eaecf4' }}>
-                          <th style={TH}>사건번호<span style={{ color: '#e53e3e' }}>*</span></th>
+                          <td style={{ ...TH, width: 100 }}>법원</td>
                           <td style={TD}>
-                            <input value={caseNo} onChange={e => setCaseNo(e.target.value)} style={{ ...INP, width: 220 }} placeholder="예: 2026가소226035" />
+                            {caseLoaded
+                              ? <span style={{ fontSize: 13 }}>{court}</span>
+                              : <select value={court} onChange={e => setCourt(e.target.value)} style={{ ...SEL, width: 220 }}><option value="">선택</option>{COURTS.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                            }
+                          </td>
+                          <td style={{ ...TH, width: 100 }}>사건번호</td>
+                          <td style={TD}>
+                            {caseLoaded
+                              ? <span style={{ fontSize: 13 }}>{caseNo}</span>
+                              : <input value={caseNo} onChange={e => setCaseNo(e.target.value)} style={{ ...INP, width: 200 }} placeholder="예: 2026가소226035" />
+                            }
                           </td>
                         </tr>
                         <tr style={{ borderBottom: '1px solid #eaecf4' }}>
-                          <th style={TH}>법원<span style={{ color: '#e53e3e' }}>*</span></th>
+                          <td style={{ ...TH, width: 100 }}>재판부</td>
                           <td style={TD}>
-                            <select value={court} onChange={e => setCourt(e.target.value)} style={{ ...SEL, width: 220 }}>
-                              <option value="">선택</option>
-                              {COURTS.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
+                            {caseLoaded
+                              ? <span style={{ fontSize: 13 }}>{division || '-'}</span>
+                              : <input value={division} onChange={e => setDivision(e.target.value)} style={{ ...INP, width: 200 }} placeholder="예: 민사10단독(소액)" />
+                            }
+                          </td>
+                          <td style={{ ...TH, width: 100 }}>사건명</td>
+                          <td style={TD}>
+                            {caseLoaded
+                              ? <span style={{ fontSize: 13 }}>{caseName}</span>
+                              : <input value={caseName} onChange={e => setCaseName(e.target.value)} style={{ ...INP, width: 200 }} placeholder="예: 손해배상(기)" />
+                            }
                           </td>
                         </tr>
                         <tr style={{ borderBottom: '1px solid #eaecf4' }}>
-                          <th style={TH}>재판부</th>
+                          <td style={{ ...TH, width: 100 }}>원고</td>
                           <td style={TD}>
-                            <input value={division} onChange={e => setDivision(e.target.value)} style={{ ...INP, width: 220 }} placeholder="예: 민사10단독(소액)" />
+                            {caseLoaded
+                              ? <span style={{ fontSize: 13 }}>{plaintiff}</span>
+                              : <input value={plaintiff} onChange={e => setPlaintiff(e.target.value)} style={{ ...INP, width: 200 }} />
+                            }
                           </td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px solid #eaecf4' }}>
-                          <th style={TH}>사건명<span style={{ color: '#e53e3e' }}>*</span></th>
+                          <td style={{ ...TH, width: 100 }}>피고</td>
                           <td style={TD}>
-                            <input value={caseName} onChange={e => setCaseName(e.target.value)} style={{ ...INP, width: 220 }} placeholder="예: 손해배상(기)" />
-                          </td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px solid #eaecf4' }}>
-                          <th style={TH}>원고<span style={{ color: '#e53e3e' }}>*</span></th>
-                          <td style={TD}>
-                            <input value={plaintiff} onChange={e => setPlaintiff(e.target.value)} style={{ ...INP, width: 220 }} />
-                          </td>
-                        </tr>
-                        <tr style={{ borderBottom: '1px solid #eaecf4' }}>
-                          <th style={TH}>피고<span style={{ color: '#e53e3e' }}>*</span></th>
-                          <td style={TD}>
-                            <input value={defendant} onChange={e => setDefendant(e.target.value)} style={{ ...INP, width: 220 }} />
+                            {caseLoaded
+                              ? <span style={{ fontSize: 13 }}>{defendant}</span>
+                              : <input value={defendant} onChange={e => setDefendant(e.target.value)} style={{ ...INP, width: 200 }} />
+                            }
                           </td>
                         </tr>
                       </tbody>
                     </table>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 14px' }}>
-                      <button onClick={() => setShowRegModal(true)} style={{ height: 32, padding: '0 20px', border: 'none', borderRadius: 2, background: NAVY, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
-                        ✎ 등록
-                      </button>
-                    </div>
+                    {!caseLoaded && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                        <button onClick={() => setShowRegModal(true)} style={{ height: 32, padding: '0 20px', border: 'none', borderRadius: 2, background: NAVY, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                          ✎ 등록
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
