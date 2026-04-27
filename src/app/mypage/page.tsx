@@ -36,6 +36,9 @@ type ActivePage =
   | 'correction-list'
   | 'unconfirmed-delivery-new'
   | 'all-delivery-new'
+  | 'practice-complaint'
+  | 'practice-answer'
+  | 'practice-brief'
   | 'generic'
 
 interface Assignment {
@@ -173,6 +176,9 @@ export default function MyPage() {
     if (activePage === 'active-cases' || activePage === 'status') fetchAllCases()
     if (activePage === 'assigned-cases' || activePage === 'status') fetchAssignments()
     if (activePage === 'practice-records' || activePage === 'submitted-docs') fetchPracticeRecords()
+    if (activePage === 'practice-complaint' || activePage === 'practice-answer' || activePage === 'practice-brief') {
+      // PracticeContent handles its own data loading
+    }
 
     return () => { fetchControllerRef.current?.abort() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3429,6 +3435,515 @@ export default function MyPage() {
     )
   }
 
+  // ── 실습 전용 (소장/답변서/준비서면) ─────────────────────
+  const PracticeContent = ({ docType }: { docType: 'complaint' | 'answer' | 'brief' }) => {
+    const [assignments, setPracticeAssignments] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+    const [expandedFacts, setExpandedFacts] = useState<Record<string, boolean>>({})
+    const [formData, setFormData] = useState<Record<string, any>>({})
+    const [submittingId, setSubmittingId] = useState<string | null>(null)
+    const [resultModal, setResultModal] = useState<{ score: number; feedback: string; breakdown: any; issues: string[] } | null>(null)
+    const [draftToast, setDraftToast] = useState(false)
+
+    // Fetch assignments for this doc type
+    useEffect(() => {
+      if (!user) return
+      setLoading(true)
+      ;(async () => {
+        const { data: assigns } = await supabase
+          .from('case_assignments')
+          .select('*')
+          .eq('student_id', user.id)
+          .eq('doc_type', docType)
+          .order('assigned_at', { ascending: false })
+
+        if (!assigns?.length) { setPracticeAssignments([]); setLoading(false); return }
+
+        const caseIds = [...new Set(assigns.map(a => a.case_id))]
+        const { data: cases } = await supabase
+          .from('practice_cases')
+          .select('*')
+          .in('id', caseIds)
+
+        const caseMap = new Map((cases || []).map(c => [c.id, c]))
+
+        const result = assigns.map(a => ({
+          ...a,
+          case: caseMap.get(a.case_id) || {},
+        }))
+
+        setPracticeAssignments(result)
+
+        // Restore drafts from localStorage
+        const restored: Record<string, any> = {}
+        result.forEach(a => {
+          const saved = localStorage.getItem(`practice_draft_${a.id}`)
+          if (saved) try { restored[a.id] = JSON.parse(saved) } catch {}
+        })
+        setFormData(restored)
+
+        setLoading(false)
+      })()
+    }, [user, docType])
+
+    function updateForm(assignId: string, field: string, value: any) {
+      setFormData(prev => ({
+        ...prev,
+        [assignId]: { ...(prev[assignId] || {}), [field]: value }
+      }))
+    }
+
+    function getForm(assignId: string) {
+      return formData[assignId] || {}
+    }
+
+    function saveDraft(assignId: string) {
+      localStorage.setItem(`practice_draft_${assignId}`, JSON.stringify(getForm(assignId)))
+      setDraftToast(true)
+      setTimeout(() => setDraftToast(false), 2500)
+    }
+
+    async function handleSubmit(assignId: string, caseData: any) {
+      const form = getForm(assignId)
+
+      // Validation
+      if (docType === 'complaint') {
+        if (!form.plaintiffName?.trim()) { alert('원고명을 입력해주세요.'); return }
+        if (!form.defendantName?.trim()) { alert('피고명을 입력해주세요.'); return }
+        if (!form.claimPurpose?.trim()) { alert('청구취지를 입력해주세요.'); return }
+        if (!form.claimReason?.trim()) { alert('청구원인을 입력해주세요.'); return }
+      } else if (docType === 'answer') {
+        if (!form.answerPurpose?.trim()) { alert('답변취지를 입력해주세요.'); return }
+        if (!form.answerReason?.trim()) { alert('답변이유를 입력해주세요.'); return }
+      } else if (docType === 'brief') {
+        if (form.inputMode === 'file') {
+          if (!form.fileName) { alert('파일을 업로드해주세요.'); return }
+        } else {
+          if (!form.content?.trim()) { alert('변론내용을 입력해주세요.'); return }
+        }
+      }
+
+      setSubmittingId(assignId)
+      try {
+        // Save to practice_records
+        const record = {
+          student_id: user!.id,
+          user_name: user!.name,
+          doc_type: docType,
+          case_type: caseData.case_name || '',
+          court: caseData.court || '',
+          plaintiff: caseData.plaintiff || form.plaintiffName || '',
+          defendant: caseData.defendant || form.defendantName || '',
+          has_agent: false,
+          evidence_count: (form.evidence || []).length,
+          score: 0,
+          feedback: '채점 중...',
+          complaint_data: { doc_type: docType, ...form },
+          case_id: caseData.id || null,
+        }
+
+        const { data: inserted, error } = await supabase
+          .from('practice_records')
+          .insert(record)
+          .select('id')
+          .single()
+        if (error) throw new Error(error.message)
+        if (!inserted?.id) throw new Error('제출 실패')
+
+        // AI grading
+        let gradeResult = null
+        try {
+          const gradeRes = await fetch('/api/grade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              formData: {
+                doc_type: docType,
+                caseCategory: caseData.case_name,
+                caseName: caseData.case_name,
+                court: caseData.court,
+                claimPurpose: form.claimPurpose || form.answerPurpose || '',
+                claimCause: form.claimReason || form.answerReason || form.content || '',
+                parties: [
+                  { id: '1', role: '원고', name: form.plaintiffName || caseData.plaintiff, addr: form.plaintiffAddr || '' },
+                  { id: '2', role: '피고', name: form.defendantName || caseData.defendant, addr: form.defendantAddr || '' },
+                ],
+                evidences: (form.evidence || []).map((e: any, i: number) => ({
+                  id: String(i), number: `${docType === 'answer' ? '을' : '갑'} 제${i+1}호증`,
+                  name: e.name || '', purpose: e.purpose || '',
+                })),
+                hasAgent: false, claimType: '', sogaType: '', soga: '',
+              },
+              sampleCase: { id: caseData.id || '0', title: caseData.case_name, case_type: caseData.case_name, court: caseData.court, plaintiff: caseData.plaintiff, defendant: caseData.defendant, created_at: new Date().toISOString(), claim_purpose: caseData.sample_claim_purpose, claim_reason: caseData.sample_claim_reason },
+              doc_type: docType,
+            }),
+            signal: AbortSignal.timeout(30_000),
+          })
+          if (gradeRes.ok) {
+            gradeResult = await gradeRes.json()
+            if (gradeResult.score != null && !gradeResult.isError) {
+              await supabase.from('practice_records').update({
+                score: gradeResult.score, feedback: gradeResult.feedback || '', grade_breakdown: gradeResult.breakdown, graded_at: new Date().toISOString(),
+              }).eq('id', inserted.id)
+            }
+          }
+        } catch {}
+
+        // Update assignment status
+        await supabase.from('case_assignments').update({ status: 'submitted' }).eq('id', assignId)
+
+        // Clear draft
+        localStorage.removeItem(`practice_draft_${assignId}`)
+
+        // Show result
+        setResultModal({
+          score: gradeResult?.score ?? 0,
+          feedback: gradeResult?.feedback || '채점이 완료되었습니다.',
+          breakdown: gradeResult?.breakdown || {},
+          issues: gradeResult?.issues || [],
+        })
+
+        // Refresh
+        setPracticeAssignments(prev => prev.map(a => a.id === assignId ? { ...a, status: 'submitted' } : a))
+      } catch (err) {
+        alert(err instanceof Error ? err.message : '제출 중 오류')
+      } finally {
+        setSubmittingId(null)
+      }
+    }
+
+    const tabInfo = {
+      complaint: { title: '소장작성실습', icon: '📄', desc: '배정된 사건의 사건개요를 읽고, 소장의 각 항목을 직접 작성하여 제출하세요. 작성 완료 후 AI 채점 결과를 확인할 수 있습니다.' },
+      answer: { title: '답변서작성실습', icon: '📝', desc: '배정된 사건의 소장 내용을 검토하고, 피고 입장에서 답변취지와 답변이유를 작성하세요.' },
+      brief: { title: '준비서면작성실습', icon: '📋', desc: '진행 중인 사건에서 변론내용을 작성하거나 작성한 파일(PDF/HWP)을 직접 업로드하세요.' },
+    }[docType]
+
+    const diffBadge = (d: string) => {
+      const m: Record<string, { bg: string; color: string; label: string }> = {
+        basic: { bg: '#e8f5e9', color: '#2e7d32', label: '기초' },
+        intermediate: { bg: '#fff3e0', color: '#e65100', label: '중급' },
+        advanced: { bg: '#fce4ec', color: '#c62828', label: '고급' },
+      }
+      const s = m[d] || m.basic
+      return <span style={{ background: s.bg, color: s.color, padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700 }}>{s.label}</span>
+    }
+
+    const statusBadge = (s: string) => {
+      if (s === 'submitted' || s === 'graded') return <span style={{ color: '#16a34a', fontWeight: 600 }}>✅ 제출완료</span>
+      return <span style={{ color: '#e53e3e', fontWeight: 600 }}>○ 미제출</span>
+    }
+
+    // Render complaint form fields
+    const renderComplaintFields = (assignId: string) => {
+      const f = getForm(assignId)
+      const u = (field: string, value: any) => updateForm(assignId, field, value)
+      const inp: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #d0d8e4', borderRadius: 4, fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }
+      return (
+        <>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#003366', padding: '10px 0', borderBottom: '2px solid #003366', marginBottom: 14 }}>작성 문항</div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>① 원고 정보 <span style={{ color: '#e53e3e' }}>*</span></div>
+            <div style={{ display: 'grid', gap: 8 }}>
+              <label style={{ fontSize: 12, color: '#555' }}>원고명 *<input value={f.plaintiffName || ''} onChange={e => u('plaintiffName', e.target.value)} style={inp} placeholder="예: 김한국" /></label>
+              <label style={{ fontSize: 12, color: '#555' }}>주소 *<input value={f.plaintiffAddr || ''} onChange={e => u('plaintiffAddr', e.target.value)} style={inp} placeholder="예: 서울특별시 강남구..." /></label>
+              <label style={{ fontSize: 12, color: '#555' }}>법인등록번호 (법인인 경우)<input value={f.plaintiffRegNo || ''} onChange={e => u('plaintiffRegNo', e.target.value)} style={inp} /></label>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>② 피고 정보 <span style={{ color: '#e53e3e' }}>*</span></div>
+            <div style={{ display: 'grid', gap: 8 }}>
+              <label style={{ fontSize: 12, color: '#555' }}>피고명 *<input value={f.defendantName || ''} onChange={e => u('defendantName', e.target.value)} style={inp} placeholder="예: 이민준" /></label>
+              <label style={{ fontSize: 12, color: '#555' }}>주소 *<input value={f.defendantAddr || ''} onChange={e => u('defendantAddr', e.target.value)} style={inp} placeholder="예: 서울특별시 서초구..." /></label>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>③ 청구취지 <span style={{ color: '#e53e3e' }}>*</span></span>
+              <span style={{ fontSize: 11, color: '#888' }}>{(f.claimPurpose || '').length} / 2000</span>
+            </div>
+            <textarea value={f.claimPurpose || ''} onChange={e => u('claimPurpose', e.target.value)} rows={10} style={{ ...inp, resize: 'vertical' }} placeholder={'청구취지를 작성하세요.\n예) 1. 피고는 원고에게 금 OOO원 및 이에 대하여...'} maxLength={2000} />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>④ 청구원인 <span style={{ color: '#e53e3e' }}>*</span></span>
+              <span style={{ fontSize: 11, color: '#888' }}>{(f.claimReason || '').length} / 5000</span>
+            </div>
+            <textarea value={f.claimReason || ''} onChange={e => u('claimReason', e.target.value)} rows={15} style={{ ...inp, resize: 'vertical' }} placeholder={'청구원인을 작성하세요.\n1. 당사자 관계\n2. 계약 체결 사실\n3. 이행 청구 근거...'} maxLength={5000} />
+          </div>
+
+          {renderEvidenceFields(assignId, '갑')}
+        </>
+      )
+    }
+
+    const renderAnswerFields = (assignId: string) => {
+      const f = getForm(assignId)
+      const u = (field: string, value: any) => updateForm(assignId, field, value)
+      const inp: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #d0d8e4', borderRadius: 4, fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }
+      return (
+        <>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#003366', padding: '10px 0', borderBottom: '2px solid #003366', marginBottom: 14 }}>작성 문항</div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>① 답변취지 <span style={{ color: '#e53e3e' }}>*</span></span>
+              <span style={{ fontSize: 11, color: '#888' }}>{(f.answerPurpose || '').length} / 1000</span>
+            </div>
+            <textarea value={f.answerPurpose || ''} onChange={e => u('answerPurpose', e.target.value)} rows={6} style={{ ...inp, resize: 'vertical' }} placeholder={'예) 1. 원고의 청구를 기각한다.\n    2. 소송비용은 원고가 부담한다.\n    라는 판결을 구합니다.'} maxLength={1000} />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>② 답변이유 <span style={{ color: '#e53e3e' }}>*</span></span>
+              <span style={{ fontSize: 11, color: '#888' }}>{(f.answerReason || '').length} / 5000</span>
+            </div>
+            <textarea value={f.answerReason || ''} onChange={e => u('answerReason', e.target.value)} rows={15} style={{ ...inp, resize: 'vertical' }} placeholder={'청구원인에 대한 구체적 반박을 작성하세요.\n1. 청구원인에 대한 인부\n2. 항변 사실\n3. 결론...'} maxLength={5000} />
+          </div>
+
+          {renderEvidenceFields(assignId, '을')}
+        </>
+      )
+    }
+
+    const renderBriefFields = (assignId: string) => {
+      const f = getForm(assignId)
+      const u = (field: string, value: any) => updateForm(assignId, field, value)
+      const mode = f.inputMode || 'direct'
+      const inp: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #d0d8e4', borderRadius: 4, fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box' }
+      return (
+        <>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#003366', padding: '10px 0', borderBottom: '2px solid #003366', marginBottom: 14 }}>작성 방식 선택</div>
+
+          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+            <label style={{ fontSize: 13, cursor: 'pointer' }}><input type="radio" checked={mode === 'direct'} onChange={() => u('inputMode', 'direct')} style={{ accentColor: '#0098a3' }} /> 직접 입력</label>
+            <label style={{ fontSize: 13, cursor: 'pointer' }}><input type="radio" checked={mode === 'file'} onChange={() => u('inputMode', 'file')} style={{ accentColor: '#0098a3' }} /> 파일 업로드 (PDF/HWP)</label>
+          </div>
+
+          {mode === 'file' ? (
+            <div style={{ border: '2px dashed #c8d8e8', borderRadius: 8, padding: '32px 20px', textAlign: 'center', background: '#fafbfe', marginBottom: 16 }}>
+              {f.fileName ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, color: '#0098a3', fontWeight: 600 }}>📄 {f.fileName}</span>
+                  <button onClick={() => { u('fileName', null); u('fileSize', 0) }} style={{ background: 'none', border: 'none', color: '#e53e3e', cursor: 'pointer', fontSize: 16 }}>✕</button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.5 }}>📄</div>
+                  <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>파일을 여기에 드래그하거나 클릭하세요</div>
+                  <input type="file" accept=".pdf,.hwp,.hwpx,.doc,.docx" onChange={e => { const file = e.target.files?.[0]; if (file) { u('fileName', file.name); u('fileSize', file.size) } }} style={{ fontSize: 12 }} />
+                </>
+              )}
+            </div>
+          ) : (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>변론내용 <span style={{ color: '#e53e3e' }}>*</span></span>
+                <span style={{ fontSize: 11, color: '#888' }}>{(f.content || '').length} / 3000</span>
+              </div>
+              <textarea value={f.content || ''} onChange={e => u('content', e.target.value)} rows={15} style={{ ...inp, resize: 'vertical' }} maxLength={3000} />
+            </div>
+          )}
+        </>
+      )
+    }
+
+    const renderEvidenceFields = (assignId: string, prefix: string) => {
+      const f = getForm(assignId)
+      const evidence: { name: string; purpose: string }[] = f.evidence || [{ name: '', purpose: '' }]
+      const u = (field: string, value: any) => updateForm(assignId, field, value)
+      const inp: React.CSSProperties = { padding: '6px 8px', border: '1px solid #d0d8e4', borderRadius: 3, fontSize: 12, fontFamily: 'inherit', boxSizing: 'border-box' as const }
+
+      return (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>⑤ 증거 목록 ({prefix}호증)</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4', fontSize: 12 }}>
+            <thead><tr style={{ background: '#f5f7fb' }}>
+              <th style={{ padding: '6px 10px', fontWeight: 700, width: 60, borderBottom: '1px solid #d0d8e4' }}>번호</th>
+              <th style={{ padding: '6px 10px', fontWeight: 700, borderBottom: '1px solid #d0d8e4' }}>증거명</th>
+              <th style={{ padding: '6px 10px', fontWeight: 700, borderBottom: '1px solid #d0d8e4' }}>입증취지</th>
+            </tr></thead>
+            <tbody>
+              {evidence.map((ev: any, i: number) => (
+                <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
+                  <td style={{ padding: '4px 10px', textAlign: 'center', fontWeight: 600 }}>{prefix}{i + 1}</td>
+                  <td style={{ padding: '4px 6px' }}><input value={ev.name} onChange={e => { const arr = [...evidence]; arr[i] = { ...arr[i], name: e.target.value }; u('evidence', arr) }} style={{ ...inp, width: '100%' }} /></td>
+                  <td style={{ padding: '4px 6px' }}><input value={ev.purpose} onChange={e => { const arr = [...evidence]; arr[i] = { ...arr[i], purpose: e.target.value }; u('evidence', arr) }} style={{ ...inp, width: '100%' }} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            <button onClick={() => u('evidence', [...evidence, { name: '', purpose: '' }])} style={{ fontSize: 11, padding: '3px 10px', border: '1px solid #0098a3', background: '#fff', color: '#0098a3', borderRadius: 3, cursor: 'pointer' }}>+ 증거 추가</button>
+            {evidence.length > 1 && <button onClick={() => u('evidence', evidence.slice(0, -1))} style={{ fontSize: 11, padding: '3px 10px', border: '1px solid #e53e3e', background: '#fff', color: '#e53e3e', borderRadius: 3, cursor: 'pointer' }}>- 증거 삭제</button>}
+          </div>
+          <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>※ 증거번호는 {prefix}1, {prefix}2... 순서로 자동 부여됩니다.</div>
+        </div>
+      )
+    }
+
+    return (
+      <div>
+        <PageHd title={tabInfo.title} actions={<ActBtn label="🖨 출력" />} />
+
+        {/* Info box */}
+        <div style={{ background: '#f0f9ff', border: '1px solid #0098a3', borderRadius: 6, padding: '14px 18px', marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#003366', marginBottom: 6 }}>📌 {tabInfo.title} 안내</div>
+          <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8 }}>{tabInfo.desc}</div>
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 60, color: '#999' }}>⏳ 불러오는 중...</div>
+        ) : assignments.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 60, background: '#fff', border: '1px solid #d0d8e4', borderRadius: 6 }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>📭</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#333', marginBottom: 6 }}>배정된 실습사건이 없습니다.</div>
+            <div style={{ fontSize: 13, color: '#888' }}>관리자에게 사건 배정을 요청하세요.</div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {assignments.map((a: any) => {
+              const c = a.case || {}
+              const f = getForm(a.id)
+              const isSubmitted = a.status === 'submitted' || a.status === 'graded'
+              const dueDate = a.due_date ? new Date(a.due_date).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }) : ''
+
+              return (
+                <div key={a.id} style={{ border: '1px solid #d0d8e4', borderRadius: 6, background: '#fff', overflow: 'hidden' }}>
+                  {/* Card header */}
+                  <div style={{ padding: '12px 16px', borderBottom: '1px solid #e8edf0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {diffBadge(c.difficulty || 'basic')}
+                      <span style={{ fontWeight: 700, color: '#003366' }}>{c.case_number}</span>
+                      <span style={{ color: '#555' }}>{c.case_name}</span>
+                      {dueDate && <span style={{ fontSize: 11, color: '#888' }}>마감: {dueDate}</span>}
+                    </div>
+                    <div>{statusBadge(a.status)}</div>
+                  </div>
+
+                  {/* Card meta */}
+                  <div style={{ padding: '8px 16px', fontSize: 12, color: '#555', borderBottom: '1px solid #f0f0f0' }}>
+                    {c.court} | {c.division}
+                    {docType === 'answer' && <span> | 원고: {c.plaintiff} 피고: {c.defendant} <strong>(나의 역할: 피고 대리인)</strong></span>}
+                    {docType !== 'answer' && <span> | 원고: {c.plaintiff} 피고: {c.defendant}</span>}
+                  </div>
+
+                  {/* Case facts toggle */}
+                  {c.case_facts && (
+                    <div style={{ padding: '0 16px' }}>
+                      <button onClick={() => setExpandedFacts(prev => ({ ...prev, [a.id]: !prev[a.id] }))} style={{ background: 'none', border: 'none', color: '#003366', fontWeight: 600, fontSize: 12, cursor: 'pointer', padding: '10px 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {docType === 'answer' ? '📄 소장 내용 보기' : '📄 사건개요 보기'} {expandedFacts[a.id] ? '▲' : '▼'}
+                      </button>
+                      {expandedFacts[a.id] && (
+                        <div style={{ background: '#f0f9ff', border: '1px solid #0098a3', borderRadius: 6, padding: '14px', marginBottom: 12, fontSize: 12, color: '#333', lineHeight: 1.9, whiteSpace: 'pre-wrap' }}>
+                          {docType === 'answer' && c.sample_claim_purpose ? (
+                            <>
+                              <div style={{ fontWeight: 700, color: '#003366', marginBottom: 8 }}>📄 원고의 소장 주요 내용</div>
+                              <div style={{ marginBottom: 12 }}>
+                                <div style={{ fontWeight: 600, marginBottom: 4 }}>청구취지:</div>
+                                <div style={{ background: '#fff', padding: '8px 12px', borderRadius: 4, border: '1px solid #e0e6ee' }}>{c.sample_claim_purpose}</div>
+                              </div>
+                              {c.sample_claim_reason && (
+                                <div style={{ marginBottom: 12 }}>
+                                  <div style={{ fontWeight: 600, marginBottom: 4 }}>청구원인:</div>
+                                  <div style={{ background: '#fff', padding: '8px 12px', borderRadius: 4, border: '1px solid #e0e6ee' }}>{c.sample_claim_reason}</div>
+                                </div>
+                              )}
+                              <div style={{ fontSize: 11, color: '#888' }}>※ 위 소장 내용을 검토하고 피고 입장에서 답변서를 작성하세요.</div>
+                            </>
+                          ) : (
+                            c.case_facts
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Form fields (only if not submitted) */}
+                  {!isSubmitted && (
+                    <div style={{ padding: '12px 16px' }}>
+                      {docType === 'complaint' && renderComplaintFields(a.id)}
+                      {docType === 'answer' && renderAnswerFields(a.id)}
+                      {docType === 'brief' && renderBriefFields(a.id)}
+
+                      {/* Action buttons */}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16, paddingTop: 12, borderTop: '1px solid #e8edf0' }}>
+                        <button onClick={() => saveDraft(a.id)} style={{ height: 36, padding: '0 20px', background: '#fff', border: '1px solid #0098a3', color: '#0098a3', borderRadius: 4, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>임시저장</button>
+                        <button onClick={() => handleSubmit(a.id, c)} disabled={submittingId === a.id} style={{ height: 36, padding: '0 20px', background: submittingId === a.id ? '#7ab8bd' : '#0098a3', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: submittingId === a.id ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+                          {submittingId === a.id ? '⏳ 채점 중...' : '제출 및 채점받기 →'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isSubmitted && (
+                    <div style={{ padding: '20px 16px', textAlign: 'center', color: '#16a34a', fontSize: 14, fontWeight: 600 }}>
+                      ✅ 제출이 완료되었습니다. 나의 실습기록에서 채점 결과를 확인하세요.
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Result modal */}
+        {resultModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 6000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: '#fff', width: 480, borderRadius: 8, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,.25)' }}>
+              <div style={{ background: '#003366', color: '#fff', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 700, fontSize: 15 }}>채점 결과</span>
+                <button onClick={() => setResultModal(null)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>✕</button>
+              </div>
+              <div style={{ padding: '24px' }}>
+                <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                  <div style={{ fontSize: 14, color: '#555', marginBottom: 8 }}>총점</div>
+                  <div style={{ fontSize: 36, fontWeight: 800, color: resultModal.score >= 80 ? '#16a34a' : resultModal.score >= 60 ? '#d97706' : '#e53e3e' }}>{resultModal.score}점</div>
+                  <div style={{ fontSize: 13, color: '#888' }}>/ 100점</div>
+                </div>
+                {resultModal.breakdown && Object.keys(resultModal.breakdown).length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>항목별 점수:</div>
+                    {Object.entries(resultModal.breakdown).map(([key, val]) => (
+                      <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12 }}>
+                        <span>• {key}</span><span style={{ fontWeight: 600 }}>{String(val)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {resultModal.feedback && (
+                  <div style={{ background: '#f7f8fc', borderRadius: 6, padding: '12px', fontSize: 12, color: '#333', lineHeight: 1.8, whiteSpace: 'pre-wrap', marginBottom: 12 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 6 }}>AI 피드백:</div>
+                    {resultModal.feedback}
+                  </div>
+                )}
+                {resultModal.issues?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#e53e3e', marginBottom: 4 }}>수정 필요 사항:</div>
+                    {resultModal.issues.map((issue, i) => <div key={i} style={{ fontSize: 12, color: '#555', paddingLeft: 8 }}>• {issue}</div>)}
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 20 }}>
+                  <button onClick={() => setResultModal(null)} style={{ height: 36, padding: '0 24px', background: '#003366', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>확인</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Draft toast */}
+        {draftToast && (
+          <div style={{ position: 'fixed', bottom: 32, right: 32, background: '#003366', color: '#fff', padding: '10px 20px', borderRadius: 6, fontSize: 13, fontWeight: 600, zIndex: 9999, boxShadow: '0 2px 12px rgba(0,0,0,.3)' }}>
+            ✓ 임시저장되었습니다
+          </div>
+        )}
+      </div>
+    )
+  }
+
   function renderContent() {
     switch (activePage) {
       case 'status': return <StatusContent />
@@ -3452,6 +3967,9 @@ export default function MyPage() {
       case 'ecfs-reg': return <EcfsRegContent />
       case 'unconfirmed-delivery-new': return <UnconfirmedDeliveryNewContent />
       case 'all-delivery-new': return <AllDeliveryNewContent />
+      case 'practice-complaint': return <PracticeContent docType="complaint" />
+      case 'practice-answer': return <PracticeContent docType="answer" />
+      case 'practice-brief': return <PracticeContent docType="brief" />
       case 'myinfo-user': return <MyInfoContent type="user" />
       case 'myinfo-pw': return <MyInfoContent type="pw" />
       default: return <GenericContent title={genericTitle || activePage} />
@@ -3579,10 +4097,10 @@ export default function MyPage() {
           <GrpHd label="🎓 실습 전용" gKey="실습전용" gold />
           {openGroups['실습전용'] && (
             <>
-              <SbItem label="📋 배정된 실습사건" page="assigned-cases" />
+              <SbItem label="소장작성실습" page="practice-complaint" />
+              <SbItem label="답변서작성실습" page="practice-answer" />
+              <SbItem label="준비서면작성실습" page="practice-brief" />
               <SbItem label="나의 실습기록" page="practice-records" />
-              <SbItem label="📄 나의 제출기록" page="my-submissions" />
-              <SbItem label="제출서류 확인" page="submitted-docs" />
             </>
           )}
 
