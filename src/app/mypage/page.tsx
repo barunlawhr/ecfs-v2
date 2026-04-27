@@ -3550,44 +3550,51 @@ export default function MyPage() {
         if (error) throw new Error(error.message)
         if (!inserted?.id) throw new Error('제출 실패')
 
-        // AI grading
-        let gradeResult = null
+        // 실습 채점 (신규 practice 모드)
+        let gradeResult: { score?: number; feedback?: string; breakdown?: unknown; issues?: string[]; isError?: boolean } | null = null
         try {
           const gradeRes = await fetch('/api/grade', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              formData: {
-                doc_type: docType,
-                caseCategory: caseData.case_name,
-                caseName: caseData.case_name,
-                court: caseData.court,
-                claimPurpose: form.claimPurpose || form.answerPurpose || '',
-                claimCause: form.claimReason || form.answerReason || form.content || '',
-                parties: [
-                  { id: '1', role: '원고', name: form.plaintiffName || caseData.plaintiff, addr: form.plaintiffAddr || '' },
-                  { id: '2', role: '피고', name: form.defendantName || caseData.defendant, addr: form.defendantAddr || '' },
-                ],
-                evidences: (form.evidence || []).map((e: any, i: number) => ({
-                  id: String(i), number: `${docType === 'answer' ? '을' : '갑'} 제${i+1}호증`,
-                  name: e.name || '', purpose: e.purpose || '',
-                })),
-                hasAgent: false, claimType: '', sogaType: '', soga: '',
+              mode: 'practice',
+              submissionData: {
+                docType,
+                plaintiffName: form.plaintiffName,
+                plaintiffAddr: form.plaintiffAddr,
+                defendantName: form.defendantName,
+                defendantAddr: form.defendantAddr,
+                claimPurpose: form.claimPurpose,
+                claimReason: form.claimReason,
+                answerPurpose: form.answerPurpose,
+                answerReason: form.answerReason,
+                content: form.content,
+                inputMode: form.inputMode,
+                fileName: form.fileName,
+                evidence: form.evidence,
               },
-              sampleCase: { id: caseData.id || '0', title: caseData.case_name, case_type: caseData.case_name, court: caseData.court, plaintiff: caseData.plaintiff, defendant: caseData.defendant, created_at: new Date().toISOString(), claim_purpose: caseData.sample_claim_purpose, claim_reason: caseData.sample_claim_reason },
-              doc_type: docType,
+              caseData: {
+                plaintiff: caseData.plaintiff || '',
+                defendant: caseData.defendant || '',
+                case_name: caseData.case_name || '',
+                case_facts: caseData.case_facts || '',
+                sample_claim_purpose: caseData.sample_claim_purpose || '',
+                sample_claim_reason: caseData.sample_claim_reason || '',
+                sample_answer_purpose: caseData.sample_answer_purpose || '',
+                sample_answer_reason: caseData.sample_answer_reason || '',
+              },
             }),
             signal: AbortSignal.timeout(30_000),
           })
           if (gradeRes.ok) {
             gradeResult = await gradeRes.json()
-            if (gradeResult.score != null && !gradeResult.isError) {
+            if (gradeResult?.score != null && !gradeResult.isError) {
               await supabase.from('practice_records').update({
                 score: gradeResult.score, feedback: gradeResult.feedback || '', grade_breakdown: gradeResult.breakdown, graded_at: new Date().toISOString(),
               }).eq('id', inserted.id)
             }
           }
-        } catch {}
+        } catch { /* 채점 실패해도 제출은 완료 */ }
 
         // Update assignment status
         await supabase.from('case_assignments').update({ status: 'submitted' }).eq('id', assignId)
@@ -3902,16 +3909,27 @@ export default function MyPage() {
                 <div style={{ textAlign: 'center', marginBottom: 20 }}>
                   <div style={{ fontSize: 14, color: '#555', marginBottom: 8 }}>총점</div>
                   <div style={{ fontSize: 36, fontWeight: 800, color: resultModal.score >= 80 ? '#16a34a' : resultModal.score >= 60 ? '#d97706' : '#e53e3e' }}>{resultModal.score}점</div>
-                  <div style={{ fontSize: 13, color: '#888' }}>/ 100점</div>
+                  <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>/ 100점</div>
+                  <div style={{ width: '80%', height: 8, background: '#e0e6ee', borderRadius: 4, margin: '0 auto', overflow: 'hidden' }}>
+                    <div style={{ width: `${resultModal.score}%`, height: '100%', background: resultModal.score >= 80 ? '#16a34a' : resultModal.score >= 60 ? '#d97706' : '#e53e3e', borderRadius: 4, transition: 'width 0.5s' }} />
+                  </div>
                 </div>
-                {resultModal.breakdown && Object.keys(resultModal.breakdown).length > 0 && (
+                {resultModal.breakdown && (Array.isArray(resultModal.breakdown) ? resultModal.breakdown.length > 0 : Object.keys(resultModal.breakdown).length > 0) && (
                   <div style={{ marginBottom: 16 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>항목별 점수:</div>
-                    {Object.entries(resultModal.breakdown).map(([key, val]) => (
-                      <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12 }}>
-                        <span>• {key}</span><span style={{ fontWeight: 600 }}>{String(val)}</span>
-                      </div>
-                    ))}
+                    {Array.isArray(resultModal.breakdown)
+                      ? (resultModal.breakdown as { item: string; score: number; maxScore: number; status: string; message: string }[]).map((b, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: 12, borderBottom: '1px solid #f0f0f0' }}>
+                          <span>{b.status === 'pass' ? '✅' : b.status === 'partial' ? '⚠️' : '❌'} {b.item}</span>
+                          <span style={{ fontWeight: 700, color: b.status === 'pass' ? '#16a34a' : b.status === 'partial' ? '#d97706' : '#e53e3e' }}>{b.score} / {b.maxScore}</span>
+                        </div>
+                      ))
+                      : Object.entries(resultModal.breakdown).map(([key, val]) => (
+                        <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12 }}>
+                          <span>• {key}</span><span style={{ fontWeight: 600 }}>{String(val)}</span>
+                        </div>
+                      ))
+                    }
                   </div>
                 )}
                 {resultModal.feedback && (
