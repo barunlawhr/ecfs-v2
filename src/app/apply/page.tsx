@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import MockBar from '@/components/layout/MockBar';
 import GnbNav from '@/components/layout/GnbNav';
 import Footer from '@/components/layout/Footer';
@@ -320,11 +320,17 @@ function PurposeExampleModal({ onClose, onApply }: { onClose: () => void; onAppl
 }
 
 // ── Main Page ──────────────────────────────────────────────────
-export default function ApplyPage() {
+export default function ApplyPageWrapper() {
+  return <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>로딩 중...</div>}><ApplyPage /></Suspense>
+}
+
+function ApplyPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [data, setData] = useState<ComplaintFormData>(EMPTY);
+  const [caseIdLoaded, setCaseIdLoaded] = useState(false);
   const [assignedCase, setAssignedCase] = useState<SampleCase | null>(null);
   const [open, setOpen] = useState({ s1: true, s2: true, s3: true, s4: true, s5: true, s6: true, s7: true });
   const [partyForm, setPartyForm] = useState<PartyLocal>(EMPTY_PARTY);
@@ -386,6 +392,42 @@ export default function ApplyPage() {
   const [draftToast, setDraftToast] = useState(false);
 
   useEffect(() => { if (!loading && !user) router.push('/'); }, [user, loading, router]);
+
+  // caseId로 배정된 사건 자동 로드
+  useEffect(() => {
+    const caseId = searchParams.get('caseId');
+    if (!caseId || caseIdLoaded) return;
+    (async () => {
+      const { data: caseData } = await supabase.from('practice_cases').select('*').eq('id', caseId).single();
+      if (caseData) {
+        // 사건기본정보 자동 채움
+        upd({
+          caseCategory: caseData.case_name || '',
+          caseName: caseData.case_name || '',
+          court: caseData.court || '',
+        });
+        // 원고/피고 자동 추가
+        const parties: Party[] = [];
+        if (caseData.plaintiff) parties.push({ id: crypto.randomUUID(), role: '원고', name: caseData.plaintiff, addr: '' });
+        if (caseData.defendant) parties.push({ id: crypto.randomUUID(), role: '피고', name: caseData.defendant, addr: '' });
+        if (parties.length) upd({ parties });
+        // 배정 사건 정보 설정
+        setAssignedCase({
+          id: caseData.id,
+          title: caseData.case_name,
+          case_type: caseData.case_type,
+          court: caseData.court,
+          plaintiff: caseData.plaintiff,
+          defendant: caseData.defendant,
+          created_at: caseData.created_at,
+          key_facts: caseData.case_facts || '',
+          claim_purpose: caseData.sample_claim_purpose || '',
+          claim_reason: caseData.sample_claim_reason || '',
+        });
+        setCaseIdLoaded(true);
+      }
+    })();
+  }, [searchParams, caseIdLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!user) return;

@@ -3462,7 +3462,7 @@ export default function MyPage() {
     const isOpen = (aId: string, key: string) => toggled[aId]?.[key] || false
 
     const info: Record<string, { title: string; steps: string[]; linkLabel: string; linkBase: string }> = {
-      complaint: { title: '소장작성실습', steps: ['아래 배정된 사건의 정보를 숙지하세요.', '상단 메뉴 [서류제출] → [소장]을 클릭하세요.', '실제 전자소송 양식에 맞춰 소장을 작성하세요.', '제출 완료 후 채점 결과를 확인하세요.'], linkLabel: '소장 작성하러 가기', linkBase: '/apply/complaint' },
+      complaint: { title: '소장작성실습', steps: ['아래 배정된 사건의 정보를 숙지하세요.', '상단 메뉴 [서류제출] → [소장]을 클릭하세요.', '실제 전자소송 양식에 맞춰 소장을 작성하세요.', '제출 완료 후 채점 결과를 확인하세요.'], linkLabel: '소장 작성하러 가기', linkBase: '/apply' },
       answer: { title: '답변서작성실습', steps: ['아래 배정된 사건의 소장 내용을 숙지하세요.', '상단 메뉴 [서류제출] → [답변서]를 클릭하세요.', '피고 입장에서 답변서를 작성하세요.', '제출 완료 후 채점 결과를 확인하세요.'], linkLabel: '답변서 작성하러 가기', linkBase: '/apply/answer' },
       brief: { title: '준비서면작성실습', steps: ['진행 중인 사건의 내용을 확인하세요.', '상단 메뉴 [서류제출] → [준비서면]을 클릭하세요.', '파일첨부방식 또는 직접입력으로 작성하세요.', '제출 완료 후 결과를 확인하세요.'], linkLabel: '준비서면 작성하러 가기', linkBase: '/apply/brief' },
     }
