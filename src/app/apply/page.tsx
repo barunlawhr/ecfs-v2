@@ -335,6 +335,14 @@ export default function ApplyPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submittedId, setSubmittedId] = useState<string | null>(null);
+  const [step, setStep] = useState(1);
+  const [confirmed, setConfirmed] = useState(false);
+  const [showSignModal, setShowSignModal] = useState(false);
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [payMethod, setPayMethod] = useState('virtual');
+  const [payInjiCheck, setPayInjiCheck] = useState(true);
+  const [paySongdalCheck, setPaySongdalCheck] = useState(true);
   const [sogaDisp, setSogaDisp] = useState('0');
   const [sogaFormatted, setSogaFormatted] = useState('0');
   const [nonPropSpecial, setNonPropSpecial] = useState(false);
@@ -662,75 +670,56 @@ export default function ApplyPage() {
     return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ fontSize: 14, color: '#666' }}>로딩 중...</span></div>;
   }
 
-  if (submitted) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif", background: '#f2f4f7' }}>
-        <MockBar /><GnbNav active="서류제출" />
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <div style={{ background: '#fff', border: '1px solid #d0d8e4', borderRadius: 6, padding: '40px 36px', textAlign: 'center', maxWidth: 560 }}>
-            <div style={{ fontSize: 52, marginBottom: 12 }}>✅</div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, color: '#003366', margin: '0 0 16px' }}>소장 제출 및 AI 채점이 완료되었습니다!</h2>
+  const NAVY = '#1a3a6b';
 
-            {/* AI 채점 결과 */}
-            {gradeResult && (
-              <div style={{ textAlign: 'left', marginBottom: 20 }}>
-                {/* 점수 */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 16 }}>
-                  <div style={{ width: 90, height: 90, borderRadius: '50%', background: gradeResult.score >= 80 ? '#ecfdf5' : gradeResult.score >= 60 ? '#fffbeb' : '#fef2f2', border: `3px solid ${gradeResult.score >= 80 ? '#10b981' : gradeResult.score >= 60 ? '#f59e0b' : '#ef4444'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: 28, fontWeight: 800, color: gradeResult.score >= 80 ? '#059669' : gradeResult.score >= 60 ? '#d97706' : '#dc2626', lineHeight: 1 }}>{gradeResult.score}</span>
-                    <span style={{ fontSize: 10, color: '#888' }}>/ 100점</span>
-                  </div>
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: gradeResult.score >= 80 ? '#059669' : gradeResult.score >= 60 ? '#d97706' : '#dc2626', marginBottom: 4 }}>
-                      {gradeResult.score >= 90 ? '우수' : gradeResult.score >= 70 ? '양호' : gradeResult.score >= 50 ? '보통' : '미흡'}
-                    </div>
-                    <div style={{ fontSize: 11, color: '#888' }}>AI 자동채점 결과</div>
-                  </div>
-                </div>
-                {/* 항목별 점수 */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-                  {[
-                    { label: '당사자 정보', score: gradeResult.breakdown.parties, max: 25 },
-                    { label: '청구취지', score: gradeResult.breakdown.claim, max: 25 },
-                    { label: '청구원인', score: gradeResult.breakdown.cause, max: 30 },
-                    { label: '입증서류', score: gradeResult.breakdown.evidence, max: 20 },
-                  ].map(item => (
-                    <div key={item.label} style={{ background: '#f8f9fc', border: '1px solid #e0e6ee', borderRadius: 4, padding: '8px 12px' }}>
-                      <div style={{ fontSize: 11, color: '#555', marginBottom: 4 }}>{item.label}</div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                        <span style={{ fontSize: 18, fontWeight: 700, color: '#003366' }}>{item.score}</span>
-                        <span style={{ fontSize: 11, color: '#999' }}>/ {item.max}점</span>
-                      </div>
-                      <div style={{ height: 4, background: '#e5e7eb', borderRadius: 2, marginTop: 4 }}>
-                        <div style={{ height: 4, background: item.score / item.max >= 0.8 ? '#10b981' : item.score / item.max >= 0.5 ? '#f59e0b' : '#ef4444', borderRadius: 2, width: `${(item.score / item.max) * 100}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {/* 피드백 */}
-                <div style={{ background: '#f0f7f8', border: `1px solid ${TEAL}40`, borderRadius: 4, padding: '12px 14px', fontSize: 12, color: '#333', lineHeight: 1.8, whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto', textAlign: 'left' }}>
-                  {gradeResult.feedback}
-                </div>
-              </div>
-            )}
+  // ── 소송비용 계산 ──
+  const sogaNum = parseFloat(data.soga) || 0;
+  let inji = 0;
+  if (sogaNum <= 100000000) inji = Math.max(Math.floor(sogaNum * 0.005), 1000);
+  else if (sogaNum <= 1000000000) inji = 450000 + Math.floor((sogaNum - 100000000) * 0.004);
+  else inji = 4050000 + Math.floor((sogaNum - 1000000000) * 0.0035);
+  if (sogaNum === 0) inji = 0;
 
-            {!gradeResult && (
-              <div style={{ background: '#f0f7f8', border: `1px solid ${TEAL}40`, borderRadius: 4, padding: '14px 18px', fontSize: 13, color: TEAL_DARK, lineHeight: 1.7, marginBottom: 24 }}>
-                채점 결과는 <strong>나의전자소송 &gt; 나의 실습기록</strong>에서 확인하세요.
-              </div>
-            )}
+  const partyCount = Math.max(data.parties.length, 2);
+  const songdal = partyCount * 15000 * 15;
 
-            {submittedId && <div style={{ fontSize: 11, color: '#888', marginBottom: 12 }}>기록 ID: {submittedId}</div>}
+  function toKoreanMoney(n: number): string {
+    if (n === 0) return '영';
+    const units = ['', '만', '억', '조'];
+    const digits = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'];
+    const subUnits = ['', '십', '백', '천'];
+    let result = '';
+    let unitIdx = 0;
+    let rem = n;
+    while (rem > 0) {
+      const chunk = rem % 10000;
+      if (chunk > 0) {
+        let chunkStr = '';
+        let c = chunk;
+        for (let i = 0; i < 4; i++) {
+          const d = c % 10;
+          if (d > 0) chunkStr = (d === 1 && i > 0 ? '' : digits[d]) + subUnits[i] + chunkStr;
+          c = Math.floor(c / 10);
+        }
+        result = chunkStr + units[unitIdx] + result;
+      }
+      rem = Math.floor(rem / 10000);
+      unitIdx++;
+    }
+    return result;
+  }
 
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <button onClick={() => router.push('/mypage')} style={{ padding: '10px 22px', background: TEAL, color: '#fff', border: 'none', borderRadius: 3, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>나의 실습기록 확인</button>
-              <button onClick={() => { setData(EMPTY); setSubmitted(false); setSubmittedId(null); setGradeResult(null); }} style={{ padding: '10px 22px', background: '#fff', color: TEAL, border: `1px solid ${TEAL}`, borderRadius: 3, fontSize: 14, cursor: 'pointer' }}>새 소장 작성</button>
-            </div>
-          </div>
-        </div>
-        <Footer />
-      </div>
-    );
+  // Build document list for steps 2-5
+  const docList: { label: string; type: string }[] = [];
+  docList.push({ label: '소장', type: 'main' });
+  data.evidences.forEach((ev, i) => {
+    docList.push({ label: `[갑${i + 1}]${ev.name}`, type: 'evidence' });
+  });
+  attachRows.forEach(ar => {
+    docList.push({ label: ar.서류명, type: 'attach' });
+  });
+  if (agentList.length > 0) {
+    docList.push({ label: '소송위임장', type: 'agent' });
   }
 
   const wonCount = data.parties.filter(p => p.role === '원고').length;
@@ -792,26 +781,37 @@ export default function ApplyPage() {
         <div style={{ width: 172, flexShrink: 0 }}>
           <div style={{ background: TEAL, color: '#fff', padding: '9px 14px', fontWeight: 700, fontSize: 13, borderRadius: '3px 3px 0 0' }}>서류작성</div>
           <div style={{ border: '1px solid #c8d4dc', borderTop: 'none', background: '#fff', borderRadius: '0 0 3px 3px', overflow: 'hidden' }}>
-            {/* 1.문서작성 (활성) */}
-            <div style={{ background: '#e6f7f8', borderBottom: '1px solid #c8dde0', padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 7 }}>
-              <div style={{ width: 18, height: 18, borderRadius: '50%', background: TEAL, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>1</div>
-              <span style={{ fontSize: 12, fontWeight: 700, color: TEAL }}>문서작성</span>
-            </div>
-            {/* Sub-items */}
-            {sideItems.map(item => (
-              <div key={item.key} onClick={() => scrollTo(item.key)}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px 5px 26px', cursor: 'pointer', background: activeNav === item.key ? '#f0fafa' : '#fff', color: activeNav === item.key ? TEAL : '#555', fontSize: 11, borderBottom: '1px solid #edf0f3' }}
-                onMouseEnter={e => { if (activeNav !== item.key) e.currentTarget.style.background = '#f8fafb'; }}
-                onMouseLeave={e => { if (activeNav !== item.key) e.currentTarget.style.background = '#fff'; }}>
-                <span style={{ color: activeNav === item.key ? TEAL : '#bbb', fontSize: 9 }}>▸</span>
-                {item.label}
-              </div>
-            ))}
-            {/* 2~5 비활성 단계 */}
-            {[['2','최종문서확인'],['3','전자서명'],['4','소송비용납부'],['5','전자제출']].map(([num, label]) => (
-              <div key={num} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderBottom: '1px solid #e8ecf0', background: '#fff' }}>
-                <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#c8d4dc', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{num}</div>
-                <span style={{ fontSize: 12, color: '#999' }}>{label}</span>
+            {[
+              { num: '1', label: '문서작성', s: 1 },
+              { num: '2', label: '최종문서확인', s: 2 },
+              { num: '3', label: '전자서명', s: 3 },
+              { num: '4', label: '소송비용납부', s: 4 },
+              { num: '5', label: '전자제출', s: 5 },
+            ].map(({ num, label, s }) => (
+              <div key={num}>
+                <div style={{
+                  background: step === s ? '#e6f7f8' : '#fff',
+                  borderBottom: '1px solid #c8dde0',
+                  padding: '7px 12px',
+                  display: 'flex', alignItems: 'center', gap: 7
+                }}>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: step > s ? TEAL : step === s ? TEAL : '#c8d4dc',
+                    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 10, fontWeight: 700, flexShrink: 0
+                  }}>{step > s ? '\u2713' : num}</div>
+                  <span style={{ fontSize: 12, fontWeight: step === s ? 700 : 400, color: step === s ? TEAL : step > s ? '#555' : '#999' }}>{label}</span>
+                </div>
+                {s === 1 && step === 1 && sideItems.map(item => (
+                  <div key={item.key} onClick={() => scrollTo(item.key)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px 5px 26px', cursor: 'pointer', background: activeNav === item.key ? '#f0fafa' : '#fff', color: activeNav === item.key ? TEAL : '#555', fontSize: 11, borderBottom: '1px solid #edf0f3' }}
+                    onMouseEnter={e => { if (activeNav !== item.key) e.currentTarget.style.background = '#f8fafb'; }}
+                    onMouseLeave={e => { if (activeNav !== item.key) e.currentTarget.style.background = '#fff'; }}>
+                    <span style={{ color: activeNav === item.key ? TEAL : '#bbb', fontSize: 9 }}>{'\u25B8'}</span>
+                    {item.label}
+                  </div>
+                ))}
               </div>
             ))}
           </div>
@@ -819,6 +819,7 @@ export default function ApplyPage() {
 
         {/* ── Main Content ── */}
         <div style={{ flex: 1, minWidth: 0 }}>
+          {step === 1 && (<>
           {/* Title row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2364,10 +2365,459 @@ export default function ApplyPage() {
                 임시저장
               </button>
             </div>
-            <button onClick={handleSubmit} disabled={submitting} style={{ height: 34, padding: '0 24px', background: submitting ? '#7ab8bd' : TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
-              {submitting ? (grading ? '🤖 AI 채점 중...' : '⏳ 제출 중...') : '작성완료 →'}
+            <button onClick={() => setStep(2)} style={{ height: 34, padding: '0 24px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              작성완료 &rarr;
             </button>
           </div>
+          </>)}
+
+          {/* ══════════════════════════════════════════════ */}
+          {/* STEP 2: 최종문서확인 */}
+          {/* ══════════════════════════════════════════════ */}
+          {step === 2 && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ color: TEAL, fontSize: 15 }}>{'\u25CF'}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#111' }}>최종문서확인</span>
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                {/* Left: document list */}
+                <div style={{ width: 220, flexShrink: 0, border: '1px solid #d0d8e4', background: '#fff', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ background: TEAL, color: '#fff', padding: '8px 12px', fontSize: 12, fontWeight: 700 }}>제출문서 목록</div>
+                  {docList.map((doc, i) => (
+                    <div key={i} style={{ padding: '7px 12px', fontSize: 12, borderBottom: '1px solid #edf0f3', color: i === 0 ? TEAL : '#333', fontWeight: i === 0 ? 700 : 400, cursor: 'pointer', background: i === 0 ? '#e6f7f8' : '#fff' }}>
+                      {doc.label} {(doc.type === 'main' || doc.type === 'evidence' || doc.type === 'agent') && '\uD83D\uDCC4'}
+                    </div>
+                  ))}
+                </div>
+                {/* Right: preview */}
+                <div style={{ flex: 1, border: '1px solid #d0d8e4', background: '#f5f6f8', borderRadius: 3, padding: 20, display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ width: '100%', maxWidth: 560, background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,.12)', padding: '48px 44px', fontFamily: "'Malgun Gothic','맑은 고딕',serif", fontSize: 13, lineHeight: 2, color: '#111', minHeight: 700 }}>
+                    <div style={{ textAlign: 'center', fontSize: 22, fontWeight: 700, letterSpacing: 12, marginBottom: 32 }}>소{'  '}장</div>
+
+                    {/* 원고 */}
+                    {data.parties.filter(p => p.role === '원고').map((p, i) => (
+                      <div key={p.id} style={{ marginBottom: 4 }}>
+                        <strong>원고{data.parties.filter(pp => pp.role === '원고').length > 1 ? ` ${i + 1}` : ''}</strong>{'  '}{p.name}
+                        {p.addr && <div style={{ paddingLeft: 48, fontSize: 12, color: '#555' }}>{p.addr}</div>}
+                      </div>
+                    ))}
+
+                    {/* 피고 */}
+                    {data.parties.filter(p => p.role === '피고').map((p, i) => (
+                      <div key={p.id} style={{ marginBottom: 4 }}>
+                        <strong>피고{data.parties.filter(pp => pp.role === '피고').length > 1 ? ` ${i + 1}` : ''}</strong>{'  '}{p.name}
+                        {p.addr && <div style={{ paddingLeft: 48, fontSize: 12, color: '#555' }}>{p.addr}</div>}
+                      </div>
+                    ))}
+
+                    {/* 대리인 */}
+                    {agentList.length > 0 && (
+                      <div style={{ marginTop: 4, marginBottom: 4 }}>
+                        {agentList.map(ag => (
+                          <div key={ag.id}><strong>{ag.partyRole}소송대리인 {ag.type}</strong>{'  '}{ag.name}</div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14, marginTop: 28, marginBottom: 20 }}>
+                      {data.caseName || getCaseTitle(data.caseCategory) || '청구의 소'}
+                    </div>
+
+                    <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, letterSpacing: 8, marginBottom: 16 }}>청 구 취 지</div>
+                    <div style={{ whiteSpace: 'pre-wrap', marginBottom: 24, fontSize: 12.5 }}>{data.claimPurpose || '(미입력)'}</div>
+
+                    <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, letterSpacing: 8, marginBottom: 16 }}>청 구 원 인</div>
+                    <div style={{ whiteSpace: 'pre-wrap', marginBottom: 24, fontSize: 12.5 }}>{data.claimCause || '(미입력)'}</div>
+
+                    {/* 입증방법 */}
+                    {data.evidences.length > 0 && (
+                      <>
+                        <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, letterSpacing: 8, marginBottom: 12 }}>입 증 방 법</div>
+                        {data.evidences.map((ev, i) => (
+                          <div key={ev.id} style={{ fontSize: 12.5, marginBottom: 2 }}>1. {ev.number}{'  '}{ev.name}</div>
+                        ))}
+                        <div style={{ marginBottom: 24 }} />
+                      </>
+                    )}
+
+                    {/* 첨부서류 */}
+                    {attachRows.length > 0 && (
+                      <>
+                        <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, letterSpacing: 8, marginBottom: 12 }}>첨 부 서 류</div>
+                        {attachRows.map((ar, i) => (
+                          <div key={ar.id} style={{ fontSize: 12.5, marginBottom: 2 }}>{i + 1}. {ar.서류명}</div>
+                        ))}
+                        <div style={{ marginBottom: 24 }} />
+                      </>
+                    )}
+
+                    <div style={{ textAlign: 'right', marginTop: 32, fontSize: 13 }}>
+                      {new Date().getFullYear()}. {new Date().getMonth() + 1}. {new Date().getDate()}.
+                    </div>
+                    {data.parties.filter(p => p.role === '원고').map(p => (
+                      <div key={p.id} style={{ textAlign: 'right', fontSize: 13 }}>원고{'  '}{p.name}{'  '}(인)</div>
+                    ))}
+                    {agentList.map(ag => (
+                      <div key={ag.id} style={{ textAlign: 'right', fontSize: 13 }}>{ag.partyRole}소송대리인 {ag.type}{'  '}{ag.name}{'  '}(인)</div>
+                    ))}
+                    <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14, marginTop: 28 }}>
+                      {data.court || '○○지방법원'} 귀중
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom notices */}
+              <div style={{ border: '1px solid #d8dce8', background: '#f8f9fb', borderRadius: 2, padding: '8px 12px', marginTop: 14, marginBottom: 10 }}>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  <li style={{ fontSize: 11, color: '#666', lineHeight: 1.8 }}>{'\u2022'} 제출 전 모든 문서의 내용을 반드시 확인하시기 바랍니다.</li>
+                  <li style={{ fontSize: 11, color: '#666', lineHeight: 1.8 }}>{'\u2022'} 문서 내용에 오류가 있는 경우 [이전으로가기]를 클릭하여 수정하시기 바랍니다.</li>
+                </ul>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', marginBottom: 14, fontSize: 12 }}>
+                <input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} style={{ accentColor: TEAL }} />
+                모든 문서의 내용에 이상이 없음을 확인합니다.
+              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <button onClick={() => setStep(1)} style={{ height: 34, padding: '0 22px', background: '#fff', border: `1px solid ${TEAL}`, color: TEAL, borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{'\u2190'} 이전으로가기</button>
+                <button onClick={() => { if (!confirmed) { alert('문서 내용 확인에 체크해주세요.'); return; } setStep(3); }} style={{ height: 34, padding: '0 24px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>확인완료 &rarr;</button>
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════ */}
+          {/* STEP 3: 전자서명 */}
+          {/* ══════════════════════════════════════════════ */}
+          {step === 3 && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ color: TEAL, fontSize: 15 }}>{'\u25CF'}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#111' }}>전자서명</span>
+              </div>
+              <div style={{ background: '#fff', border: '1px solid #d0d8e4', borderRadius: 3, overflow: 'hidden', marginBottom: 14 }}>
+                <div style={{ background: '#f0f4f8', padding: '8px 14px', fontSize: 12, fontWeight: 700, borderBottom: '1px solid #d0d8e4' }}>서명 대상 문서</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#f5f7fb' }}>
+                      <th style={{ padding: '7px 10px', fontSize: 11, fontWeight: 700, borderBottom: '2px solid #333', borderRight: '1px solid #e0e6ee', textAlign: 'center', width: 50 }}>No.</th>
+                      <th style={{ padding: '7px 10px', fontSize: 11, fontWeight: 700, borderBottom: '2px solid #333', borderRight: '1px solid #e0e6ee', textAlign: 'center' }}>문서명</th>
+                      <th style={{ padding: '7px 10px', fontSize: 11, fontWeight: 700, borderBottom: '2px solid #333', borderRight: '1px solid #e0e6ee', textAlign: 'center', width: 100 }}>유형</th>
+                      <th style={{ padding: '7px 10px', fontSize: 11, fontWeight: 700, borderBottom: '2px solid #333', textAlign: 'center', width: 100 }}>서명상태</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {docList.map((doc, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #eaecf4' }}>
+                        <td style={{ padding: '7px 10px', textAlign: 'center', fontSize: 12, borderRight: '1px solid #eaecf4' }}>{i + 1}</td>
+                        <td style={{ padding: '7px 10px', fontSize: 12, borderRight: '1px solid #eaecf4' }}>{doc.label}</td>
+                        <td style={{ padding: '7px 10px', textAlign: 'center', fontSize: 11, borderRight: '1px solid #eaecf4', color: '#555' }}>
+                          {doc.type === 'main' ? '본문서' : doc.type === 'evidence' ? '증거서류' : doc.type === 'agent' ? '위임장' : '첨부서류'}
+                        </td>
+                        <td style={{ padding: '7px 10px', textAlign: 'center', fontSize: 11, color: '#888' }}>미서명</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ border: '1px solid #d8dce8', background: '#f8f9fb', borderRadius: 2, padding: '8px 12px', marginBottom: 14 }}>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  <li style={{ fontSize: 11, color: '#666', lineHeight: 1.8 }}>{'\u2022'} 전자서명은 제출하는 모든 문서에 대해 일괄적으로 수행됩니다.</li>
+                  <li style={{ fontSize: 11, color: '#666', lineHeight: 1.8 }}>{'\u2022'} 서명 후에는 문서 내용을 수정할 수 없습니다.</li>
+                </ul>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <button onClick={() => setStep(2)} style={{ height: 34, padding: '0 22px', background: '#fff', border: `1px solid ${TEAL}`, color: TEAL, borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{'\u2190'} 이전으로가기</button>
+                <button onClick={() => setShowSignModal(true)} style={{ height: 34, padding: '0 24px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>전자서명 &rarr;</button>
+              </div>
+              {/* Sign Modal */}
+              {showSignModal && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ background: '#fff', width: 420, borderRadius: 4, boxShadow: '0 4px 24px rgba(0,0,0,.3)', overflow: 'hidden' }}>
+                    <div style={{ background: TEAL, color: '#fff', padding: '11px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>전자서명</span>
+                      <button onClick={() => setShowSignModal(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>{'\u2715'}</button>
+                    </div>
+                    <div style={{ padding: '28px 24px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 40, marginBottom: 12 }}>{'\u270D\uFE0F'}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#333', marginBottom: 8 }}>전자서명을 진행합니다</div>
+                      <div style={{ fontSize: 12, color: '#666', marginBottom: 20 }}>모든 제출 문서({docList.length}건)에 대해 전자서명이 적용됩니다.</div>
+                      <button onClick={() => { setShowSignModal(false); setStep(4); }} style={{ height: 36, padding: '0 32px', background: TEAL, color: '#fff', border: 'none', borderRadius: 3, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>서명완료</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════ */}
+          {/* STEP 4: 소송비용납부 */}
+          {/* ══════════════════════════════════════════════ */}
+          {step === 4 && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ color: TEAL, fontSize: 15 }}>{'\u25CF'}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#111' }}>소송비용납부</span>
+              </div>
+
+              {/* 소송비용 table */}
+              <div style={{ background: '#fff', border: '1px solid #d0d8e4', borderRadius: 3, overflow: 'hidden', marginBottom: 14 }}>
+                <div style={{ background: '#f0f4f8', padding: '8px 14px', fontSize: 12, fontWeight: 700, borderBottom: '1px solid #d0d8e4' }}>소송비용 산출내역</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#f5f7fb' }}>
+                      <th style={{ padding: '7px 12px', fontSize: 11, fontWeight: 700, borderBottom: '2px solid #333', borderRight: '1px solid #e0e6ee', textAlign: 'center' }}>구분</th>
+                      <th style={{ padding: '7px 12px', fontSize: 11, fontWeight: 700, borderBottom: '2px solid #333', borderRight: '1px solid #e0e6ee', textAlign: 'center' }}>금액</th>
+                      <th style={{ padding: '7px 12px', fontSize: 11, fontWeight: 700, borderBottom: '2px solid #333', textAlign: 'center' }}>한글 금액</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #eaecf4' }}>
+                      <td style={{ padding: '8px 12px', fontSize: 12, borderRight: '1px solid #eaecf4', textAlign: 'center', fontWeight: 600 }}>인지액</td>
+                      <td style={{ padding: '8px 12px', fontSize: 12, borderRight: '1px solid #eaecf4', textAlign: 'right' }}>{inji.toLocaleString('ko-KR')}원</td>
+                      <td style={{ padding: '8px 12px', fontSize: 12, textAlign: 'center', color: '#555' }}>{toKoreanMoney(inji)}원</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #eaecf4' }}>
+                      <td style={{ padding: '8px 12px', fontSize: 12, borderRight: '1px solid #eaecf4', textAlign: 'center', fontWeight: 600 }}>송달료</td>
+                      <td style={{ padding: '8px 12px', fontSize: 12, borderRight: '1px solid #eaecf4', textAlign: 'right' }}>{songdal.toLocaleString('ko-KR')}원</td>
+                      <td style={{ padding: '8px 12px', fontSize: 12, textAlign: 'center', color: '#555' }}>{toKoreanMoney(songdal)}원</td>
+                    </tr>
+                    <tr style={{ background: '#f0fafa' }}>
+                      <td style={{ padding: '8px 12px', fontSize: 12, borderRight: '1px solid #eaecf4', textAlign: 'center', fontWeight: 700, color: TEAL }}>합계</td>
+                      <td style={{ padding: '8px 12px', fontSize: 13, borderRight: '1px solid #eaecf4', textAlign: 'right', fontWeight: 700, color: TEAL }}>{(inji + songdal).toLocaleString('ko-KR')}원</td>
+                      <td style={{ padding: '8px 12px', fontSize: 12, textAlign: 'center', fontWeight: 600, color: TEAL }}>{toKoreanMoney(inji + songdal)}원</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 납부방식 */}
+              <div style={{ background: '#fff', border: '1px solid #d0d8e4', borderRadius: 3, overflow: 'hidden', marginBottom: 14 }}>
+                <div style={{ background: '#f0f4f8', padding: '8px 14px', fontSize: 12, fontWeight: 700, borderBottom: '1px solid #d0d8e4' }}>납부방식 선택</div>
+                <div style={{ padding: '14px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10 }}>
+                  {[
+                    { value: 'virtual', label: '가상계좌', desc: '발급받은 가상계좌로 입금' },
+                    { value: 'transfer', label: '계좌이체', desc: '실시간 계좌이체' },
+                    { value: 'card', label: '신용카드', desc: '신용/체크카드 결제' },
+                    { value: 'phone', label: '휴대폰소액결제', desc: '휴대폰 결제' },
+                  ].map(opt => (
+                    <div key={opt.value} onClick={() => setPayMethod(opt.value)}
+                      style={{ border: `2px solid ${payMethod === opt.value ? TEAL : '#d0d8e4'}`, borderRadius: 4, padding: '14px 12px', textAlign: 'center', cursor: 'pointer', background: payMethod === opt.value ? '#e6f7f8' : '#fff', transition: 'all .15s' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: payMethod === opt.value ? TEAL : '#333', marginBottom: 4 }}>{opt.label}</div>
+                      <div style={{ fontSize: 10, color: '#888' }}>{opt.desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 안내 박스 */}
+              <div style={{ border: '1px solid #d8dce8', background: '#f8f9fb', borderRadius: 2, padding: '8px 12px', marginBottom: 14 }}>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  <li style={{ fontSize: 11, color: '#666', lineHeight: 1.8 }}>{'\u2022'} 인지액은 수입인지로 납부하며, 전자소송의 경우 전자적으로 납부합니다.</li>
+                  <li style={{ fontSize: 11, color: '#666', lineHeight: 1.8 }}>{'\u2022'} 송달료는 당사자 수 x 15,000원 x 15회분으로 산정됩니다.</li>
+                  <li style={{ fontSize: 11, color: '#666', lineHeight: 1.8 }}>{'\u2022'} 소가가 입력되지 않은 경우 인지액이 0원으로 표시될 수 있습니다.</li>
+                </ul>
+              </div>
+
+              {/* 납부정보 */}
+              <div style={{ background: '#fff', border: '1px solid #d0d8e4', borderRadius: 3, overflow: 'hidden', marginBottom: 14 }}>
+                <div style={{ background: '#f0f4f8', padding: '8px 14px', fontSize: 12, fontWeight: 700, borderBottom: '1px solid #d0d8e4' }}>납부정보</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #eaecf4' }}>
+                      <td style={{ padding: '8px 14px', width: 30 }}>
+                        <input type="checkbox" checked={payInjiCheck} onChange={e => setPayInjiCheck(e.target.checked)} style={{ accentColor: TEAL }} />
+                      </td>
+                      <td style={{ padding: '8px 14px', fontSize: 12, fontWeight: 600, width: 80 }}>인지액</td>
+                      <td style={{ padding: '8px 14px', fontSize: 12 }}>{inji.toLocaleString('ko-KR')}원</td>
+                      <td style={{ padding: '8px 14px', fontSize: 11, color: '#555' }}>납부당사자: {data.parties.find(p => p.role === '원고')?.name || '-'}</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #eaecf4' }}>
+                      <td style={{ padding: '8px 14px' }}>
+                        <input type="checkbox" checked={paySongdalCheck} onChange={e => setPaySongdalCheck(e.target.checked)} style={{ accentColor: TEAL }} />
+                      </td>
+                      <td style={{ padding: '8px 14px', fontSize: 12, fontWeight: 600 }}>송달료</td>
+                      <td style={{ padding: '8px 14px', fontSize: 12 }}>{songdal.toLocaleString('ko-KR')}원</td>
+                      <td style={{ padding: '8px 14px', fontSize: 11, color: '#555' }}>납부당사자: {data.parties.find(p => p.role === '원고')?.name || '-'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <button onClick={() => setStep(3)} style={{ height: 34, padding: '0 22px', background: '#fff', border: `1px solid ${TEAL}`, color: TEAL, borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{'\u2190'} 이전으로</button>
+                <button onClick={() => setShowPayModal(true)} style={{ height: 34, padding: '0 24px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>납부하기 &rarr;</button>
+              </div>
+              {/* Pay Modal */}
+              {showPayModal && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ background: '#fff', width: 420, borderRadius: 4, boxShadow: '0 4px 24px rgba(0,0,0,.3)', overflow: 'hidden' }}>
+                    <div style={{ background: TEAL, color: '#fff', padding: '11px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>납부확인</span>
+                      <button onClick={() => setShowPayModal(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>{'\u2715'}</button>
+                    </div>
+                    <div style={{ padding: '28px 24px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#333', marginBottom: 16 }}>소송비용을 납부합니다</div>
+                      <div style={{ fontSize: 12, color: '#555', marginBottom: 6 }}>인지액: {payInjiCheck ? `${inji.toLocaleString('ko-KR')}원` : '미선택'}</div>
+                      <div style={{ fontSize: 12, color: '#555', marginBottom: 6 }}>송달료: {paySongdalCheck ? `${songdal.toLocaleString('ko-KR')}원` : '미선택'}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: TEAL, marginBottom: 20 }}>합계: {((payInjiCheck ? inji : 0) + (paySongdalCheck ? songdal : 0)).toLocaleString('ko-KR')}원</div>
+                      <div style={{ fontSize: 11, color: '#888', marginBottom: 16 }}>납부방식: {payMethod === 'virtual' ? '가상계좌' : payMethod === 'transfer' ? '계좌이체' : payMethod === 'card' ? '신용카드' : '휴대폰소액결제'}</div>
+                      <button onClick={() => { setShowPayModal(false); setStep(5); }} style={{ height: 36, padding: '0 32px', background: TEAL, color: '#fff', border: 'none', borderRadius: 3, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>납부완료</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════ */}
+          {/* STEP 5: 전자제출 */}
+          {/* ══════════════════════════════════════════════ */}
+          {step === 5 && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ color: TEAL, fontSize: 15 }}>{'\u25CF'}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#111' }}>전자제출</span>
+              </div>
+
+              {/* 사건정보 */}
+              <div style={{ background: '#fff', border: '1px solid #d0d8e4', borderRadius: 3, overflow: 'hidden', marginBottom: 14 }}>
+                <div style={{ background: '#f0f4f8', padding: '8px 14px', fontSize: 12, fontWeight: 700, borderBottom: '1px solid #d0d8e4' }}>사건 정보 요약</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    {[
+                      ['사건명', data.caseName || data.caseCategory || '-'],
+                      ['법원', data.court || '-'],
+                      ['원고', data.parties.filter(p => p.role === '원고').map(p => p.name).join(', ') || '-'],
+                      ['피고', data.parties.filter(p => p.role === '피고').map(p => p.name).join(', ') || '-'],
+                      ['소가', sogaNum ? `${sogaNum.toLocaleString('ko-KR')}원` : '-'],
+                      ['인지액', `${inji.toLocaleString('ko-KR')}원`],
+                      ['송달료', `${songdal.toLocaleString('ko-KR')}원`],
+                    ].map(([label, val]) => (
+                      <tr key={label} style={{ borderBottom: '1px solid #eaecf4' }}>
+                        <th style={{ padding: '7px 14px', fontSize: 12, fontWeight: 600, color: '#333', background: '#f8f9fb', width: 120, textAlign: 'left', borderRight: '1px solid #eaecf4' }}>{label}</th>
+                        <td style={{ padding: '7px 14px', fontSize: 12, color: '#333' }}>{val}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 제출문서 */}
+              <div style={{ background: '#fff', border: '1px solid #d0d8e4', borderRadius: 3, overflow: 'hidden', marginBottom: 14 }}>
+                <div style={{ background: '#f0f4f8', padding: '8px 14px', fontSize: 12, fontWeight: 700, borderBottom: '1px solid #d0d8e4' }}>제출 문서 ({docList.length}건)</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#f5f7fb' }}>
+                      <th style={{ padding: '7px 10px', fontSize: 11, fontWeight: 700, borderBottom: '2px solid #333', borderRight: '1px solid #e0e6ee', textAlign: 'center', width: 50 }}>No.</th>
+                      <th style={{ padding: '7px 10px', fontSize: 11, fontWeight: 700, borderBottom: '2px solid #333', borderRight: '1px solid #e0e6ee', textAlign: 'center' }}>문서명</th>
+                      <th style={{ padding: '7px 10px', fontSize: 11, fontWeight: 700, borderBottom: '2px solid #333', borderRight: '1px solid #e0e6ee', textAlign: 'center', width: 100 }}>서명</th>
+                      <th style={{ padding: '7px 10px', fontSize: 11, fontWeight: 700, borderBottom: '2px solid #333', textAlign: 'center', width: 100 }}>상태</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {docList.map((doc, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #eaecf4' }}>
+                        <td style={{ padding: '7px 10px', textAlign: 'center', fontSize: 12, borderRight: '1px solid #eaecf4' }}>{i + 1}</td>
+                        <td style={{ padding: '7px 10px', fontSize: 12, borderRight: '1px solid #eaecf4' }}>{doc.label}</td>
+                        <td style={{ padding: '7px 10px', textAlign: 'center', fontSize: 11, borderRight: '1px solid #eaecf4', color: TEAL, fontWeight: 600 }}>{'\u2713'} 완료</td>
+                        <td style={{ padding: '7px 10px', textAlign: 'center', fontSize: 11, color: TEAL, fontWeight: 600 }}>제출대기</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ border: '1px solid #d8dce8', background: '#f8f9fb', borderRadius: 2, padding: '8px 12px', marginBottom: 14 }}>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  <li style={{ fontSize: 11, color: '#666', lineHeight: 1.8 }}>{'\u2022'} [문서제출] 버튼을 클릭하면 법원에 서류가 전자적으로 제출됩니다.</li>
+                  <li style={{ fontSize: 11, color: '#666', lineHeight: 1.8 }}>{'\u2022'} 제출 후에는 서류 내용을 수정할 수 없습니다.</li>
+                  <li style={{ fontSize: 11, color: '#c0392b', lineHeight: 1.8, fontWeight: 600 }}>{'\u2022'} 제출 완료 후 AI 자동채점 결과를 확인할 수 있습니다.</li>
+                </ul>
+              </div>
+
+              {submitError && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 3, padding: '10px 14px', color: '#dc2626', fontSize: 12, marginBottom: 10 }}>
+                  {submitError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <button onClick={() => setStep(4)} style={{ height: 34, padding: '0 22px', background: '#fff', border: `1px solid ${TEAL}`, color: TEAL, borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{'\u2190'} 이전으로</button>
+                <button
+                  onClick={async () => {
+                    await handleSubmit();
+                    if (!submitError) setShowSubmitModal(true);
+                  }}
+                  disabled={submitting}
+                  style={{ height: 34, padding: '0 24px', background: submitting ? '#7ab8bd' : TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+                  {submitting ? (grading ? 'AI 채점 중...' : '제출 중...') : '문서제출'}
+                </button>
+              </div>
+
+              {/* Submit completion modal */}
+              {showSubmitModal && submitted && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ background: '#fff', width: 520, borderRadius: 6, boxShadow: '0 4px 24px rgba(0,0,0,.3)', overflow: 'hidden' }}>
+                    <div style={{ background: TEAL, color: '#fff', padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, fontSize: 15 }}>제출 완료</span>
+                      <button onClick={() => router.push('/mypage')} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>{'\u2715'}</button>
+                    </div>
+                    <div style={{ padding: '32px 28px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 52, marginBottom: 12 }}>{'\u2705'}</div>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: '#003366', margin: '0 0 12px' }}>소장 제출 및 AI 채점이 완료되었습니다!</h2>
+                      {submittedId && <div style={{ fontSize: 12, color: '#555', marginBottom: 8 }}>접수번호: <strong style={{ color: TEAL }}>{submittedId.slice(0, 8).toUpperCase()}</strong></div>}
+
+                      {gradeResult && (
+                        <div style={{ textAlign: 'left', marginTop: 16, marginBottom: 16 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 16 }}>
+                            <div style={{ width: 80, height: 80, borderRadius: '50%', background: gradeResult.score >= 80 ? '#ecfdf5' : gradeResult.score >= 60 ? '#fffbeb' : '#fef2f2', border: `3px solid ${gradeResult.score >= 80 ? '#10b981' : gradeResult.score >= 60 ? '#f59e0b' : '#ef4444'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                              <span style={{ fontSize: 26, fontWeight: 800, color: gradeResult.score >= 80 ? '#059669' : gradeResult.score >= 60 ? '#d97706' : '#dc2626', lineHeight: 1 }}>{gradeResult.score}</span>
+                              <span style={{ fontSize: 9, color: '#888' }}>/ 100</span>
+                            </div>
+                            <div style={{ textAlign: 'left' }}>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: gradeResult.score >= 80 ? '#059669' : gradeResult.score >= 60 ? '#d97706' : '#dc2626', marginBottom: 4 }}>
+                                {gradeResult.score >= 90 ? '우수' : gradeResult.score >= 70 ? '양호' : gradeResult.score >= 50 ? '보통' : '미흡'}
+                              </div>
+                              <div style={{ fontSize: 11, color: '#888' }}>AI 자동채점 결과</div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                            {[
+                              { label: '당사자 정보', score: gradeResult.breakdown.parties, max: 25 },
+                              { label: '청구취지', score: gradeResult.breakdown.claim, max: 25 },
+                              { label: '청구원인', score: gradeResult.breakdown.cause, max: 30 },
+                              { label: '입증서류', score: gradeResult.breakdown.evidence, max: 20 },
+                            ].map(item => (
+                              <div key={item.label} style={{ background: '#f8f9fc', border: '1px solid #e0e6ee', borderRadius: 4, padding: '8px 12px' }}>
+                                <div style={{ fontSize: 11, color: '#555', marginBottom: 4 }}>{item.label}</div>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                                  <span style={{ fontSize: 16, fontWeight: 700, color: '#003366' }}>{item.score}</span>
+                                  <span style={{ fontSize: 10, color: '#999' }}>/ {item.max}</span>
+                                </div>
+                                <div style={{ height: 4, background: '#e5e7eb', borderRadius: 2, marginTop: 4 }}>
+                                  <div style={{ height: 4, background: item.score / item.max >= 0.8 ? '#10b981' : item.score / item.max >= 0.5 ? '#f59e0b' : '#ef4444', borderRadius: 2, width: `${(item.score / item.max) * 100}%` }} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ background: '#f0f7f8', border: `1px solid ${TEAL}40`, borderRadius: 4, padding: '10px 12px', fontSize: 11, color: '#333', lineHeight: 1.8, whiteSpace: 'pre-wrap', maxHeight: 160, overflowY: 'auto', textAlign: 'left' }}>
+                            {gradeResult.feedback}
+                          </div>
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16 }}>
+                        <button onClick={() => router.push('/mypage')} style={{ padding: '10px 22px', background: TEAL, color: '#fff', border: 'none', borderRadius: 3, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>나의 실습기록 확인</button>
+                        <button onClick={() => { setData(EMPTY); setSubmitted(false); setSubmittedId(null); setGradeResult(null); setStep(1); setConfirmed(false); setShowSubmitModal(false); }} style={{ padding: '10px 22px', background: '#fff', color: TEAL, border: `1px solid ${TEAL}`, borderRadius: 3, fontSize: 14, cursor: 'pointer' }}>새 소장 작성</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
       </div>
 
