@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import MockBar from '@/components/layout/MockBar'
 import GnbNav from '@/components/layout/GnbNav'
@@ -34,6 +34,8 @@ type ActivePage =
   | 'submit-detail'
   | 'my-submissions'
   | 'correction-list'
+  | 'unconfirmed-delivery-new'
+  | 'all-delivery-new'
   | 'generic'
 
 interface Assignment {
@@ -136,11 +138,24 @@ export default function MyPage() {
   const [expandedFeedback, setExpandedFeedback] = useState<Record<string, boolean>>({})
   const [viewDocCase, setViewDocCase] = useState<ViewDocCase | null>(null)
   const [viewDocItem, setViewDocItem] = useState<DocItem | null>(null)
+  const [deliveryUnconfirmedCount, setDeliveryUnconfirmedCount] = useState(0)
 
   useEffect(() => {
     if (!loading && !user) router.push('/')
     if (!loading && user?.role === 'admin') router.push('/admin')
   }, [user, loading, router])
+
+  // Fetch unconfirmed delivery count
+  useEffect(() => {
+    if (!user) return
+    ;(async () => {
+      const { count } = await supabase.from('delivery_documents')
+        .select('id', { count: 'exact', head: true })
+        .eq('student_id', user.id)
+        .is('received_at', null)
+      setDeliveryUnconfirmedCount(count || 0)
+    })()
+  }, [user])
 
   const fetchControllerRef = useRef<AbortController | null>(null)
 
@@ -3078,6 +3093,292 @@ export default function MyPage() {
     )
   }
 
+  // ── 미확인송달문서 (DB연동) ────────────────────────────────────
+  const UnconfirmedDeliveryNewContent = () => {
+    interface DeliveryDoc {
+      id: string; court: string; division: string; case_number: string
+      document_name: string; sent_at: string; received_at: string|null
+      is_auto_confirmed: boolean; has_publish: boolean; doc_type: string
+    }
+    const [docs, setDocs] = useState<DeliveryDoc[]>([])
+    const [ddLoading, setDdLoading] = useState(true)
+
+    const loadDocs = useCallback(async () => {
+      if (!user) return
+      setDdLoading(true)
+      // Auto-confirm old docs first
+      const sevenDaysAgo = new Date(Date.now() - 7*86400000).toISOString().slice(0,10)
+      await supabase.from('delivery_documents')
+        .update({ is_auto_confirmed: true, received_at: sevenDaysAgo })
+        .eq('student_id', user.id)
+        .is('received_at', null)
+        .lte('sent_at', sevenDaysAgo)
+
+      // Fetch unconfirmed
+      const { data } = await supabase.from('delivery_documents')
+        .select('*')
+        .eq('student_id', user.id)
+        .is('received_at', null)
+        .order('sent_at', { ascending: false })
+      setDocs((data || []) as DeliveryDoc[])
+      setDdLoading(false)
+    }, [user])
+
+    useEffect(() => { loadDocs() }, [loadDocs])
+
+    function confirmDoc(id: string) {
+      supabase.from('delivery_documents')
+        .update({ received_at: new Date().toISOString().slice(0,10) })
+        .eq('id', id)
+        .then(() => {
+          setDocs(prev => prev.filter(d => d.id !== id))
+          setDeliveryUnconfirmedCount(prev => Math.max(0, prev - 1))
+        })
+    }
+
+    const selS: React.CSSProperties = { height:30, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 8px', fontFamily:'inherit', background:'#fff', cursor:'pointer' }
+    const tdS: React.CSSProperties = { padding:'8px 10px', fontSize:12, borderBottom:'1px solid #eee', verticalAlign:'middle', textAlign:'center' }
+
+    // Example dates for 송달간주 안내
+    const today = new Date()
+    const exSent = new Date(today.getTime() - 5*86400000)
+    const exAuto = new Date(exSent.getTime() + 7*86400000)
+    const fmtD = (d: Date) => `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`
+
+    return (
+      <div>
+        <PageHd title="미확인송달문서" actions={<><ActBtn label="📌 나의 메뉴 추가" /><ActBtn label="🖨 출력" /></>} />
+
+        {/* 필터 (decorative) */}
+        <div style={{ background:'#fff', borderBottom:'1px solid #eee', padding:'16px 20px', display:'flex', flexDirection:'column', gap:10 }}>
+          <div style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#333', minWidth:52 }}>소송유형</span>
+            <select style={{ ...selS, width:100 }}>{['전체','민사','형사','가사','행정'].map(t=><option key={t}>{t}</option>)}</select>
+            <span style={{ fontSize:12, fontWeight:600, color:'#333', marginLeft:16 }}>법원</span>
+            <select style={{ ...selS, width:140 }}>{['전체','서울중앙지방법원','인천지방법원','수원지방법원'].map(t=><option key={t}>{t}</option>)}</select>
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#333', minWidth:52 }}>사건번호</span>
+            <select style={{ ...selS, width:75 }}>{['2026','2025','2024'].map(y=><option key={y}>{y}</option>)}</select>
+            <select style={{ ...selS, width:65 }}>{['가단','가합','나','가소'].map(t=><option key={t}>{t}</option>)}</select>
+            <input type="text" style={{ height:30, width:100, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 8px', fontSize:12, fontFamily:'inherit' }} />
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#333', minWidth:52 }}>정렬순서</span>
+            {[['발송일자 ↓','발송일자 ↑'],['법원 ↑','법원 ↓']].map((opts,i)=>(
+              <select key={i} defaultValue={opts[0]} style={{ ...selS, width:100 }}>{opts.map(o=><option key={o}>{o}</option>)}</select>
+            ))}
+          </div>
+          <div style={{ textAlign:'center', paddingTop:4 }}>
+            <button onClick={loadDocs} style={{ height:36, padding:'0 50px', background:'#003366', color:'#fff', border:'none', borderRadius:3, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>조 회</button>
+          </div>
+        </div>
+
+        {/* 안내 */}
+        <div style={{ background:'#fffbe6', borderTop:'1px dotted #e0d8a0', borderBottom:'1px dotted #e0d8a0', padding:'8px 16px', fontSize:11, color:'#7a6000', lineHeight:1.8 }}>
+          ※ &apos;발급/조회&apos; 버튼을 이용하여 발급하여야 &apos;열람용&apos;이라는 문구가 기재되지 않은 등본을 출력할 수 있고, 그렇지 않은 경우에는 &apos;열람용&apos;이라는 문구가 포함되어 출력되는 점에 유의하시기 바랍니다.
+        </div>
+
+        {/* 도구 버튼 */}
+        <div style={{ background:'#fff', borderBottom:'1px solid #dde0e8', padding:'6px 16px', display:'flex', justifyContent:'flex-end', gap:8 }}>
+          <button style={{ height:28, padding:'0 14px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>일괄확인 ›</button>
+          <button style={{ height:28, padding:'0 14px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>📗 엑셀로 저장</button>
+        </div>
+
+        {/* 테이블 */}
+        <div style={{ background:'#fff', overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <thead>
+              <tr style={{ background:'#f0f3f8', borderBottom:'2px solid #b8c8e0' }}>
+                <th style={{ padding:'8px 8px', width:28 }}><input type="checkbox" /></th>
+                {['법원','재판부','사건번호','송달문서','발송일자','문서발급','송달내역'].map(h=>(
+                  <th key={h} style={{ padding:'8px 10px', fontWeight:600, fontSize:11, color:'#333', textAlign:'center', whiteSpace:'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {ddLoading ? (
+                <tr><td colSpan={8} style={{ ...tdS, padding:40, color:'#888' }}>로딩 중...</td></tr>
+              ) : docs.length === 0 ? (
+                <tr><td colSpan={8} style={{ ...tdS, padding:48, color:'#aaa', fontSize:13 }}>미확인 송달문서가 없습니다.</td></tr>
+              ) : (
+                docs.map(doc => (
+                  <tr key={doc.id}>
+                    <td style={tdS}><input type="checkbox" /></td>
+                    <td style={tdS}>{doc.court}</td>
+                    <td style={tdS}>{doc.division}</td>
+                    <td style={{ ...tdS, textAlign:'left' }}>
+                      <span style={{ color:'#0098a3', textDecoration:'underline', cursor:'pointer', fontWeight:600 }}>{doc.case_number}</span>
+                    </td>
+                    <td style={{ ...tdS, textAlign:'left' }}>{doc.document_name}</td>
+                    <td style={tdS}>{doc.sent_at}</td>
+                    <td style={tdS}>
+                      {doc.has_publish && <button style={{ height:24, padding:'0 8px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:2, fontSize:10, cursor:'pointer', fontFamily:'inherit' }}>발급/조회</button>}
+                    </td>
+                    <td style={tdS}>
+                      <button onClick={() => { confirmDoc(doc.id); alert('송달 내역을 확인했습니다.') }} style={{ height:24, padding:'0 10px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:2, fontSize:10, cursor:'pointer', fontFamily:'inherit' }}>조회</button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 송달간주 안내 */}
+        <div style={{ background:'#f0f9ff', border:'1px solid #0098a3', borderRadius:6, padding:'16px 20px', margin:'16px 0' }}>
+          <div style={{ fontSize:14, fontWeight:700, color:'#003366', marginBottom:10 }}>📋 송달간주일 안내</div>
+          <div style={{ fontSize:12, color:'#333', lineHeight:2 }}>
+            <p style={{ margin:'0 0 6px' }}>전자소송에서 송달문서는 발송일로부터 <strong>7일</strong>이 경과하면 자동으로 송달 간주 처리됩니다.</p>
+            <p style={{ margin:'0 0 6px' }}>예시: 발송일이 <strong>{fmtD(exSent)}</strong>인 경우, <strong>{fmtD(exAuto)}</strong>에 자동 확인(송달간주) 처리됩니다.</p>
+            <p style={{ margin:0, fontSize:11, color:'#666' }}>※ 송달간주 전에 직접 확인하시면 해당 일자가 수신일로 기록됩니다.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── 전체송달문서 (DB연동) ────────────────────────────────────
+  const AllDeliveryNewContent = () => {
+    interface DeliveryDoc {
+      id: string; court: string; division: string; case_number: string
+      document_name: string; sent_at: string; received_at: string|null
+      is_auto_confirmed: boolean; has_publish: boolean; doc_type: string
+    }
+    const [docs, setDocs] = useState<DeliveryDoc[]>([])
+    const [ddLoading, setDdLoading] = useState(true)
+
+    const loadDocs = useCallback(async () => {
+      if (!user) return
+      setDdLoading(true)
+      // Auto-confirm old docs first
+      const sevenDaysAgo = new Date(Date.now() - 7*86400000).toISOString().slice(0,10)
+      await supabase.from('delivery_documents')
+        .update({ is_auto_confirmed: true, received_at: sevenDaysAgo })
+        .eq('student_id', user.id)
+        .is('received_at', null)
+        .lte('sent_at', sevenDaysAgo)
+
+      const { data } = await supabase.from('delivery_documents')
+        .select('*')
+        .eq('student_id', user.id)
+        .order('sent_at', { ascending: false })
+      setDocs((data || []) as DeliveryDoc[])
+      setDdLoading(false)
+    }, [user])
+
+    useEffect(() => { loadDocs() }, [loadDocs])
+
+    const selS: React.CSSProperties = { height:30, border:'1px solid #c8cdd6', borderRadius:3, fontSize:12, padding:'0 8px', fontFamily:'inherit', background:'#fff', cursor:'pointer' }
+    const tdS: React.CSSProperties = { padding:'8px 10px', fontSize:12, borderBottom:'1px solid #eee', verticalAlign:'middle', textAlign:'center' }
+
+    const today2 = new Date()
+    const exSent2 = new Date(today2.getTime() - 5*86400000)
+    const exAuto2 = new Date(exSent2.getTime() + 7*86400000)
+    const fmtD2 = (d: Date) => `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`
+
+    return (
+      <div>
+        <PageHd title="전체송달문서" actions={<><ActBtn label="📌 나의 메뉴 추가" /><ActBtn label="🖨 출력" /></>} />
+
+        {/* 필터 (decorative) */}
+        <div style={{ background:'#fff', borderBottom:'1px solid #eee', padding:'16px 20px', display:'flex', flexDirection:'column', gap:10 }}>
+          <div style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#333', minWidth:52 }}>소송유형</span>
+            <select style={{ ...selS, width:100 }}>{['전체','민사','형사','가사','행정'].map(t=><option key={t}>{t}</option>)}</select>
+            <span style={{ fontSize:12, fontWeight:600, color:'#333', marginLeft:16 }}>법원</span>
+            <select style={{ ...selS, width:140 }}>{['전체','서울중앙지방법원','인천지방법원','수원지방법원'].map(t=><option key={t}>{t}</option>)}</select>
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#333', minWidth:52 }}>사건번호</span>
+            <select style={{ ...selS, width:75 }}>{['2026','2025','2024'].map(y=><option key={y}>{y}</option>)}</select>
+            <select style={{ ...selS, width:65 }}>{['가단','가합','나','가소'].map(t=><option key={t}>{t}</option>)}</select>
+            <input type="text" style={{ height:30, width:100, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 8px', fontSize:12, fontFamily:'inherit' }} />
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#333', minWidth:52 }}>정렬순서</span>
+            {[['발송일자 ↓','발송일자 ↑'],['법원 ↑','법원 ↓']].map((opts,i)=>(
+              <select key={i} defaultValue={opts[0]} style={{ ...selS, width:100 }}>{opts.map(o=><option key={o}>{o}</option>)}</select>
+            ))}
+          </div>
+          <div style={{ textAlign:'center', paddingTop:4 }}>
+            <button onClick={loadDocs} style={{ height:36, padding:'0 50px', background:'#003366', color:'#fff', border:'none', borderRadius:3, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>조 회</button>
+          </div>
+        </div>
+
+        {/* 안내 */}
+        <div style={{ background:'#fffbe6', borderTop:'1px dotted #e0d8a0', borderBottom:'1px dotted #e0d8a0', padding:'8px 16px', fontSize:11, color:'#7a6000', lineHeight:1.8 }}>
+          ※ &apos;발급/조회&apos; 버튼을 이용하여 발급하여야 &apos;열람용&apos;이라는 문구가 기재되지 않은 등본을 출력할 수 있고, 그렇지 않은 경우에는 &apos;열람용&apos;이라는 문구가 포함되어 출력되는 점에 유의하시기 바랍니다.
+        </div>
+
+        {/* 도구 버튼 */}
+        <div style={{ background:'#fff', borderBottom:'1px solid #dde0e8', padding:'6px 16px', display:'flex', justifyContent:'flex-end', gap:8 }}>
+          <button style={{ height:28, padding:'0 14px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>일괄확인 ›</button>
+          <button style={{ height:28, padding:'0 14px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>📗 엑셀로 저장</button>
+        </div>
+
+        {/* 테이블 */}
+        <div style={{ background:'#fff', overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <thead>
+              <tr style={{ background:'#f0f3f8', borderBottom:'2px solid #b8c8e0' }}>
+                <th style={{ padding:'8px 8px', width:28 }}><input type="checkbox" /></th>
+                {['법원','재판부','사건번호','송달문서','발송일자','수신일자','문서발급','관련서류'].map(h=>(
+                  <th key={h} style={{ padding:'8px 10px', fontWeight:600, fontSize:11, color:'#333', textAlign:'center', whiteSpace:'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {ddLoading ? (
+                <tr><td colSpan={9} style={{ ...tdS, padding:40, color:'#888' }}>로딩 중...</td></tr>
+              ) : docs.length === 0 ? (
+                <tr><td colSpan={9} style={{ ...tdS, padding:48, color:'#aaa', fontSize:13 }}>송달문서가 없습니다.</td></tr>
+              ) : (
+                docs.map(doc => (
+                  <tr key={doc.id}>
+                    <td style={tdS}><input type="checkbox" /></td>
+                    <td style={tdS}>{doc.court}</td>
+                    <td style={tdS}>{doc.division}</td>
+                    <td style={{ ...tdS, textAlign:'left' }}>
+                      <span style={{ color:'#0098a3', textDecoration:'underline', cursor:'pointer', fontWeight:600 }}>{doc.case_number}</span>
+                    </td>
+                    <td style={{ ...tdS, textAlign:'left' }}>{doc.document_name}</td>
+                    <td style={tdS}>{doc.sent_at}</td>
+                    <td style={tdS}>
+                      {doc.received_at ? (
+                        doc.is_auto_confirmed ? (
+                          <span style={{ color:'#9ca3af' }}>{doc.received_at}(자동확인)</span>
+                        ) : (
+                          <span style={{ color:'#111' }}>{doc.received_at}</span>
+                        )
+                      ) : (
+                        <span style={{ color:'#e53e3e', fontWeight:700 }}>미확인</span>
+                      )}
+                    </td>
+                    <td style={tdS}>
+                      {doc.has_publish && <button style={{ height:24, padding:'0 8px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:2, fontSize:10, cursor:'pointer', fontFamily:'inherit' }}>발급/조회</button>}
+                    </td>
+                    <td style={tdS}></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 송달간주 안내 */}
+        <div style={{ background:'#f0f9ff', border:'1px solid #0098a3', borderRadius:6, padding:'16px 20px', margin:'16px 0' }}>
+          <div style={{ fontSize:14, fontWeight:700, color:'#003366', marginBottom:10 }}>📋 송달간주일 안내</div>
+          <div style={{ fontSize:12, color:'#333', lineHeight:2 }}>
+            <p style={{ margin:'0 0 6px' }}>전자소송에서 송달문서는 발송일로부터 <strong>7일</strong>이 경과하면 자동으로 송달 간주 처리됩니다.</p>
+            <p style={{ margin:'0 0 6px' }}>예시: 발송일이 <strong>{fmtD2(exSent2)}</strong>인 경우, <strong>{fmtD2(exAuto2)}</strong>에 자동 확인(송달간주) 처리됩니다.</p>
+            <p style={{ margin:0, fontSize:11, color:'#666' }}>※ 송달간주 전에 직접 확인하시면 해당 일자가 수신일로 기록됩니다.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   function renderContent() {
     switch (activePage) {
       case 'status': return <StatusContent />
@@ -3099,6 +3400,8 @@ export default function MyPage() {
       case 'correction-list': return <CorrectionListContent />
       case 'completed-cases': return <CompletedCasesContent />
       case 'ecfs-reg': return <EcfsRegContent />
+      case 'unconfirmed-delivery-new': return <UnconfirmedDeliveryNewContent />
+      case 'all-delivery-new': return <AllDeliveryNewContent />
       case 'myinfo-user': return <MyInfoContent type="user" />
       case 'myinfo-pw': return <MyInfoContent type="pw" />
       default: return <GenericContent title={genericTitle || activePage} />
@@ -3173,8 +3476,10 @@ export default function MyPage() {
             <>
               <SbItem label="작성중서류" page="draft-docs" />
               <SbItem label="제출서류" page="submitted-docs" />
-              <SbItem label="미확인송달문서" page="unread-delivery" />
-              <SbItem label="전체송달문서" page="all-delivery" />
+              <SbItem label={`미확인송달문서${deliveryUnconfirmedCount > 0 ? ` \uD83D\uDD34${deliveryUnconfirmedCount}` : ''}`} page="unconfirmed-delivery-new" />
+              <SbItem label="전체송달문서" page="all-delivery-new" />
+              <SbItem label="미확인송달문서(구)" page="unread-delivery" />
+              <SbItem label="전체송달문서(구)" page="all-delivery" />
               <SbItem label="송달문서 정(등)본발급" page="generic" title="송달문서 정(등)본발급" />
             </>
           )}

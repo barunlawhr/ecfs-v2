@@ -46,7 +46,7 @@ function getAllAccounts(): AccountRow[] {
   return Object.values(merged)
 }
 
-type Panel = 'dashboard' | 'accounts' | 'cases' | 'assign' | 'records' | 'corrections' | 'ecfs-cases' | 'settings'
+type Panel = 'dashboard' | 'accounts' | 'cases' | 'assign' | 'records' | 'corrections' | 'deliveries' | 'ecfs-cases' | 'settings'
 
 const PANEL_ITEMS: { key: Panel; icon: string; label: string }[] = [
   { key: 'dashboard', icon: '📊', label: '대시보드' },
@@ -55,6 +55,7 @@ const PANEL_ITEMS: { key: Panel; icon: string; label: string }[] = [
   { key: 'assign', icon: '🎯', label: '사건배정 관리' },
   { key: 'corrections', icon: '📝', label: '보정명령 관리' },
   { key: 'records', icon: '📈', label: '실습/채점 현황' },
+  { key: 'deliveries', icon: '📬', label: '송달문서 관리' },
   { key: 'ecfs-cases', icon: '⚖️', label: '전자소송 가상사건' },
   { key: 'settings', icon: '⚙', label: '설정' },
 ]
@@ -1784,6 +1785,192 @@ export default function AdminPage() {
     )
   }
 
+  function DeliveriesPanel() {
+    const [cases, setCases] = useState<{id:string; case_number:string; case_name:string; court:string; division:string}[]>([])
+    const [selectedStudentId, setSelectedStudentId] = useState('')
+    const [selectedCaseId, setSelectedCaseId] = useState('')
+    const [docName, setDocName] = useState('')
+    const [sentDaysAgo, setSentDaysAgo] = useState(5)
+    const [sentCustomDate, setSentCustomDate] = useState('')
+    const [sentMode, setSentMode] = useState<'preset'|'custom'>('preset')
+    const [hasPublish, setHasPublish] = useState(false)
+    const [deliveries, setDeliveries] = useState<Record<string, unknown>[]>([])
+    const [submitting, setSubmitting] = useState(false)
+
+    useEffect(() => {
+      if (!selectedStudentId) return
+      ;(async () => {
+        const { data: assigns } = await supabase.from('case_assignments').select('case_id').eq('student_id', selectedStudentId)
+        if (!assigns?.length) { setCases([]); return }
+        const caseIds = assigns.map((a: Record<string, unknown>) => a.case_id)
+        const { data } = await supabase.from('practice_cases').select('id, case_number, case_name, court, division').in('id', caseIds)
+        if (data) setCases(data as {id:string; case_number:string; case_name:string; court:string; division:string}[])
+      })()
+    }, [selectedStudentId])
+
+    const selectedCase = cases.find(c => c.id === selectedCaseId)
+
+    const fetchDeliveries = useCallback(async () => {
+      const { data } = await supabase.from('delivery_documents').select('*').order('created_at', { ascending: false })
+      if (data) setDeliveries(data)
+    }, [])
+    useEffect(() => { fetchDeliveries() }, [fetchDeliveries])
+
+    async function handleSubmit() {
+      if (!selectedStudentId || !selectedCaseId || !docName) { alert('모든 필드를 입력하세요.'); return }
+      setSubmitting(true)
+      const sentAt = sentMode === 'custom' ? sentCustomDate :
+        new Date(Date.now() - sentDaysAgo * 86400000).toISOString().slice(0, 10)
+      const { error } = await supabase.from('delivery_documents').insert({
+        student_id: selectedStudentId,
+        case_id: selectedCaseId,
+        court: selectedCase?.court || '',
+        division: selectedCase?.division || '',
+        case_number: selectedCase?.case_number || '',
+        document_name: docName,
+        sent_at: sentAt,
+        has_publish: hasPublish,
+      })
+      if (error) alert('등록 실패: ' + error.message)
+      else { setDocName(''); fetchDeliveries(); showToast('송달문서가 등록되었습니다.') }
+      setSubmitting(false)
+    }
+
+    async function handleDelete(id: string) {
+      if (!confirm('삭제하시겠습니까?')) return
+      await supabase.from('delivery_documents').delete().eq('id', id)
+      fetchDeliveries(); showToast('삭제되었습니다.')
+    }
+
+    const students = Object.entries(HARDCODED_ACCOUNTS).filter(([, v]) => v.role === 'student')
+    const thS: React.CSSProperties = { padding:'8px 10px', fontSize:11, fontWeight:700, color:'#333', textAlign:'center', whiteSpace:'nowrap', background:'#f0f3f8', borderBottom:'2px solid #b8c8e0' }
+    const tdS: React.CSSProperties = { padding:'8px 10px', fontSize:12, borderBottom:'1px solid #eee', verticalAlign:'middle', textAlign:'center' }
+    const quickDocs = ['변론기일통지서', '준비서면부본', '보정권고', '결정정본', '조정회부결정등본']
+
+    return (
+      <div>
+        <h2 style={{ fontSize:18, fontWeight:800, color:'#0d2244', marginBottom:20, display:'flex', alignItems:'center', gap:8 }}>📬 송달문서 관리</h2>
+
+        {/* Form card */}
+        <div style={{ background:'#f8f9fc', border:'1px solid #dde0e8', borderRadius:8, padding:20, marginBottom:24 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            {/* 학생 선택 */}
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:13, fontWeight:600, color:'#333', minWidth:90 }}>학생 선택</span>
+              <select value={selectedStudentId} onChange={e => { setSelectedStudentId(e.target.value); setSelectedCaseId('') }} style={{ height:32, border:'1px solid #c8cdd6', borderRadius:4, fontSize:13, padding:'0 8px', fontFamily:'inherit', minWidth:180 }}>
+                <option value="">-- 선택 --</option>
+                {students.map(([id, acc]) => <option key={id} value={id}>{acc.name} ({id})</option>)}
+              </select>
+            </div>
+
+            {/* 사건 선택 */}
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:13, fontWeight:600, color:'#333', minWidth:90 }}>사건 선택</span>
+              <select value={selectedCaseId} onChange={e => setSelectedCaseId(e.target.value)} style={{ height:32, border:'1px solid #c8cdd6', borderRadius:4, fontSize:13, padding:'0 8px', fontFamily:'inherit', minWidth:320 }}>
+                <option value="">-- 선택 --</option>
+                {cases.map(c => <option key={c.id} value={c.id}>{c.case_number} ({c.case_name}) - {c.court}</option>)}
+              </select>
+            </div>
+
+            {/* 송달문서명 */}
+            <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+              <span style={{ fontSize:13, fontWeight:600, color:'#333', minWidth:90 }}>송달문서명</span>
+              <input type="text" value={docName} onChange={e => setDocName(e.target.value)} style={{ height:32, border:'1px solid #c8cdd6', borderRadius:4, padding:'0 10px', fontSize:13, fontFamily:'inherit', width:240 }} placeholder="문서명 입력" />
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                {quickDocs.map(d => (
+                  <button key={d} onClick={() => setDocName(d)} style={{ height:28, padding:'0 10px', background: docName === d ? '#003366' : '#fff', color: docName === d ? '#fff' : '#555', border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>{d}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* 발송일자 */}
+            <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+              <span style={{ fontSize:13, fontWeight:600, color:'#333', minWidth:90 }}>발송일자</span>
+              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, cursor:'pointer' }}>
+                  <input type="radio" checked={sentMode === 'preset'} onChange={() => setSentMode('preset')} style={{ accentColor:'#003366' }} />지정일전
+                </label>
+                {[4,5,6,7].map(d => (
+                  <button key={d} onClick={() => { setSentMode('preset'); setSentDaysAgo(d) }} style={{ height:26, padding:'0 10px', background: sentMode === 'preset' && sentDaysAgo === d ? '#003366' : '#fff', color: sentMode === 'preset' && sentDaysAgo === d ? '#fff' : '#555', border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>{d}일전</button>
+                ))}
+                <span style={{ margin:'0 6px', color:'#ccc' }}>|</span>
+                <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, cursor:'pointer' }}>
+                  <input type="radio" checked={sentMode === 'custom'} onChange={() => setSentMode('custom')} style={{ accentColor:'#003366' }} />직접입력
+                </label>
+                <input type="date" value={sentCustomDate} onChange={e => { setSentCustomDate(e.target.value); setSentMode('custom') }} style={{ height:28, border:'1px solid #c8cdd6', borderRadius:3, padding:'0 6px', fontSize:12, fontFamily:'inherit' }} />
+              </div>
+            </div>
+
+            {/* 발급/조회 표시 */}
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:13, fontWeight:600, color:'#333', minWidth:90 }}>발급/조회 표시</span>
+              <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, cursor:'pointer' }}>
+                <input type="checkbox" checked={hasPublish} onChange={e => setHasPublish(e.target.checked)} style={{ accentColor:'#003366' }} />
+                발급/조회 버튼 표시
+              </label>
+            </div>
+
+            {/* 등록 버튼 */}
+            <div style={{ textAlign:'center', paddingTop:6 }}>
+              <button onClick={handleSubmit} disabled={submitting} style={{ height:38, padding:'0 48px', background:'#003366', color:'#fff', border:'none', borderRadius:4, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit', opacity: submitting ? 0.6 : 1 }}>
+                {submitting ? '등록 중...' : '등록'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <thead>
+              <tr>
+                {['학생','사건번호','문서명','발송일','자동확인예정일','수신상태','삭제'].map(h => (
+                  <th key={h} style={thS}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {deliveries.length === 0 ? (
+                <tr><td colSpan={7} style={{ ...tdS, padding:40, color:'#aaa' }}>등록된 송달문서가 없습니다.</td></tr>
+              ) : (
+                deliveries.map((d: Record<string, unknown>) => {
+                  const sentDate = d.sent_at as string
+                  const autoDate = new Date(new Date(sentDate).getTime() + 7 * 86400000).toISOString().slice(0, 10)
+                  const receivedAt = d.received_at as string | null
+                  const isAuto = d.is_auto_confirmed as boolean
+                  const studentAcc = HARDCODED_ACCOUNTS[d.student_id as string]
+                  return (
+                    <tr key={d.id as string}>
+                      <td style={tdS}>{studentAcc?.name || (d.student_id as string)}</td>
+                      <td style={tdS}>{d.case_number as string}</td>
+                      <td style={tdS}>{d.document_name as string}</td>
+                      <td style={tdS}>{sentDate}</td>
+                      <td style={tdS}>{autoDate}</td>
+                      <td style={tdS}>
+                        {receivedAt ? (
+                          isAuto ? (
+                            <span style={{ display:'inline-block', padding:'2px 10px', borderRadius:10, background:'#f3f4f6', color:'#6b7280', fontSize:11, fontWeight:600 }}>자동확인</span>
+                          ) : (
+                            <span style={{ display:'inline-block', padding:'2px 10px', borderRadius:10, background:'#f0fff4', color:'#38a169', fontSize:11, fontWeight:700, border:'1px solid #9ae6b4' }}>확인</span>
+                          )
+                        ) : (
+                          <span style={{ display:'inline-block', padding:'2px 10px', borderRadius:10, background:'#fff5f5', color:'#e53e3e', fontSize:11, fontWeight:700, border:'1px solid #feb2b2' }}>미확인</span>
+                        )}
+                      </td>
+                      <td style={tdS}>
+                        <button onClick={() => handleDelete(d.id as string)} style={{ padding:'3px 10px', fontSize:11, background:'#fff', border:'1px solid #e53e3e', color:'#e53e3e', borderRadius:3, cursor:'pointer' }}>삭제</button>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
   function renderPanel() {
     switch (activePanel) {
       case 'dashboard': return <DashboardPanel />
@@ -1792,6 +1979,7 @@ export default function AdminPage() {
       case 'assign': return <AssignPanel />
       case 'records': return <RecordsPanel />
       case 'corrections': return <CorrectionsPanel />
+      case 'deliveries': return <DeliveriesPanel />
       case 'ecfs-cases': return <EcfsCasesPanel />
       case 'settings': return <SettingsPanel />
       default: return <DashboardPanel />
