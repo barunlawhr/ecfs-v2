@@ -3476,7 +3476,7 @@ export default function MyPage() {
             <>
               <SbItem label="작성중서류" page="draft-docs" />
               <SbItem label="제출서류" page="submitted-docs" />
-              <SbItem label={`미확인송달문서${deliveryUnconfirmedCount > 0 ? ` \uD83D\uDD34${deliveryUnconfirmedCount}` : ''}`} page="unconfirmed-delivery-new" />
+              <SbItem label="미확인송달문서" page="unconfirmed-delivery-new" />
               <SbItem label="전체송달문서" page="all-delivery-new" />
               <SbItem label="미확인송달문서(구)" page="unread-delivery" />
               <SbItem label="전체송달문서(구)" page="all-delivery" />
