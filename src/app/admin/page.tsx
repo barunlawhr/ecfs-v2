@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import MockBar from '@/components/layout/MockBar'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { HARDCODED_ACCOUNTS } from '@/lib/auth'
+// HARDCODED_ACCOUNTS는 auth.ts 로그인 fallback에서만 사용 (여기선 미사용)
 import { fetchAccounts, addAccount as addAccountToDb, deleteAccounts as deleteAccountsFromDb, type AccountRow as DbAccountRow } from '@/lib/accounts'
 import type { SampleCase, Assignment, PracticeRecord } from '@/types'
 import { calculateScore, generateFeedback } from '@/lib/scoring'
@@ -26,8 +26,6 @@ interface AccountRow {
   isHardcoded?: boolean
 }
 
-// Legacy localStorage key (마이그레이션 후 미사용)
-const ACC_KEY = 'ec_acc'
 
 type Panel = 'dashboard' | 'accounts' | 'cases' | 'assign' | 'records' | 'corrections' | 'deliveries' | 'ecfs-cases' | 'settings'
 
@@ -43,10 +41,6 @@ const PANEL_ITEMS: { key: Panel; icon: string; label: string }[] = [
   { key: 'settings', icon: '⚙', label: '설정' },
 ]
 
-// fallback용 (대시보드 초기 로딩)
-const STUDENT_IDS_FALLBACK = Object.entries(HARDCODED_ACCOUNTS)
-  .filter(([, v]) => v.role === 'student')
-  .map(([id]) => id)
 
 const COURT_OPTIONS = ['서울중앙지방법원', '서울동부지방법원', '서울서부지방법원', '서울남부지방법원', '서울북부지방법원', '수원지방법원', '인천지방법원', '부산지방법원']
 const CASE_TYPE_OPTIONS = ['대여금', '손해배상', '매매대금', '임금', '부당이득금', '소유권이전등기', '기타']
@@ -68,10 +62,18 @@ export default function AdminPage() {
   const router = useRouter()
   const [activePanel, setActivePanel] = useState<Panel>('dashboard')
   const [toast, setToast] = useState<string | null>(null)
+  const [allAccounts, setAllAccounts] = useState<DbAccountRow[]>([])
   const siteTitle = '[바른커리어] 전자소송모의실습 관리자'
+
+  const studentAccounts = allAccounts.filter(a => a.role === 'student')
+  const studentIds = studentAccounts.map(a => a.login_id)
+  function nameOf(id: string): string { return allAccounts.find(a => a.login_id === id)?.name || id }
+
+  async function reloadAccounts() { setAllAccounts(await fetchAccounts()) }
 
   useEffect(() => {
     if (!loading && (!user || user.role !== 'admin')) router.push('/')
+    if (!loading && user?.role === 'admin') reloadAccounts()
   }, [user, loading, router])
 
   if (loading) {
@@ -135,8 +137,8 @@ export default function AdminPage() {
       load()
     }, [])
 
-    const totalAccounts = Object.keys(HARDCODED_ACCOUNTS).length
-    const studentCount = STUDENT_IDS_FALLBACK.length
+    const totalAccounts = allAccounts.length
+    const studentCount = studentIds.length
 
     const cards = [
       { label: '전체 계정', value: totalAccounts, color: '#1a3a6b', bg: '#eef2fb' },
@@ -211,7 +213,7 @@ export default function AdminPage() {
       if (error) { alert('추가 실패: ' + error); return }
       setForm({ login_id: '', password: '', name: '', org: '', email: '', role: 'student' })
       setShowAddForm(false)
-      await loadRows()
+      await loadRows(); await reloadAccounts()
       showToast('계정이 추가되었습니다.')
     }
 
@@ -220,7 +222,7 @@ export default function AdminPage() {
       if (error) { alert('삭제 실패: ' + error); return }
       setSelectedIds(new Set())
       setDeleteModal(null)
-      await loadRows()
+      await loadRows(); await reloadAccounts()
       showToast(`${ids.length}개 계정이 삭제되었습니다.`)
     }
 
@@ -246,7 +248,7 @@ export default function AdminPage() {
       const { error } = await supabase.from('accounts').update(updates).eq('login_id', editModal.login_id)
       if (error) { alert('수정 실패: ' + error.message); return }
       setEditModal(null)
-      await loadRows()
+      await loadRows(); await reloadAccounts()
       showToast('계정이 수정되었습니다.')
     }
 
@@ -301,7 +303,7 @@ export default function AdminPage() {
           if (error) { setSaving(false); alert('DB 등록 실패: ' + error.message); return }
         }
         setSaving(false)
-        await loadRows()
+        await loadRows(); await reloadAccounts()
         showToast(`${rows.length}개 계정 등록 완료${fail > 0 ? ` (${fail}개 실패)` : ''}`)
       } catch (err) { setSaving(false); alert('Excel 파싱 오류: ' + String(err)) }
       if (fileRef.current) fileRef.current.value = ''
@@ -693,9 +695,8 @@ export default function AdminPage() {
     interface APCase { id: string; case_number: string; case_name: string }
     interface APAssignment { id: string; case_id: string; student_id: string; role: string; assigned_at: string; due_date: string | null; status: string; doc_type?: string }
 
-    const ASSIGN_STUDENT_LIST = Object.entries(HARDCODED_ACCOUNTS)
-      .filter(([, acc]) => acc.role === 'student')
-      .map(([id, acc]) => ({ id, name: acc.name }))
+    const ASSIGN_STUDENT_LIST = studentAccounts
+      .map(a => ({ id: a.login_id, name: a.name }))
 
     const [cases, setCases] = useState<APCase[]>([])
     const [selectedCaseId, setSelectedCaseId] = useState('')
@@ -743,8 +744,7 @@ export default function AdminPage() {
     }
 
     function getStudentName2(sid: string): string {
-      const acc = HARDCODED_ACCOUNTS[sid]
-      return acc ? acc.name : sid
+      return nameOf(sid)
     }
 
     const assignInp: React.CSSProperties = { padding: '7px 10px', border: '1px solid #d0d8e8', borderRadius: 4, fontSize: 13, boxSizing: 'border-box' }
@@ -871,9 +871,8 @@ export default function AdminPage() {
     const [subLoading, setSubLoading] = useState(true)
     const [subFilter, setSubFilter] = useState('')
 
-    const SUB_STUDENT_LIST = Object.entries(HARDCODED_ACCOUNTS)
-      .filter(([, acc]) => acc.role === 'student')
-      .map(([id, acc]) => ({ id, name: acc.name }))
+    const SUB_STUDENT_LIST = studentAccounts
+      .map(a => ({ id: a.login_id, name: a.name }))
 
     function subScoreColor(score: number | null): string {
       if (score === null || score === undefined) return '#888'
@@ -947,19 +946,19 @@ export default function AdminPage() {
     const byStudent: Record<string, PracticeRecord[]> = {}
     records.forEach(r => { if (!byStudent[r.student_id]) byStudent[r.student_id] = []; byStudent[r.student_id].push(r) })
 
-    const studentSummaries = STUDENT_IDS_FALLBACK.map(id => {
+    const studentSummaries = studentIds.map(id => {
       const recs = byStudent[id] || []; const count = recs.length
       const avg = count > 0 ? Math.round(recs.reduce((s, r) => s + r.score, 0) / count) : 0
       const best = count > 0 ? Math.max(...recs.map(r => r.score)) : 0
-      return { id, name: HARDCODED_ACCOUNTS[id]?.name || id, count, avg, best, recs }
+      return { id, name: nameOf(id), count, avg, best, recs }
     }).filter(s => s.count > 0)
 
     const selectedRecs = selectedStudent ? byStudent[selectedStudent] || [] : []
-    const selectedAcc = selectedStudent ? HARDCODED_ACCOUNTS[selectedStudent] : null
+    const selectedAcc = selectedStudent ? allAccounts.find(a => a.login_id === selectedStudent) : null
 
     // Submissions helpers
     function getSubStudentId(sub: SubRow): string { const a = subAMap[sub.assignment_id]; return a ? a.student_id : '-' }
-    function getSubStudentName(sid: string): string { const acc = HARDCODED_ACCOUNTS[sid]; return acc ? acc.name : sid }
+    function getSubStudentName(sid: string): string { return nameOf(sid) }
     function getSubCaseNumber(sub: SubRow): string { const a = subAMap[sub.assignment_id]; if (!a) return '-'; const c = subCMap[a.case_id]; return c ? c.case_number : '-' }
     const filteredSubs = subFilter ? submissions.filter(s => getSubStudentId(s) === subFilter) : submissions
 
@@ -1544,10 +1543,9 @@ export default function AdminPage() {
             <div style={{ display: 'flex', gap: 8 }}>
               <select value={selectedStudent} onChange={e => setSelectedStudent(e.target.value)} style={{ ...inp, flex: 1 }}>
                 <option value="">-- 학생 선택 --</option>
-                {STUDENT_IDS_FALLBACK.map(id => {
-                  const acc = HARDCODED_ACCOUNTS[id]
-                  return <option key={id} value={id}>{acc?.name} ({id})</option>
-                })}
+                {studentIds.map(id => (
+                  <option key={id} value={id}>{nameOf(id)} ({id})</option>
+                ))}
               </select>
               <button
                 onClick={() => { if (selectedStudent) setDataDeleteModal({ type: 'student', sid: selectedStudent }) }}
@@ -1568,7 +1566,7 @@ export default function AdminPage() {
               <div style={{ padding: '24px 20px', fontSize: 14, color: '#333', lineHeight: 1.8 }}>
                 {dataDeleteModal.type === 'all'
                   ? '전체 실습기록을 초기화하시겠습니까?'
-                  : `'${HARDCODED_ACCOUNTS[dataDeleteModal.sid!]?.name || dataDeleteModal.sid}' 학생의 실습기록을 삭제하시겠습니까?`}
+                  : `'${nameOf(dataDeleteModal.sid!)}' 학생의 실습기록을 삭제하시겠습니까?`}
                 <br />
                 <span style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>⚠️ 이 작업은 되돌릴 수 없습니다.</span>
               </div>
@@ -1589,9 +1587,8 @@ export default function AdminPage() {
   function CorrectionsPanel() {
     interface CPCase { id: string; case_number: string; case_name: string }
     // 학생 목록: 배정된 학생 우선, 없으면 전체 학생 표시
-    const allStudents = Object.entries(HARDCODED_ACCOUNTS)
-      .filter(([, acc]) => acc.role === 'student')
-      .map(([id, acc]) => ({ id, name: acc.name }))
+    const allStudents = studentAccounts
+      .map(a => ({ id: a.login_id, name: a.name }))
 
     interface CPOrder {
       id: string; case_id: string; student_id: string; order_number: string
@@ -1693,7 +1690,7 @@ export default function AdminPage() {
                 <option value="">-- 학생 선택 --</option>
                 {cpAssignedStudents.length > 0 && (
                   <optgroup label="배정된 학생">
-                    {cpAssignedStudents.map(sid => <option key={sid} value={sid}>{HARDCODED_ACCOUNTS[sid]?.name || sid} ({sid})</option>)}
+                    {cpAssignedStudents.map(sid => <option key={sid} value={sid}>{nameOf(sid)} ({sid})</option>)}
                   </optgroup>
                 )}
                 <optgroup label="전체 학생">
@@ -1755,7 +1752,7 @@ export default function AdminPage() {
               {cpOrders.map(o => (
                 <tr key={o.id} style={{ borderBottom: '1px solid #eee' }}>
                   <td style={{ padding: '8px 12px', textAlign: 'center' }}>{o.practice_cases?.case_number || '-'}</td>
-                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>{HARDCODED_ACCOUNTS[o.student_id]?.name || o.student_id}</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>{nameOf(o.student_id)}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'center' }}>{o.order_number}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                     {o.deadline}
@@ -1840,7 +1837,7 @@ export default function AdminPage() {
       fetchDeliveries(); showToast('삭제되었습니다.')
     }
 
-    const students = Object.entries(HARDCODED_ACCOUNTS).filter(([, v]) => v.role === 'student')
+    const students = studentAccounts
     const thS: React.CSSProperties = { padding:'8px 10px', fontSize:11, fontWeight:700, color:'#333', textAlign:'center', whiteSpace:'nowrap', background:'#f0f3f8', borderBottom:'2px solid #b8c8e0' }
     const tdS: React.CSSProperties = { padding:'8px 10px', fontSize:12, borderBottom:'1px solid #eee', verticalAlign:'middle', textAlign:'center' }
     const quickDocs = ['변론기일통지서', '준비서면부본', '보정권고', '결정정본', '조정회부결정등본']
@@ -1857,7 +1854,7 @@ export default function AdminPage() {
               <span style={{ fontSize:13, fontWeight:600, color:'#333', minWidth:90 }}>학생 선택</span>
               <select value={selectedStudentId} onChange={e => { setSelectedStudentId(e.target.value); setSelectedCaseId('') }} style={{ height:32, border:'1px solid #c8cdd6', borderRadius:4, fontSize:13, padding:'0 8px', fontFamily:'inherit', minWidth:180 }}>
                 <option value="">-- 선택 --</option>
-                {students.map(([id, acc]) => <option key={id} value={id}>{acc.name} ({id})</option>)}
+                {students.map(s => <option key={s.login_id} value={s.login_id}>{s.name} ({s.login_id})</option>)}
               </select>
             </div>
 
@@ -1936,7 +1933,7 @@ export default function AdminPage() {
                   const autoDate = new Date(new Date(sentDate).getTime() + 7 * 86400000).toISOString().slice(0, 10)
                   const receivedAt = d.received_at as string | null
                   const isAuto = d.is_auto_confirmed as boolean
-                  const studentAcc = HARDCODED_ACCOUNTS[d.student_id as string]
+                  const studentAcc = { name: nameOf(d.student_id as string) }
                   return (
                     <tr key={d.id as string}>
                       <td style={tdS}>{studentAcc?.name || (d.student_id as string)}</td>

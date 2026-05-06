@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { HARDCODED_ACCOUNTS } from '@/lib/auth'
+import { fetchStudents, type AccountRow } from '@/lib/accounts'
 import { NAVY, TH, TD, SEL } from '@/lib/constants'
 
 interface Submission {
@@ -32,9 +32,7 @@ interface CaseMap {
   }
 }
 
-const STUDENT_LIST = Object.entries(HARDCODED_ACCOUNTS)
-  .filter(([, acc]) => acc.role === 'student')
-  .map(([id, acc]) => ({ id, name: acc.name }))
+// 동적 로드 (아래 useEffect에서 설정)
 
 function scoreColor(score: number | null): string {
   if (score === null || score === undefined) return '#888'
@@ -48,6 +46,7 @@ export default function AdminScoresPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
 
+  const [studentList, setStudentList] = useState<{ id: string; name: string }[]>([])
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [assignmentMap, setAssignmentMap] = useState<AssignmentMap>({})
   const [caseMap, setCaseMap] = useState<CaseMap>({})
@@ -111,12 +110,15 @@ export default function AdminScoresPage() {
       router.replace('/admin')
       return
     }
-    if (!authLoading && user?.role === 'admin') fetchData()
+    if (!authLoading && user?.role === 'admin') {
+      fetchStudents().then(s => setStudentList(s.map(a => ({ id: a.login_id, name: a.name }))))
+      fetchData()
+    }
   }, [authLoading, user, router, fetchData])
 
   function getStudentName(studentId: string): string {
-    const acc = HARDCODED_ACCOUNTS[studentId]
-    return acc ? acc.name : studentId
+    const s = studentList.find(a => a.id === studentId)
+    return s ? s.name : studentId
   }
 
   function getStudentId(sub: Submission): string {
@@ -164,7 +166,7 @@ export default function AdminScoresPage() {
             onChange={e => setFilterStudent(e.target.value)}
           >
             <option value="">전체</option>
-            {STUDENT_LIST.map(s => (
+            {studentList.map(s => (
               <option key={s.id} value={s.id}>{s.name} ({s.id})</option>
             ))}
           </select>
