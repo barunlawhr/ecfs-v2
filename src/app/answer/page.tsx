@@ -240,8 +240,14 @@ export default function AnswerPage() {
   // ── 작성완료 (제출) ──
   async function handleSubmit() {
     if (!user) return;
-    if (!formData.court) { alert('법원을 선택해주세요.'); return; }
-    if (!formData.claimPurpose.trim()) { alert('청구취지에 대한 답변을 입력해주세요.'); return; }
+
+    // 프론트엔드 검증
+    const { validateAnswer, formatValidationErrors } = await import('@/lib/validation');
+    const errors = validateAnswer(formData);
+    if (errors.length > 0) {
+      setSubmitError('필수 항목을 확인해주세요:\n' + formatValidationErrors(errors));
+      return;
+    }
 
     setSubmitting(true);
     setSubmitError('');

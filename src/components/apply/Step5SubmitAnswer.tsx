@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ComplaintFormData, SampleCase } from '@/types'
 import { supabase } from '@/lib/supabase'
+import { validateAnswer, formatValidationErrors, type ValidationError } from '@/lib/validation'
 
 interface Step5SubmitAnswerProps {
   data: ComplaintFormData
@@ -24,13 +25,23 @@ export default function Step5SubmitAnswer({
 }: Step5SubmitAnswerProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<ValidationError[]>([])
 
   const defendant = data.parties.find(p => p.role === '피고')?.name || '-'
   const plaintiff = data.parties.find(p => p.role === '원고')?.name || '-'
 
   const handleSubmit = async () => {
-    setLoading(true)
+    setFieldErrors([])
     setError(null)
+
+    const errors = validateAnswer(data)
+    if (errors.length > 0) {
+      setFieldErrors(errors)
+      setError('필수 항목을 확인해주세요:\n' + formatValidationErrors(errors))
+      return
+    }
+
+    setLoading(true)
 
     try {
       const mockCase: SampleCase = {
@@ -194,11 +205,19 @@ export default function Step5SubmitAnswer({
           </div>
         </div>
 
-        {error && (
-          <div style={{
-            backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6,
-            padding: '12px 16px', color: '#dc2626', fontSize: 14, marginBottom: 16,
-          }}>
+        {fieldErrors.length > 0 && (
+          <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '14px 16px', marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', marginBottom: 8 }}>⚠️ 필수 항목을 확인해주세요</div>
+            {fieldErrors.map((e, i) => (
+              <div key={i} style={{ fontSize: 13, color: '#b91c1c', padding: '3px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
+                <span><strong>{e.label}</strong>: {e.message}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {error && !fieldErrors.length && (
+          <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '12px 16px', color: '#dc2626', fontSize: 14, marginBottom: 16 }}>
             오류: {error}
           </div>
         )}

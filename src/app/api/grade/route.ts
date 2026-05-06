@@ -42,6 +42,15 @@ export async function POST(req: NextRequest) {
     })
   }
 
+  // ── 서버사이드 검증 (이중 방어) ──
+  const { validateFormDataServer } = await import('@/lib/validation')
+  const docType = body.doc_type || body.formData?.doc_type || 'complaint'
+  const serverErr = validateFormDataServer(body.formData || body.submissionData || {}, docType)
+  if (serverErr) {
+    console.warn('[Grade API] 서버 검증 실패:', serverErr)
+    return NextResponse.json({ error: serverErr, score: 0, feedback: `서버 검증 실패: ${serverErr}`, isError: true }, { status: 400 })
+  }
+
   // ── 기존 레거시 채점 모드 ──
   if (!apiKey || !apiKey.startsWith('sk-ant')) {
     const { ruleGrade, buildFeedback } = await import('@/lib/scoring')
