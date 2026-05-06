@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import MockBar from '@/components/layout/MockBar'
 import GnbNav from '@/components/layout/GnbNav'
 import Footer from '@/components/layout/Footer'
@@ -115,17 +115,15 @@ function bgFn(s: number) {
 export default function MyPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const initialPage = (searchParams.get('page') as ActivePage) || 'status'
-  const [activePage, setActivePage] = useState<ActivePage>(initialPage)
+  const [activePage, setActivePage] = useState<ActivePage>('status')
   const [genericTitle, setGenericTitle] = useState('')
-  const isDeliveryPage = initialPage.includes('delivery') || initialPage.includes('unconfirmed')
+  const [initialReady, setInitialReady] = useState(false)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
-    '나의사건관리': !isDeliveryPage,
+    '나의사건관리': true,
     '사건진행': false,
     '국선전담사건': false,
     '각종신청': false,
-    '나의문서함': isDeliveryPage,
+    '나의문서함': false,
     '납부환급관리': false,
     '기록열람': false,
     '전자소송사건등록': false,
@@ -155,6 +153,20 @@ export default function MyPage() {
     if (!loading && !user) router.push('/')
     if (!loading && user?.role === 'admin') router.push('/admin')
   }, [user, loading, router])
+
+  // URL 쿼리 파라미터로 초기 페이지 설정 (클라이언트 사이드)
+  useEffect(() => {
+    if (initialReady) return
+    const params = new URLSearchParams(window.location.search)
+    const page = params.get('page') as ActivePage | null
+    if (page) {
+      setActivePage(page)
+      if (page.includes('delivery') || page.includes('unconfirmed')) {
+        setOpenGroups(prev => ({ ...prev, '나의문서함': true, '나의사건관리': false }))
+      }
+    }
+    setInitialReady(true)
+  }, [initialReady])
 
   // Fetch unconfirmed delivery count (페이지 전환마다 갱신)
   useEffect(() => {
