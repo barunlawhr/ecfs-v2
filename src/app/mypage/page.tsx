@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import MockBar from '@/components/layout/MockBar'
 import GnbNav from '@/components/layout/GnbNav'
 import Footer from '@/components/layout/Footer'
@@ -115,14 +115,17 @@ function bgFn(s: number) {
 export default function MyPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [activePage, setActivePage] = useState<ActivePage>('status')
+  const searchParams = useSearchParams()
+  const initialPage = (searchParams.get('page') as ActivePage) || 'status'
+  const [activePage, setActivePage] = useState<ActivePage>(initialPage)
   const [genericTitle, setGenericTitle] = useState('')
+  const isDeliveryPage = initialPage.includes('delivery') || initialPage.includes('unconfirmed')
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
-    '나의사건관리': true,
+    '나의사건관리': !isDeliveryPage,
     '사건진행': false,
     '국선전담사건': false,
     '각종신청': false,
-    '나의문서함': false,
+    '나의문서함': isDeliveryPage,
     '납부환급관리': false,
     '기록열람': false,
     '전자소송사건등록': false,

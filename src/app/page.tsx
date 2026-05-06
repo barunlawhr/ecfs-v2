@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabase';
 const quickIcons = [
   { label: '나의사건관리', icon: '📁', href: '/mypage' },
   { label: '작성중서류', icon: '📝', href: '/apply?new=true' },
-  { label: '미확인송달문서', icon: '📬', href: '/mypage' },
+  { label: '미확인송달문서', icon: '📬', href: '/mypage?page=unconfirmed-delivery-new' },
   { label: '제증명발급', icon: '📜', href: '#' },
   { label: '소송비용납부', icon: '💰', href: '#' },
   { label: '알림서비스', icon: '🔔', href: '#' },
