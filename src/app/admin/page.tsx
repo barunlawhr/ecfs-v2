@@ -1783,6 +1783,7 @@ export default function AdminPage() {
   function DeliveriesPanel() {
     const [cases, setCases] = useState<{id:string; case_number:string; case_name:string; court:string; division:string}[]>([])
     const [selectedStudentId, setSelectedStudentId] = useState('')
+    const [isAllStudents, setIsAllStudents] = useState(false)
     const [selectedCaseId, setSelectedCaseId] = useState('')
     const [docName, setDocName] = useState('')
     const [sentDaysAgo, setSentDaysAgo] = useState(5)
@@ -1793,15 +1794,21 @@ export default function AdminPage() {
     const [submitting, setSubmitting] = useState(false)
 
     useEffect(() => {
-      if (!selectedStudentId) return
+      if (!selectedStudentId && !isAllStudents) { setCases([]); return }
       ;(async () => {
-        const { data: assigns } = await supabase.from('case_assignments').select('case_id').eq('student_id', selectedStudentId)
-        if (!assigns?.length) { setCases([]); return }
-        const caseIds = assigns.map((a: Record<string, unknown>) => a.case_id)
-        const { data } = await supabase.from('practice_cases').select('id, case_number, case_name, court, division').in('id', caseIds)
-        if (data) setCases(data as {id:string; case_number:string; case_name:string; court:string; division:string}[])
+        if (isAllStudents) {
+          // 전체 학생 → 모든 사건 표시
+          const { data } = await supabase.from('practice_cases').select('id, case_number, case_name, court, division').order('created_at', { ascending: false })
+          if (data) setCases(data as {id:string; case_number:string; case_name:string; court:string; division:string}[])
+        } else {
+          const { data: assigns } = await supabase.from('case_assignments').select('case_id').eq('student_id', selectedStudentId)
+          if (!assigns?.length) { setCases([]); return }
+          const caseIds = assigns.map((a: Record<string, unknown>) => a.case_id)
+          const { data } = await supabase.from('practice_cases').select('id, case_number, case_name, court, division').in('id', caseIds)
+          if (data) setCases(data as {id:string; case_number:string; case_name:string; court:string; division:string}[])
+        }
       })()
-    }, [selectedStudentId])
+    }, [selectedStudentId, isAllStudents])
 
     const selectedCase = cases.find(c => c.id === selectedCaseId)
 
@@ -1812,12 +1819,15 @@ export default function AdminPage() {
     useEffect(() => { fetchDeliveries() }, [fetchDeliveries])
 
     async function handleSubmit() {
-      if (!selectedStudentId || !selectedCaseId || !docName) { alert('모든 필드를 입력하세요.'); return }
+      if ((!selectedStudentId && !isAllStudents) || !selectedCaseId || !docName) { alert('모든 필드를 입력하세요.'); return }
       setSubmitting(true)
       const sentAt = sentMode === 'custom' ? sentCustomDate :
         new Date(Date.now() - sentDaysAgo * 86400000).toISOString().slice(0, 10)
-      const { error } = await supabase.from('delivery_documents').insert({
-        student_id: selectedStudentId,
+
+      const targetStudents = isAllStudents ? studentAccounts.map(s => s.login_id) : [selectedStudentId]
+
+      const rows = targetStudents.map(sid => ({
+        student_id: sid,
         case_id: selectedCaseId,
         court: selectedCase?.court || '',
         division: selectedCase?.division || '',
@@ -1825,9 +1835,11 @@ export default function AdminPage() {
         document_name: docName,
         sent_at: sentAt,
         has_publish: hasPublish,
-      })
+      }))
+
+      const { error } = await supabase.from('delivery_documents').insert(rows)
       if (error) alert('등록 실패: ' + error.message)
-      else { setDocName(''); fetchDeliveries(); showToast('송달문서가 등록되었습니다.') }
+      else { setDocName(''); fetchDeliveries(); showToast(`${targetStudents.length}명에게 송달문서가 등록되었습니다.`) }
       setSubmitting(false)
     }
 
@@ -1852,10 +1864,15 @@ export default function AdminPage() {
             {/* 학생 선택 */}
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
               <span style={{ fontSize:13, fontWeight:600, color:'#333', minWidth:90 }}>학생 선택</span>
-              <select value={selectedStudentId} onChange={e => { setSelectedStudentId(e.target.value); setSelectedCaseId('') }} style={{ height:32, border:'1px solid #c8cdd6', borderRadius:4, fontSize:13, padding:'0 8px', fontFamily:'inherit', minWidth:180 }}>
+              <select value={isAllStudents ? '__ALL__' : selectedStudentId} onChange={e => {
+                if (e.target.value === '__ALL__') { setIsAllStudents(true); setSelectedStudentId(''); setSelectedCaseId('') }
+                else { setIsAllStudents(false); setSelectedStudentId(e.target.value); setSelectedCaseId('') }
+              }} style={{ height:32, border:'1px solid #c8cdd6', borderRadius:4, fontSize:13, padding:'0 8px', fontFamily:'inherit', minWidth:180 }}>
                 <option value="">-- 선택 --</option>
+                <option value="__ALL__">📋 전체 학생 ({students.length}명)</option>
                 {students.map(s => <option key={s.login_id} value={s.login_id}>{s.name} ({s.login_id})</option>)}
               </select>
+              {isAllStudents && <span style={{ fontSize:11, color:'#e53e3e', fontWeight:700 }}>전체 {students.length}명에게 일괄 등록됩니다</span>}
             </div>
 
             {/* 사건 선택 */}

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
-import { buildNameMap } from '@/lib/accounts'
+import { buildNameMap, fetchStudents } from '@/lib/accounts'
 
 const TEAL = '#00a99d'
 const NAVY = '#1a3a6b'
@@ -44,6 +44,8 @@ export default function AdminCorrectionsPage() {
 
   const [caseId, setCaseId] = useState('')
   const [studentId, setStudentId] = useState('')
+  const [isAllStudents, setIsAllStudents] = useState(false)
+  const [allStudentIds, setAllStudentIds] = useState<string[]>([])
   const [orderNumber, setOrderNumber] = useState('')
   const [orderDate, setOrderDate] = useState('')
   const [deadline, setDeadline] = useState('')
@@ -58,15 +60,17 @@ export default function AdminCorrectionsPage() {
     }
   }, [user, authLoading, router])
 
-  // Load cases + name map
+  // Load cases + name map + all student ids
   useEffect(() => {
     ;(async () => {
-      const [{ data }, nm] = await Promise.all([
+      const [{ data }, nm, sList] = await Promise.all([
         supabase.from('practice_cases').select('id, case_number, case_name').order('created_at', { ascending: false }),
         buildNameMap(),
+        fetchStudents(),
       ])
       if (data) setCases(data)
       setNameMap(nm)
+      setAllStudentIds(sList.map(s => s.login_id))
     })()
   }, [])
 
@@ -91,21 +95,26 @@ export default function AdminCorrectionsPage() {
   useEffect(() => { fetchOrders() }, [fetchOrders])
 
   const handleSubmit = async () => {
-    if (!caseId || !studentId || !orderNumber || !orderDate || !deadline || !orderContent) {
+    if (!caseId || (!studentId && !isAllStudents) || !orderNumber || !orderDate || !deadline || !orderContent) {
       alert('모든 필드를 입력해주세요.')
       return
     }
     setSubmitting(true)
-    const { error } = await supabase.from('correction_orders').insert({
+    const targets = isAllStudents
+      ? assignments.length > 0 ? assignments.map(a => a.student_id) : allStudentIds
+      : [studentId]
+
+    const rows = targets.map(sid => ({
       case_id: caseId,
-      student_id: studentId,
+      student_id: sid,
       order_number: orderNumber,
       order_date: orderDate,
       deadline,
       order_content: orderContent,
       order_type: orderType,
       status: 'pending',
-    })
+    }))
+    const { error } = await supabase.from('correction_orders').insert(rows)
     if (error) {
       alert('등록 실패: ' + error.message)
     } else {
@@ -158,10 +167,15 @@ export default function AdminCorrectionsPage() {
             </div>
             <div>
               <label style={lbl}>학생 선택</label>
-              <select value={studentId} onChange={e => setStudentId(e.target.value)} style={{ ...inp, cursor: 'pointer' }}>
+              <select value={isAllStudents ? '__ALL__' : studentId} onChange={e => {
+                if (e.target.value === '__ALL__') { setIsAllStudents(true); setStudentId('') }
+                else { setIsAllStudents(false); setStudentId(e.target.value) }
+              }} style={{ ...inp, cursor: 'pointer' }}>
                 <option value="">-- 학생 선택 --</option>
+                <option value="__ALL__">📋 전체 학생 (배정된 학생 일괄)</option>
                 {assignments.map(a => <option key={a.student_id} value={a.student_id}>{nameMap[a.student_id] || a.student_id} ({a.student_id})</option>)}
               </select>
+              {isAllStudents && <span style={{ fontSize:11, color:'#e53e3e', fontWeight:700, marginTop:4, display:'block' }}>배정된 전체 학생에게 일괄 등록됩니다</span>}
             </div>
             <div>
               <label style={lbl}>보정명령번호</label>
