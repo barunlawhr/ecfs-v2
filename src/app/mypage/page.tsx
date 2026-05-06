@@ -439,7 +439,7 @@ export default function MyPage() {
   if (!user || user.role === 'admin') return null
 
   // ── Sidebar helpers ──────────────────────────────────────────
-  const SbItem = ({ label, page, title = '', indent = true }: { label: string; page: ActivePage; title?: string; indent?: boolean }) => {
+  const SbItem = ({ label, page, title = '', indent = true, badge }: { label: string; page: ActivePage; title?: string; indent?: boolean; badge?: number }) => {
     const isActive = activePage === page && (title === genericTitle || !title)
     return (
       <div
@@ -453,9 +453,13 @@ export default function MyPage() {
           fontWeight: isActive ? 600 : 400,
           borderBottom: '1px solid #eef0f5',
           borderLeft: isActive ? '3px solid #0067c2' : '3px solid transparent',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}
       >
         {label}
+        {badge != null && badge > 0 && (
+          <span style={{ background: '#dc2626', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 10, padding: '1px 6px', minWidth: 16, textAlign: 'center', lineHeight: '16px' }}>{badge}</span>
+        )}
       </div>
     )
   }
@@ -3746,7 +3750,7 @@ export default function MyPage() {
             <>
               <SbItem label="작성중서류" page="draft-docs" />
               <SbItem label="제출서류" page="submitted-docs" />
-              <SbItem label="미확인송달문서" page="unconfirmed-delivery-new" />
+              <SbItem label="미확인송달문서" page="unconfirmed-delivery-new" badge={deliveryUnconfirmedCount} />
               <SbItem label="전체송달문서" page="all-delivery-new" />
               <SbItem label="송달문서 정(등)본발급" page="generic" title="송달문서 정(등)본발급" />
             </>
