@@ -3750,7 +3750,7 @@ export default function MyPage() {
             <>
               <SbItem label="작성중서류" page="draft-docs" />
               <SbItem label="제출서류" page="submitted-docs" />
-              <SbItem label="미확인송달문서" page="unconfirmed-delivery-new" badge={deliveryUnconfirmedCount} />
+              <SbItem label="미확인송달문서" page="unconfirmed-delivery-new" />
               <SbItem label="전체송달문서" page="all-delivery-new" />
               <SbItem label="송달문서 정(등)본발급" page="generic" title="송달문서 정(등)본발급" />
             </>
