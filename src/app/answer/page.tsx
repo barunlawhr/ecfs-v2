@@ -305,7 +305,7 @@ export default function AnswerPage() {
         if (gradeRes.ok) {
           const gradeResult = await gradeRes.json();
           if (gradeResult.score != null && !gradeResult.isError) {
-            await supabase
+            const { error: updateErr } = await supabase
               .from('practice_records')
               .update({
                 score: gradeResult.score,
@@ -314,9 +314,23 @@ export default function AnswerPage() {
                 graded_at: new Date().toISOString(),
               })
               .eq('id', recordId);
+
+            if (updateErr) {
+              console.error('[답변서/독립] 채점 점수 저장 실패:', updateErr.message);
+              setSubmitError('제출은 완료되었으나 채점 결과 저장에 실패했습니다.');
+            }
           }
+        } else {
+          const { error: fallbackErr } = await supabase
+            .from('practice_records')
+            .update({ feedback: '채점 처리 중 오류가 발생했습니다. 관리자에게 문의하세요.' })
+            .eq('id', recordId);
+          if (fallbackErr) console.error('[답변서/독립] 채점 실패 메시지 저장 실패:', fallbackErr.message);
         }
-      } catch { /* 채점 실패해도 제출은 완료 */ }
+      } catch (gradeErr) {
+        console.error('[답변서/독립] 채점 API 호출 실패:', gradeErr);
+        // 채점 실패해도 제출은 완료
+      }
 
       setSubmittedRecordId(recordId);
       setSubmitted(true);

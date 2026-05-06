@@ -90,10 +90,12 @@ export default function Step5Submit({
         signal: AbortSignal.timeout(30_000),
       })
 
+      let gradeWarning: string | null = null
+
       if (gradeRes.ok) {
         const gradeResult = await gradeRes.json()
         if (gradeResult.score != null && !gradeResult.isError) {
-          await supabase
+          const { error: updateErr } = await supabase
             .from('practice_records')
             .update({
               score: gradeResult.score,
@@ -102,15 +104,23 @@ export default function Step5Submit({
               graded_at: new Date().toISOString(),
             })
             .eq('id', recordId)
+
+          if (updateErr) {
+            console.error('[소장] 채점 점수 저장 실패:', updateErr.message)
+            gradeWarning = '제출은 완료되었으나 채점 결과 저장에 실패했습니다. 관리자에게 문의하세요.'
+          }
         }
       } else {
-        // 채점 실패 시 기록에 표시 (제출 자체는 계속 진행)
-        await supabase
+        const { error: fallbackErr } = await supabase
           .from('practice_records')
           .update({ feedback: '채점 처리 중 오류가 발생했습니다. 관리자에게 문의하세요.' })
           .eq('id', recordId)
+
+        if (fallbackErr) console.error('[소장] 채점 실패 메시지 저장 실패:', fallbackErr.message)
+        gradeWarning = '채점 처리 중 오류가 발생했습니다. 제출은 완료되었습니다.'
       }
 
+      if (gradeWarning) setError(gradeWarning)
       onSubmitComplete(recordId)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '제출 중 오류가 발생했습니다.'
