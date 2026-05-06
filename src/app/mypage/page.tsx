@@ -1364,7 +1364,14 @@ export default function MyPage() {
         <div style={{ background:'#fff', borderBottom:'1px solid #dde0e8', padding:'6px 16px', display:'flex', justifyContent:'flex-end', gap:8 }}>
           <button style={{ height:28, padding:'0 12px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>관심사건 지정</button>
           <button style={{ height:28, padding:'0 12px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>완료사건 지정</button>
-          <button style={{ height:28, padding:'0 14px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>📗 엑셀로 저장</button>
+          <button onClick={async () => {
+            const xlsx = await import('xlsx')
+            const rows = filtered.map(c => ({ 법원:c.court, 사건번호:c.caseNum, 재판부:c.division, 사건지위:c.status, 접수일자:c.filedDate, 원고:c.plaintiff, 피고:c.defendant, 기일시간:c.hearingDate, 기일장소:c.hearingPlace }))
+            const ws = xlsx.utils.json_to_sheet(rows)
+            const wb = xlsx.utils.book_new()
+            xlsx.utils.book_append_sheet(wb, ws, '진행중사건')
+            xlsx.writeFile(wb, `진행중사건_${new Date().toISOString().slice(0,10)}.xlsx`)
+          }} style={{ height:28, padding:'0 14px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>📗 엑셀로 저장</button>
         </div>
 
         {/* 테이블 */}
@@ -2921,7 +2928,14 @@ export default function MyPage() {
 
         {/* 엑셀/완료사건 버튼 */}
         <div style={{ display:'flex', justifyContent:'flex-end', gap:6, padding:'8px 14px', background:'#fff' }}>
-          <button style={{ height:28, padding:'0 12px', border:'1px solid #aaa', borderRadius:3, fontSize:11, background:'#fff', cursor:'pointer', color:'#555', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>📊 엑셀로 저장</button>
+          <button onClick={async () => {
+            const xlsx = await import('xlsx')
+            const rows = CONFIRMED_CASES.map(c => ({ 법원:c.court, 사건번호:c.caseNo, 재판부:c.dept, 사건지위:c.status, 확정일자:c.confirmedDate, 원고:c.plaintiff, 피고:c.defendant }))
+            const ws = xlsx.utils.json_to_sheet(rows)
+            const wb = xlsx.utils.book_new()
+            xlsx.utils.book_append_sheet(wb, ws, '확정된사건')
+            xlsx.writeFile(wb, `확정된사건_${new Date().toISOString().slice(0,10)}.xlsx`)
+          }} style={{ height:28, padding:'0 12px', border:'1px solid #aaa', borderRadius:3, fontSize:11, background:'#fff', cursor:'pointer', color:'#555', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>📊 엑셀로 저장</button>
           <button style={{ height:28, padding:'0 12px', border:'1px solid #aaa', borderRadius:3, fontSize:11, background:'#fff', cursor:'pointer', color:'#555', fontFamily:'inherit' }}>완료사건 지정</button>
         </div>
 
