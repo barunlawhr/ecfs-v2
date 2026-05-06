@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
+import { buildNameMap } from '@/lib/accounts'
 
 const TEAL = '#00a99d'
 const NAVY = '#1a3a6b'
@@ -16,7 +17,6 @@ interface PracticeCase {
 
 interface CaseAssignment {
   student_id: string
-  student_name: string
 }
 
 interface CorrectionOrder {
@@ -39,6 +39,7 @@ export default function AdminCorrectionsPage() {
 
   const [cases, setCases] = useState<PracticeCase[]>([])
   const [assignments, setAssignments] = useState<CaseAssignment[]>([])
+  const [nameMap, setNameMap] = useState<Record<string, string>>({})
   const [orders, setOrders] = useState<CorrectionOrder[]>([])
 
   const [caseId, setCaseId] = useState('')
@@ -57,11 +58,15 @@ export default function AdminCorrectionsPage() {
     }
   }, [user, authLoading, router])
 
-  // Load cases
+  // Load cases + name map
   useEffect(() => {
     ;(async () => {
-      const { data } = await supabase.from('practice_cases').select('id, case_number, case_name').order('created_at', { ascending: false })
+      const [{ data }, nm] = await Promise.all([
+        supabase.from('practice_cases').select('id, case_number, case_name').order('created_at', { ascending: false }),
+        buildNameMap(),
+      ])
       if (data) setCases(data)
+      setNameMap(nm)
     })()
   }, [])
 
@@ -69,7 +74,7 @@ export default function AdminCorrectionsPage() {
   useEffect(() => {
     if (!caseId) { setAssignments([]); return }
     ;(async () => {
-      const { data } = await supabase.from('case_assignments').select('student_id, student_name').eq('case_id', caseId)
+      const { data } = await supabase.from('case_assignments').select('student_id').eq('case_id', caseId)
       if (data) setAssignments(data)
     })()
   }, [caseId])
@@ -155,7 +160,7 @@ export default function AdminCorrectionsPage() {
               <label style={lbl}>학생 선택</label>
               <select value={studentId} onChange={e => setStudentId(e.target.value)} style={{ ...inp, cursor: 'pointer' }}>
                 <option value="">-- 학생 선택 --</option>
-                {assignments.map(a => <option key={a.student_id} value={a.student_id}>{a.student_name} ({a.student_id})</option>)}
+                {assignments.map(a => <option key={a.student_id} value={a.student_id}>{nameMap[a.student_id] || a.student_id} ({a.student_id})</option>)}
               </select>
             </div>
             <div>
@@ -212,7 +217,7 @@ export default function AdminCorrectionsPage() {
               {orders.map(o => (
                 <tr key={o.id} style={{ borderBottom: '1px solid #eee' }}>
                   <td style={{ padding: '8px 12px', textAlign: 'center' }}>{o.practice_cases?.case_number || '-'}</td>
-                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>{o.student_id}</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>{nameMap[o.student_id] || o.student_id}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'center' }}>{o.order_number}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'center' }}>{o.deadline}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'center' }}>{o.order_type === 'address' ? '주소보정' : '일반보정'}</td>

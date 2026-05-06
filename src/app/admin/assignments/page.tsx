@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { HARDCODED_ACCOUNTS } from '@/lib/auth'
+import { fetchStudents, type AccountRow } from '@/lib/accounts'
 import { TEAL, NAVY, TH, TD, INP, SEL } from '@/lib/constants'
 
 interface PracticeCase {
@@ -23,22 +23,19 @@ interface CaseAssignment {
   status: string
 }
 
-const STUDENT_LIST = Object.entries(HARDCODED_ACCOUNTS)
-  .filter(([, acc]) => acc.role === 'student')
-  .map(([id, acc]) => ({ id, name: acc.name }))
-
 export default function AdminAssignmentsPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
 
   const [cases, setCases] = useState<PracticeCase[]>([])
+  const [students, setStudents] = useState<AccountRow[]>([])
   const [selectedCaseId, setSelectedCaseId] = useState('')
   const [assignments, setAssignments] = useState<CaseAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   // Assignment form
-  const [formStudentId, setFormStudentId] = useState(STUDENT_LIST[0]?.id || '')
+  const [formStudentId, setFormStudentId] = useState('')
   const [formRole, setFormRole] = useState('원고측')
   const [formDueDate, setFormDueDate] = useState('')
 
@@ -73,7 +70,10 @@ export default function AdminAssignmentsPage() {
       return
     }
     if (!authLoading && user?.role === 'admin') {
-      fetchCases().then(() => setLoading(false))
+      Promise.all([fetchCases(), fetchStudents().then(s => {
+        setStudents(s)
+        if (s.length > 0 && !formStudentId) setFormStudentId(s[0].login_id)
+      })]).then(() => setLoading(false))
     }
   }, [authLoading, user, router, fetchCases])
 
@@ -103,8 +103,8 @@ export default function AdminAssignmentsPage() {
   }
 
   function getStudentName(studentId: string): string {
-    const acc = HARDCODED_ACCOUNTS[studentId]
-    return acc ? acc.name : studentId
+    const s = students.find(a => a.login_id === studentId)
+    return s ? s.name : studentId
   }
 
   if (authLoading) return <div style={{ padding: 40, textAlign: 'center' }}>로딩 중...</div>
@@ -150,8 +150,8 @@ export default function AdminAssignmentsPage() {
               <label style={labelStyle}>
                 학생
                 <select style={{ ...SEL, width: 160 }} value={formStudentId} onChange={e => setFormStudentId(e.target.value)}>
-                  {STUDENT_LIST.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} ({s.id})</option>
+                  {students.map(s => (
+                    <option key={s.login_id} value={s.login_id}>{s.name} ({s.login_id})</option>
                   ))}
                 </select>
               </label>
