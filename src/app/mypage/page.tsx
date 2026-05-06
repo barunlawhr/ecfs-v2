@@ -3213,8 +3213,9 @@ export default function MyPage() {
         .is('received_at', null)
         .order('sent_at', { ascending: false })
 
-      // 기본 4건 seed: DB에 미확인 문서가 없으면 자동 생성
-      if (!data || data.length === 0) {
+      // 기본 4건 seed: 이 학생에게 문서가 한 건도 없을 때만 생성
+      const { count } = await supabase.from('delivery_documents').select('id', { count: 'exact', head: true }).eq('student_id', user.id)
+      if ((!data || data.length === 0) && (count === 0 || count === null)) {
         const now = new Date()
         const seedDocs = [
           { student_id: user.id, court: '서울중앙지방법원', division: '민사10단독(소액)', case_number: '2026가소226035', document_name: '소장부본', sent_at: new Date(now.getTime() - 5*86400000).toISOString().slice(0,10), has_publish: true },
