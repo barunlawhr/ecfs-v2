@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { fetchStudents, type AccountRow } from '@/lib/accounts'
+import StudentPicker from '@/components/admin/StudentPicker'
 import { TEAL, NAVY, TH, TD, INP, SEL } from '@/lib/constants'
 
 interface PracticeCase {
@@ -35,7 +36,7 @@ export default function AdminAssignmentsPage() {
   const [error, setError] = useState('')
 
   // Assignment form
-  const [formStudentId, setFormStudentId] = useState('')
+  const [formStudents, setFormStudents] = useState<Set<string>>(new Set())
   const [formRole, setFormRole] = useState('원고측')
   const [formDueDate, setFormDueDate] = useState('')
 
@@ -72,7 +73,7 @@ export default function AdminAssignmentsPage() {
     if (!authLoading && user?.role === 'admin') {
       Promise.all([fetchCases(), fetchStudents().then(s => {
         setStudents(s)
-        if (s.length > 0 && !formStudentId) setFormStudentId(s[0].login_id)
+        void s // loaded
       })]).then(() => setLoading(false))
     }
   }, [authLoading, user, router, fetchCases])
@@ -82,15 +83,15 @@ export default function AdminAssignmentsPage() {
   }, [selectedCaseId, fetchAssignments])
 
   async function handleAssign() {
-    if (!selectedCaseId || !formStudentId) { alert('사건과 학생을 선택하세요.'); return }
-    const payload = {
+    if (!selectedCaseId || formStudents.size === 0) { alert('사건과 학생을 선택하세요.'); return }
+    const rows = [...formStudents].map(sid => ({
       case_id: selectedCaseId,
-      student_id: formStudentId,
+      student_id: sid,
       role: formRole,
       due_date: formDueDate || null,
       status: 'assigned',
-    }
-    const { error: err } = await supabase.from('case_assignments').insert([payload])
+    }))
+    const { error: err } = await supabase.from('case_assignments').insert(rows)
     if (err) { alert('배정 실패: ' + err.message); return }
     fetchAssignments(selectedCaseId)
   }
@@ -147,14 +148,10 @@ export default function AdminAssignmentsPage() {
           <div style={{ background: '#fff', border: '1px solid #d0d8e4', borderRadius: 6, padding: 20, marginBottom: 24 }}>
             <h3 style={{ fontSize: 14, fontWeight: 700, color: NAVY, marginBottom: 14 }}>새 배정</h3>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <label style={labelStyle}>
+              <div style={{ ...labelStyle, minWidth: 200 }}>
                 학생
-                <select style={{ ...SEL, width: 160 }} value={formStudentId} onChange={e => setFormStudentId(e.target.value)}>
-                  {students.map(s => (
-                    <option key={s.login_id} value={s.login_id}>{s.name} ({s.login_id})</option>
-                  ))}
-                </select>
-              </label>
+                <StudentPicker students={students.map(s=>({id:s.login_id,name:s.name}))} selected={formStudents} onChange={setFormStudents} placeholder="학생 선택" />
+              </div>
 
               <label style={labelStyle}>
                 역할

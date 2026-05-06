@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 // HARDCODED_ACCOUNTS는 auth.ts 로그인 fallback에서만 사용 (여기선 미사용)
 import { fetchAccounts, addAccount as addAccountToDb, deleteAccounts as deleteAccountsFromDb, type AccountRow as DbAccountRow } from '@/lib/accounts'
+import StudentPicker from '@/components/admin/StudentPicker'
 import type { SampleCase, Assignment, PracticeRecord } from '@/types'
 import { calculateScore, generateFeedback } from '@/lib/scoring'
 
@@ -704,7 +705,7 @@ export default function AdminPage() {
     const [assignLoading, setAssignLoading] = useState(true)
     const [assignError, setAssignError] = useState('')
 
-    const [formStudentId, setFormStudentId] = useState(ASSIGN_STUDENT_LIST[0]?.id || '')
+    const [formStudents, setFormStudents] = useState<Set<string>>(new Set())
     const [formRole, setFormRole] = useState('원고측')
     const [formDocType, setFormDocType] = useState('complaint')
     const [formDueDate, setFormDueDate] = useState('')
@@ -728,12 +729,12 @@ export default function AdminPage() {
     useEffect(() => { if (selectedCaseId) fetchAssignments(selectedCaseId) }, [selectedCaseId, fetchAssignments])
 
     async function handleAssign() {
-      if (!selectedCaseId || !formStudentId) { alert('사건과 학생을 선택하세요.'); return }
-      const payload = { case_id: selectedCaseId, student_id: formStudentId, role: formRole, doc_type: formDocType, due_date: formDueDate || null, status: 'assigned' }
-      const { error: err } = await supabase.from('case_assignments').insert([payload])
+      if (!selectedCaseId || formStudents.size === 0) { alert('사건과 학생을 선택하세요.'); return }
+      const rows = [...formStudents].map(sid => ({ case_id: selectedCaseId, student_id: sid, role: formRole, doc_type: formDocType, due_date: formDueDate || null, status: 'assigned' }))
+      const { error: err } = await supabase.from('case_assignments').insert(rows)
       if (err) { alert('배정 실패: ' + err.message); return }
       fetchAssignments(selectedCaseId)
-      showToast('배정 완료!')
+      showToast(`${rows.length}명 배정 완료!`)
     }
 
     async function handleDeleteAssign(id: string) {
@@ -769,12 +770,10 @@ export default function AdminPage() {
           <div style={{ background: '#fff', border: '1px solid #d0d8e4', borderRadius: 6, padding: 20, marginBottom: 24 }}>
             <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a3a6b', marginBottom: 14 }}>새 배정</h3>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 600, color: '#333' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 600, color: '#333', minWidth: 200 }}>
                 학생
-                <select style={{ ...assignInp, width: 160 }} value={formStudentId} onChange={e => setFormStudentId(e.target.value)}>
-                  {ASSIGN_STUDENT_LIST.map(s => <option key={s.id} value={s.id}>{s.name} ({s.id})</option>)}
-                </select>
-              </label>
+                <StudentPicker students={ASSIGN_STUDENT_LIST} selected={formStudents} onChange={setFormStudents} placeholder="학생 선택" />
+              </div>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, fontWeight: 600, color: '#333' }}>
                 역할
                 <select style={{ ...assignInp, width: 120 }} value={formRole} onChange={e => setFormRole(e.target.value)}>
@@ -1050,10 +1049,9 @@ export default function AdminPage() {
           <div>
             <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 13, fontWeight: 600 }}>학생 필터:</span>
-              <select style={{ padding: '7px 10px', border: '1px solid #d0d8e8', borderRadius: 4, fontSize: 13, width: 200 }} value={subFilter} onChange={e => setSubFilter(e.target.value)}>
-                <option value="">전체</option>
-                {SUB_STUDENT_LIST.map(s => <option key={s.id} value={s.id}>{s.name} ({s.id})</option>)}
-              </select>
+              <div style={{ width: 220 }}>
+                <StudentPicker students={SUB_STUDENT_LIST} selected={subFilter ? new Set([subFilter]) : new Set()} onChange={s => setSubFilter(s.size > 0 ? [...s][0] : '')} placeholder="전체" single />
+              </div>
             </div>
             {subLoading ? (
               <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>불러오는 중...</div>
@@ -1686,17 +1684,16 @@ export default function AdminPage() {
             </div>
             <div>
               <label style={cpLbl}>학생 선택</label>
-              <select value={cpStudentId} onChange={e => setCpStudentId(e.target.value)} style={{ ...cpInp, cursor: 'pointer' }}>
-                <option value="">-- 학생 선택 --</option>
-                {cpAssignedStudents.length > 0 && (
-                  <optgroup label="배정된 학생">
-                    {cpAssignedStudents.map(sid => <option key={sid} value={sid}>{nameOf(sid)} ({sid})</option>)}
-                  </optgroup>
-                )}
-                <optgroup label="전체 학생">
-                  {allStudents.filter(s => !cpAssignedStudents.includes(s.id)).map(s => <option key={s.id} value={s.id}>{s.name} ({s.id})</option>)}
-                </optgroup>
-              </select>
+              <StudentPicker
+                students={[
+                  ...cpAssignedStudents.map(sid => ({ id: sid, name: nameOf(sid) })),
+                  ...allStudents.filter(s => !cpAssignedStudents.includes(s.id)),
+                ]}
+                selected={cpStudentId ? new Set([cpStudentId]) : new Set()}
+                onChange={s => setCpStudentId(s.size > 0 ? [...s][0] : '')}
+                placeholder="학생 선택"
+                single
+              />
             </div>
             <div>
               <label style={cpLbl}>보정명령번호</label>
@@ -1860,27 +1857,16 @@ export default function AdminPage() {
         {/* Form card */}
         <div style={{ background:'#f8f9fc', border:'1px solid #dde0e8', borderRadius:8, padding:20, marginBottom:24 }}>
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            {/* 학생 선택 (체크박스) */}
-            <div>
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-                <span style={{ fontSize:13, fontWeight:600, color:'#333', minWidth:90 }}>학생 선택</span>
-                <label style={{ fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:4, fontWeight:700, color:'#003366' }}>
-                  <input type="checkbox" checked={checkedStudents.size === studentAccounts.length && studentAccounts.length > 0}
-                    onChange={e => setCheckedStudents(e.target.checked ? new Set(studentAccounts.map(s=>s.login_id)) : new Set())}
-                    style={{ accentColor:'#003366' }} />
-                  전체 선택
-                </label>
-                {checkedStudents.size > 0 && <span style={{ fontSize:11, color:'#e53e3e', fontWeight:700 }}>{checkedStudents.size}명 선택됨</span>}
-              </div>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:'6px 14px', padding:'8px 12px', background:'#fff', border:'1px solid #dde0e8', borderRadius:6, maxHeight:120, overflowY:'auto' }}>
-                {studentAccounts.map(s => (
-                  <label key={s.login_id} style={{ fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:4, whiteSpace:'nowrap' }}>
-                    <input type="checkbox" checked={checkedStudents.has(s.login_id)}
-                      onChange={e => { const n = new Set(checkedStudents); e.target.checked ? n.add(s.login_id) : n.delete(s.login_id); setCheckedStudents(n); setSelectedCaseId('') }}
-                      style={{ accentColor:'#003366' }} />
-                    {s.name}
-                  </label>
-                ))}
+            {/* 학생 선택 */}
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:13, fontWeight:600, color:'#333', minWidth:90 }}>학생 선택</span>
+              <div style={{ width: 280 }}>
+                <StudentPicker
+                  students={studentAccounts.map(s => ({ id: s.login_id, name: s.name }))}
+                  selected={checkedStudents}
+                  onChange={s => { setCheckedStudents(s); setSelectedCaseId('') }}
+                  placeholder="학생 선택"
+                />
               </div>
             </div>
 

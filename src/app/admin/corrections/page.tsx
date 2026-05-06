@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { buildNameMap } from '@/lib/accounts'
+import StudentPicker from '@/components/admin/StudentPicker'
 
 const TEAL = '#00a99d'
 const NAVY = '#1a3a6b'
@@ -161,33 +162,12 @@ export default function AdminCorrectionsPage() {
             </div>
             <div>
               <label style={lbl}>학생 선택</label>
-              <div>
-                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6 }}>
-                  {assignments.length > 0 && (
-                    <label style={{ fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:4, fontWeight:700, color:NAVY }}>
-                      <input type="checkbox" checked={checkedStudents.size === assignments.length && assignments.length > 0}
-                        onChange={e => setCheckedStudents(e.target.checked ? new Set(assignments.map(a=>a.student_id)) : new Set())}
-                        style={{ accentColor:NAVY }} />
-                      전체 선택
-                    </label>
-                  )}
-                  {checkedStudents.size > 0 && <span style={{ fontSize:11, color:'#e53e3e', fontWeight:700 }}>{checkedStudents.size}명 선택됨</span>}
-                </div>
-                {assignments.length === 0 ? (
-                  <p style={{ fontSize:12, color:'#999' }}>사건을 먼저 선택하세요</p>
-                ) : (
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:'4px 14px', padding:'6px 10px', background:'#fff', border:'1px solid #dde0e8', borderRadius:4 }}>
-                    {assignments.map(a => (
-                      <label key={a.student_id} style={{ fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
-                        <input type="checkbox" checked={checkedStudents.has(a.student_id)}
-                          onChange={e => { const n = new Set(checkedStudents); e.target.checked ? n.add(a.student_id) : n.delete(a.student_id); setCheckedStudents(n) }}
-                          style={{ accentColor:NAVY }} />
-                        {nameMap[a.student_id] || a.student_id}
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <StudentPicker
+                students={assignments.map(a => ({ id: a.student_id, name: nameMap[a.student_id] || a.student_id }))}
+                selected={checkedStudents}
+                onChange={setCheckedStudents}
+                placeholder={assignments.length === 0 ? '사건을 먼저 선택하세요' : '학생 선택'}
+              />
             </div>
             <div>
               <label style={lbl}>보정명령번호</label>

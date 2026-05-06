@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { fetchStudents, type AccountRow } from '@/lib/accounts'
+import StudentPicker from '@/components/admin/StudentPicker'
 import { NAVY, TH, TD, SEL } from '@/lib/constants'
 
 interface Submission {
@@ -160,16 +161,9 @@ export default function AdminScoresPage() {
         {/* Filter */}
         <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 13, fontWeight: 600 }}>학생 필터:</span>
-          <select
-            style={{ ...SEL, width: 200 }}
-            value={filterStudent}
-            onChange={e => setFilterStudent(e.target.value)}
-          >
-            <option value="">전체</option>
-            {studentList.map(s => (
-              <option key={s.id} value={s.id}>{s.name} ({s.id})</option>
-            ))}
-          </select>
+          <div style={{ width: 220 }}>
+            <StudentPicker students={studentList} selected={filterStudent ? new Set([filterStudent]) : new Set()} onChange={s => setFilterStudent(s.size > 0 ? [...s][0] : '')} placeholder="전체" single />
+          </div>
         </div>
 
         {loading ? (
