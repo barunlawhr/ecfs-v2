@@ -6,6 +6,7 @@ import MockBar from '@/components/layout/MockBar'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { HARDCODED_ACCOUNTS } from '@/lib/auth'
+import { fetchAccounts, addAccount as addAccountToDb, deleteAccounts as deleteAccountsFromDb, type AccountRow as DbAccountRow } from '@/lib/accounts'
 import type { SampleCase, Assignment, PracticeRecord } from '@/types'
 import { calculateScore, generateFeedback } from '@/lib/scoring'
 
@@ -25,26 +26,8 @@ interface AccountRow {
   isHardcoded?: boolean
 }
 
+// Legacy localStorage key (마이그레이션 후 미사용)
 const ACC_KEY = 'ec_acc'
-
-function getLocalAccounts(): Record<string, AccountRow> {
-  if (typeof window === 'undefined') return {}
-  try { return JSON.parse(localStorage.getItem(ACC_KEY) || '{}') } catch { return {} }
-}
-
-function getAllAccounts(): AccountRow[] {
-  const localAccs = getLocalAccounts()
-  // Build from HARDCODED_ACCOUNTS
-  const merged: Record<string, AccountRow> = {}
-  Object.entries(HARDCODED_ACCOUNTS).forEach(([id, acc]) => {
-    merged[id] = { login_id: id, name: acc.name, org: acc.org, role: acc.role, cohort: '', bar_num: acc.barNum, email: acc.email, isHardcoded: true }
-  })
-  // localStorage overrides (same id wins for local)
-  Object.entries(localAccs).forEach(([id, acc]) => {
-    merged[id] = { ...(acc as AccountRow), login_id: id, isHardcoded: false }
-  })
-  return Object.values(merged)
-}
 
 type Panel = 'dashboard' | 'accounts' | 'cases' | 'assign' | 'records' | 'corrections' | 'deliveries' | 'ecfs-cases' | 'settings'
 
@@ -60,7 +43,8 @@ const PANEL_ITEMS: { key: Panel; icon: string; label: string }[] = [
   { key: 'settings', icon: '⚙', label: '설정' },
 ]
 
-const STUDENT_IDS = Object.entries(HARDCODED_ACCOUNTS)
+// fallback용 (대시보드 초기 로딩)
+const STUDENT_IDS_FALLBACK = Object.entries(HARDCODED_ACCOUNTS)
   .filter(([, v]) => v.role === 'student')
   .map(([id]) => id)
 
@@ -152,7 +136,7 @@ export default function AdminPage() {
     }, [])
 
     const totalAccounts = Object.keys(HARDCODED_ACCOUNTS).length
-    const studentCount = STUDENT_IDS.length
+    const studentCount = STUDENT_IDS_FALLBACK.length
 
     const cards = [
       { label: '전체 계정', value: totalAccounts, color: '#1a3a6b', bg: '#eef2fb' },
@@ -204,35 +188,11 @@ export default function AdminPage() {
     const [editModal, setEditModal] = useState<{ login_id: string; name: string; org: string; email: string; password: string } | null>(null)
     const fileRef = useRef<HTMLInputElement>(null)
 
-    // admin만 삭제 불가
     const PROTECTED_IDS = new Set(['admin'])
-    // 삭제된 hardcoded 계정 목록 (ec_del)
-    const DEL_KEY = 'ec_del'
 
-    function getDeletedSet(): Set<string> {
-      try { return new Set(JSON.parse(localStorage.getItem(DEL_KEY) || '[]')) } catch { return new Set() }
-    }
-
-    const DEFAULT_IDS = [
-      'student01','student02','student03','student04','student05',
-      'student06','student07','student08','student09','student10','admin',
-    ]
-
-    function loadRows() {
-      const localAccs = getLocalAccounts()
-      const deleted = getDeletedSet()
-      // 1) DEFAULT_ACC 먼저 — 삭제된 것은 제외
-      const defaultRows: AccountRow[] = DEFAULT_IDS
-        .filter(id => !deleted.has(id))
-        .map(id => {
-          const a = HARDCODED_ACCOUNTS[id]
-          return { login_id: id, name: a.name, org: a.org, role: a.role, cohort: '', bar_num: a.barNum, email: a.email, isHardcoded: PROTECTED_IDS.has(id) }
-        })
-      // 2) localStorage에만 있는 계정
-      const extraRows: AccountRow[] = Object.entries(localAccs)
-        .filter(([id]) => !HARDCODED_ACCOUNTS[id])
-        .map(([id, a]) => ({ ...(a as AccountRow), login_id: id, isHardcoded: false }))
-      setRows([...defaultRows, ...extraRows])
+    async function loadRows() {
+      const data = await fetchAccounts()
+      setRows(data.map(a => ({ ...a, isHardcoded: PROTECTED_IDS.has(a.login_id) })) as AccountRow[])
     }
 
     useEffect(() => { loadRows() }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -245,66 +205,48 @@ export default function AdminPage() {
       setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
     }
 
-    function handleAdd() {
+    async function handleAdd() {
       if (!form.login_id || !form.password || !form.name) { alert('아이디, 비밀번호, 이름은 필수입니다.'); return }
-      try {
-        const stored = getLocalAccounts()
-        stored[form.login_id] = { ...form } as AccountRow
-        localStorage.setItem(ACC_KEY, JSON.stringify(stored))
-        setForm({ login_id: '', password: '', name: '', org: '', email: '', role: 'student' })
-        setShowAddForm(false)
-        loadRows()
-        showToast('계정이 추가되었습니다.')
-      } catch (e) { alert('추가 실패: ' + String(e)) }
+      const { error } = await addAccountToDb({ login_id: form.login_id, password: form.password, name: form.name, org: form.org, email: form.email, role: form.role })
+      if (error) { alert('추가 실패: ' + error); return }
+      setForm({ login_id: '', password: '', name: '', org: '', email: '', role: 'student' })
+      setShowAddForm(false)
+      await loadRows()
+      showToast('계정이 추가되었습니다.')
     }
 
-    function execDelete(ids: string[]) {
-      const stored = getLocalAccounts()
-      const deleted = getDeletedSet()
-      ids.forEach(id => {
-        if (HARDCODED_ACCOUNTS[id]) {
-          deleted.add(id) // hardcoded → ec_del에 추가
-        } else {
-          delete stored[id] // local → ec_acc에서 삭제
-        }
-      })
-      localStorage.setItem(ACC_KEY, JSON.stringify(stored))
-      localStorage.setItem(DEL_KEY, JSON.stringify([...deleted]))
+    async function execDelete(ids: string[]) {
+      const { error } = await deleteAccountsFromDb(ids)
+      if (error) { alert('삭제 실패: ' + error); return }
       setSelectedIds(new Set())
       setDeleteModal(null)
-      loadRows()
+      await loadRows()
       showToast(`${ids.length}개 계정이 삭제되었습니다.`)
     }
 
     function handleEditOpen(acc: AccountRow) {
-      const stored = getLocalAccounts()
-      const override = stored[acc.login_id]
       setEditModal({
         login_id: acc.login_id,
-        name: override?.name || acc.name || '',
-        org: override?.org || acc.org || '',
-        email: override?.email || acc.email || '',
-        password: override?.password || '',
+        name: acc.name || '',
+        org: acc.org || '',
+        email: acc.email || '',
+        password: '',
       })
     }
 
-    function saveEdit() {
+    async function saveEdit() {
       if (!editModal) return
       if (!editModal.name.trim()) { alert('이름은 필수입니다.'); return }
-      const stored = getLocalAccounts()
-      const prev = stored[editModal.login_id] || {}
-      stored[editModal.login_id] = {
-        ...prev,
-        login_id: editModal.login_id,
+      const updates: Record<string, string> = {
         name: editModal.name.trim(),
         org: editModal.org.trim(),
         email: editModal.email.trim(),
-        ...(editModal.password.trim() ? { password: editModal.password.trim() } : {}),
-        role: prev.role || (HARDCODED_ACCOUNTS[editModal.login_id]?.role ?? 'student'),
       }
-      localStorage.setItem(ACC_KEY, JSON.stringify(stored))
+      if (editModal.password.trim()) updates.password = editModal.password.trim()
+      const { error } = await supabase.from('accounts').update(updates).eq('login_id', editModal.login_id)
+      if (error) { alert('수정 실패: ' + error.message); return }
       setEditModal(null)
-      loadRows()
+      await loadRows()
       showToast('계정이 수정되었습니다.')
     }
 
@@ -343,20 +285,24 @@ export default function AdminPage() {
         const jsonRows: Record<string, string>[] = xlsx.utils.sheet_to_json(ws)
         if (!jsonRows.length) { alert('데이터가 없습니다.'); return }
         setSaving(true)
-        const stored = getLocalAccounts()
-        let ok = 0, fail = 0
-        for (const r of jsonRows) {
-          const id = String(r['login_id'] || r['아이디'] || '')
-          const pw = String(r['password'] || r['비밀번호'] || '')
-          const nm = String(r['name'] || r['이름'] || '')
-          if (!id || !pw || !nm) { fail++; continue }
-          stored[id] = { login_id: id, password: pw, name: nm, org: String(r['org']||r['소속']||''), email: String(r['email']||r['이메일']||''), role: String(r['role']||r['역할']||'student'), cohort: String(r['cohort']||r['기수']||''), bar_num: String(r['bar_num']||r['사원번호']||'') }
-          ok++
+        const rows = jsonRows.map(r => ({
+          login_id: String(r['login_id'] || r['아이디'] || ''),
+          password: String(r['password'] || r['비밀번호'] || ''),
+          name: String(r['name'] || r['이름'] || ''),
+          org: String(r['org'] || r['소속'] || ''),
+          email: String(r['email'] || r['이메일'] || ''),
+          role: String(r['role'] || r['역할'] || 'student'),
+          cohort: String(r['cohort'] || r['기수'] || ''),
+          bar_num: String(r['bar_num'] || r['사원번호'] || ''),
+        })).filter(r => r.login_id && r.password && r.name)
+        const fail = jsonRows.length - rows.length
+        if (rows.length > 0) {
+          const { error } = await supabase.from('accounts').upsert(rows, { onConflict: 'login_id' })
+          if (error) { setSaving(false); alert('DB 등록 실패: ' + error.message); return }
         }
-        localStorage.setItem(ACC_KEY, JSON.stringify(stored))
         setSaving(false)
-        loadRows()
-        showToast(`${ok}개 계정 등록 완료${fail > 0 ? ` (${fail}개 실패)` : ''}`)
+        await loadRows()
+        showToast(`${rows.length}개 계정 등록 완료${fail > 0 ? ` (${fail}개 실패)` : ''}`)
       } catch (err) { setSaving(false); alert('Excel 파싱 오류: ' + String(err)) }
       if (fileRef.current) fileRef.current.value = ''
     }
@@ -1001,7 +947,7 @@ export default function AdminPage() {
     const byStudent: Record<string, PracticeRecord[]> = {}
     records.forEach(r => { if (!byStudent[r.student_id]) byStudent[r.student_id] = []; byStudent[r.student_id].push(r) })
 
-    const studentSummaries = STUDENT_IDS.map(id => {
+    const studentSummaries = STUDENT_IDS_FALLBACK.map(id => {
       const recs = byStudent[id] || []; const count = recs.length
       const avg = count > 0 ? Math.round(recs.reduce((s, r) => s + r.score, 0) / count) : 0
       const best = count > 0 ? Math.max(...recs.map(r => r.score)) : 0
@@ -1598,7 +1544,7 @@ export default function AdminPage() {
             <div style={{ display: 'flex', gap: 8 }}>
               <select value={selectedStudent} onChange={e => setSelectedStudent(e.target.value)} style={{ ...inp, flex: 1 }}>
                 <option value="">-- 학생 선택 --</option>
-                {STUDENT_IDS.map(id => {
+                {STUDENT_IDS_FALLBACK.map(id => {
                   const acc = HARDCODED_ACCOUNTS[id]
                   return <option key={id} value={id}>{acc?.name} ({id})</option>
                 })}
