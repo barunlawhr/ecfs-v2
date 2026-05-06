@@ -632,25 +632,28 @@ export default function AnswerPage() {
           <div id="sec-s2" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
             <SecHd label="② 청구취지에 대한 답변" open={open.s2} toggle={() => toggle('s2')} />
             {open.s2 && (
-              <div>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div style={{ padding: '12px 14px 14px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4' }}>
                   <tbody>
                     <tr>
-                      <th style={{ ...TH, verticalAlign: 'top', paddingTop: 11, width: 120 }}>청구취지에 대한 답변<span style={{ color: '#e53e3e' }}>*</span></th>
-                      <td style={TD}>
-                        <div style={{ background: '#f0f7ff', border: '1px solid #c5d8f6', borderRadius: 4, padding: '8px 12px', fontSize: 11, color: '#1e40af', marginBottom: 8, lineHeight: 1.7 }}>
-                          <strong>예시:</strong> 1. 원고의 청구를 기각한다. 2. 소송비용은 원고가 부담한다. 라는 판결을 구합니다.
+                      <th style={{ ...TH, verticalAlign: 'top', paddingTop: 14, width: 130, lineHeight: 1.6 }}>청구취지에 대한<br/>답변 <span style={{ color: '#e53e3e' }}>*</span><br/><span style={{ fontSize: 10, color: '#888' }}>ⓘ</span></th>
+                      <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+                          <span style={{ fontSize: 11, color: '#888' }}>( {new TextEncoder().encode(formData.claimPurpose || '').length} / 6000 Bytes )</span>
                         </div>
                         <textarea
                           value={formData.claimPurpose}
                           onChange={e => upd({ claimPurpose: e.target.value })}
                           placeholder={`1. 원고의 청구를 기각한다.\n2. 소송비용은 원고가 부담한다.\n라는 판결을 구합니다.`}
-                          style={{ width: '100%', minHeight: 120, padding: '8px 10px', border: '1px solid #c8cdd6', borderRadius: 2, fontSize: 12, lineHeight: 1.7, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                          style={{ width: '100%', minHeight: 120, padding: '8px 10px', border: '2px solid #222', fontSize: 13, lineHeight: 1.7, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }}
                         />
                       </td>
                     </tr>
                   </tbody>
                 </table>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+                  <button style={{ height: 36, padding: '0 24px', border: 'none', borderRadius: 3, background: '#1a3a6b', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>✎ 등록</button>
+                </div>
               </div>
             )}
           </div>
@@ -659,51 +662,67 @@ export default function AnswerPage() {
           <div id="sec-s3" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
             <SecHd label="③ 청구원인에 대한 답변" open={open.s3} toggle={() => toggle('s3')} />
             {open.s3 && (
-              <div>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div style={{ padding: '12px 14px 14px' }}>
+                <div style={{ borderBottom: '3px solid #1a3a6b', marginBottom: 12 }} />
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4' }}>
                   <tbody>
                     <tr>
-                      <th style={{ ...TH, verticalAlign: 'top', paddingTop: 11, width: 120 }}>청구원인에 대한 답변<span style={{ color: '#e53e3e' }}>*</span></th>
-                      <td style={TD}>
-                        <div
-                          ref={causeRef}
-                          contentEditable
-                          suppressContentEditableWarning
-                          onInput={e => upd({ claimCause: (e.target as HTMLDivElement).innerText })}
-                          data-placeholder="원고의 주장에 대한 반박 이유를 구체���으로 서술하세요..."
-                          style={{
-                            minHeight: 200, padding: '8px 10px', border: '1px solid #c8cdd6',
-                            borderRadius: 2, fontSize: 12, lineHeight: 1.8, outline: 'none',
-                            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                          }}
-                        />
-                        <style>{`
-                          [data-placeholder]:empty:before {
-                            content: attr(data-placeholder);
-                            color: #9ca3af;
-                            pointer-events: none;
-                          }
-                        `}</style>
-
+                      <th style={{ ...TH, verticalAlign: 'top', paddingTop: 14, width: 130, lineHeight: 1.6 }}>청구원인에 대한<br/>답변 <span style={{ color: '#e53e3e' }}>*</span><br/><span style={{ fontSize: 10, color: '#888' }}>ⓘ</span></th>
+                      <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
+                        <div style={{ marginBottom: 8 }}>
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 13, cursor: 'pointer' }}>
+                            <input type="radio" name="causeInput2" defaultChecked style={{ accentColor: '#1a3a6b' }} /> ◉ 직접입력
+                          </label>
+                        </div>
+                        <div style={{ border: '1px solid #c8cdd6' }}>
+                          <div style={{ background: '#f0f3f8', borderBottom: '1px solid #dde0e6', padding: '3px 6px', display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                            {['📄','🔍','✂','📋','📑','🗑'].map((ic, i) => <button key={i} style={{ height: 24, minWidth: 24, padding: '0 3px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 12, cursor: 'pointer' }}>{ic}</button>)}
+                            <span style={{ width: 1, height: 16, background: '#c8cdd6', margin: '0 3px' }} />
+                            <button style={{ height: 24, minWidth: 24, border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 12, cursor: 'pointer' }}>↩</button>
+                            <button style={{ height: 24, minWidth: 24, border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 12, cursor: 'pointer' }}>↪</button>
+                            <span style={{ width: 1, height: 16, background: '#c8cdd6', margin: '0 3px' }} />
+                            <button style={{ height: 24, minWidth: 24, border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'serif' }}>B</button>
+                            <button style={{ height: 24, minWidth: 24, border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 13, cursor: 'pointer', fontStyle: 'italic', fontFamily: 'serif' }}>I</button>
+                            <button style={{ height: 24, minWidth: 24, border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>U</button>
+                            <span style={{ width: 1, height: 16, background: '#c8cdd6', margin: '0 3px' }} />
+                            <button style={{ height: 24, padding: '0 4px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 12, cursor: 'pointer' }}>≡</button>
+                            <button style={{ height: 24, padding: '0 4px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 12, cursor: 'pointer' }}>☰</button>
+                            <button style={{ height: 24, padding: '0 4px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 12, cursor: 'pointer' }}>≣</button>
+                            <span style={{ width: 1, height: 16, background: '#c8cdd6', margin: '0 3px' }} />
+                            <button style={{ height: 24, padding: '0 4px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 12, cursor: 'pointer', color: '#e53e3e' }}>A·</button>
+                            <button style={{ height: 24, padding: '0 4px', border: '1px solid #c8cdd6', borderRadius: 2, background: '#fff', fontSize: 12, cursor: 'pointer' }}>A·</button>
+                          </div>
+                          <div style={{ background: '#f5f7fb', borderBottom: '1px solid #dde0e6', padding: '3px 6px', display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, color: '#555' }}>
+                            <span>글꼴</span><select style={{ height: 22, fontSize: 11, border: '1px solid #c8cdd6', borderRadius: 2, padding: '0 4px' }}><option>글꼴</option></select><span>·</span><span>크기</span><select style={{ height: 22, fontSize: 11, border: '1px solid #c8cdd6', borderRadius: 2, padding: '0 4px' }}><option>크기</option></select><span>·</span>
+                          </div>
+                          <div style={{ background: '#e8f4fd', borderBottom: '1px solid #c8dff0', padding: '5px 10px', fontSize: 11, color: '#1a6fa8' }}>ℹ 편집기에 대한 도움말은 ALT + 숫자 0(언어 자판 위 숫자키)를 누르세요</div>
+                          <div ref={causeRef} contentEditable suppressContentEditableWarning onInput={e => upd({ claimCause: (e.target as HTMLDivElement).innerText })} data-placeholder="청구원인에 대한 답변 내용을 입력하세요. 2000자 이내, 표나 그림은 내용파일첨부를 이용)" style={{ minHeight: 180, padding: '10px 12px', fontSize: 13, fontFamily: "'맑은 고딕', sans-serif", lineHeight: 1.8, outline: 'none', background: '#fff', color: '#222' }} />
+                          <style>{`[data-placeholder]:empty:before{content:attr(data-placeholder);color:#bbb;pointer-events:none}`}</style>
+                          <div style={{ background: '#f7f8fb', borderTop: '1px solid #e5e8ee', padding: '4px 10px', textAlign: 'right', fontSize: 11, color: '#888' }}>글자: {(formData.claimCause || '').length}/2000</div>
+                        </div>
+                        <div style={{ marginTop: 10 }}>
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 13, cursor: 'pointer' }}>
+                            <input type="radio" name="causeInput2" style={{ accentColor: '#1a3a6b' }} /> ○ 내용파일 첨부
+                          </label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                            <button style={{ height: 28, padding: '0 14px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 12, cursor: 'pointer', color: '#333' }}>📎 내용파일첨부하기</button>
+                          </div>
+                        </div>
+                        <div style={{ marginTop: 6, fontSize: 11, color: '#00a99d', lineHeight: 1.7 }}>※ 첨부가능한 파일 형식 : HWP, HWPX, DOC, DOCX, PDF, TXT, BMP, JPG, JPEG, GIF, TIF, TIFF, PNG (PDF파일로 자동변환, 20MB까지 첨부가능)</div>
                         {assignedCase?.key_facts && (
                           <div style={{ marginTop: 12, border: '1px solid #d1d5db', borderRadius: 4, overflow: 'hidden' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#f3f4f6', cursor: 'pointer', userSelect: 'none', fontSize: 12 }}
-                              onClick={() => {/* toggle facts */}}>
-                              <span style={{ fontWeight: 600, color: '#374151' }}>참고 사실관계 (원고 주장)</span>
-                            </div>
-                            <div style={{ padding: '10px 12px', fontSize: 12, lineHeight: 1.8, color: '#374151', backgroundColor: '#fafafa', whiteSpace: 'pre-wrap' }}>
-                              {assignedCase.key_facts}
-                            </div>
+                            <div style={{ padding: '8px 12px', backgroundColor: '#f3f4f6', fontSize: 12 }}><span style={{ fontWeight: 600, color: '#374151' }}>참고 사실관계 (원고 주장)</span></div>
+                            <div style={{ padding: '10px 12px', fontSize: 12, lineHeight: 1.8, color: '#374151', backgroundColor: '#fafafa', whiteSpace: 'pre-wrap' }}>{assignedCase.key_facts}</div>
                           </div>
                         )}
-
-                        <div style={{ marginTop: 8, fontSize: 11, color: '#888' }}>
-                          ※ 청구원인에 대한 답변은 원고 주장의 사실관계에 대하여 인정 여부 및 반박 사유를 구체적으로 작성하시기 바랍니다.
-                        </div>
+                        <div style={{ marginTop: 6, fontSize: 11, color: '#555', lineHeight: 1.7 }}>※ 청구원인에 대한 답변은 원고 주장의 사실관계에 대하여 인정 여부 및 반박 사유를 구체적으로 작성하시기 바랍니다.</div>
                       </td>
                     </tr>
                   </tbody>
                 </table>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+                  <button style={{ height: 36, padding: '0 24px', border: 'none', borderRadius: 3, background: '#1a3a6b', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>✎ 등록</button>
+                </div>
               </div>
             )}
           </div>
