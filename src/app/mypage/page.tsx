@@ -568,7 +568,7 @@ export default function MyPage() {
               <div style={{ flex: 1, display: 'flex' }}>
                 {[
                   { n: allCases.length, l: '진행중사건' },
-                  { n: getUnreadDocs().filter(d => !d.confirmed).length, l: '미확인송달' },
+                  { n: deliveryUnconfirmedCount, l: '미확인송달' },
                   { n: 0, l: '관심사건' },
                 ].map(({ n, l }) => (
                   <div key={l} style={{ flex: 1, textAlign: 'center' }}>
@@ -3229,8 +3229,10 @@ export default function MyPage() {
           .select('*').eq('student_id', user.id).is('received_at', null)
           .order('sent_at', { ascending: false })
         setDocs((seeded || []) as DeliveryDoc[])
+        setDeliveryUnconfirmedCount(seeded?.length || 0)
       } else {
         setDocs(data as DeliveryDoc[])
+        setDeliveryUnconfirmedCount(data?.length || 0)
       }
       setDdLoading(false)
     }, [user])
@@ -3382,6 +3384,9 @@ export default function MyPage() {
         .eq('student_id', user.id)
         .order('sent_at', { ascending: false })
       setDocs((data || []) as DeliveryDoc[])
+      // 미확인 카운트 동기화
+      const unconfirmed = (data || []).filter((d: DeliveryDoc) => !d.received_at).length
+      setDeliveryUnconfirmedCount(unconfirmed)
       setDdLoading(false)
     }, [user])
 
