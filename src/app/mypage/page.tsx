@@ -3631,8 +3631,8 @@ export default function MyPage() {
       case 'submitted-docs': return <SubmittedDocsContent />
       case 'schedule': return <ScheduleContent />
       case 'pay': return <PayContent />
-      case 'all-delivery': return <AllDeliveryContent />
-      case 'unread-delivery': return <UnreadDeliveryContent />
+      case 'all-delivery': return <AllDeliveryNewContent />
+      case 'unread-delivery': return <UnconfirmedDeliveryNewContent />
       case 'alert-service': return <AlertServiceContent />
       case 'doc-history': return <DocHistoryContent />
       case 'delivery-detail': return <DeliveryDetailContent />
@@ -3723,8 +3723,6 @@ export default function MyPage() {
               <SbItem label="제출서류" page="submitted-docs" />
               <SbItem label="미확인송달문서" page="unconfirmed-delivery-new" />
               <SbItem label="전체송달문서" page="all-delivery-new" />
-              <SbItem label="미확인송달문서(구)" page="unread-delivery" />
-              <SbItem label="전체송달문서(구)" page="all-delivery" />
               <SbItem label="송달문서 정(등)본발급" page="generic" title="송달문서 정(등)본발급" />
             </>
           )}
