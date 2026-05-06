@@ -3197,6 +3197,7 @@ export default function MyPage() {
     const loadDocs = useCallback(async () => {
       if (!user) return
       setDdLoading(true)
+
       // Auto-confirm old docs first
       const sevenDaysAgo = new Date(Date.now() - 7*86400000).toISOString().slice(0,10)
       await supabase.from('delivery_documents')
@@ -3211,7 +3212,25 @@ export default function MyPage() {
         .eq('student_id', user.id)
         .is('received_at', null)
         .order('sent_at', { ascending: false })
-      setDocs((data || []) as DeliveryDoc[])
+
+      // 기본 4건 seed: DB에 미확인 문서가 없으면 자동 생성
+      if (!data || data.length === 0) {
+        const now = new Date()
+        const seedDocs = [
+          { student_id: user.id, court: '서울중앙지방법원', division: '민사10단독(소액)', case_number: '2026가소226035', document_name: '소장부본', sent_at: new Date(now.getTime() - 5*86400000).toISOString().slice(0,10), has_publish: true },
+          { student_id: user.id, court: '수원지방법원', division: '민사2단독', case_number: '2026가단22345', document_name: '답변서부본', sent_at: new Date(now.getTime() - 3*86400000).toISOString().slice(0,10), has_publish: false },
+          { student_id: user.id, court: '인천지방법원', division: '민사5단독', case_number: '2025가단33456', document_name: '보정명령등본', sent_at: new Date(now.getTime() - 2*86400000).toISOString().slice(0,10), has_publish: true },
+          { student_id: user.id, court: '서울동부지방법원', division: '민사1단독', case_number: '2026가단44567', document_name: '준비서면부본', sent_at: new Date(now.getTime() - 1*86400000).toISOString().slice(0,10), has_publish: false },
+        ]
+        await supabase.from('delivery_documents').insert(seedDocs)
+        // 다시 조회
+        const { data: seeded } = await supabase.from('delivery_documents')
+          .select('*').eq('student_id', user.id).is('received_at', null)
+          .order('sent_at', { ascending: false })
+        setDocs((seeded || []) as DeliveryDoc[])
+      } else {
+        setDocs(data as DeliveryDoc[])
+      }
       setDdLoading(false)
     }, [user])
 
