@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
-import { buildNameMap, fetchStudents } from '@/lib/accounts'
+import { buildNameMap } from '@/lib/accounts'
 
 const TEAL = '#00a99d'
 const NAVY = '#1a3a6b'
@@ -43,9 +43,7 @@ export default function AdminCorrectionsPage() {
   const [orders, setOrders] = useState<CorrectionOrder[]>([])
 
   const [caseId, setCaseId] = useState('')
-  const [studentId, setStudentId] = useState('')
-  const [isAllStudents, setIsAllStudents] = useState(false)
-  const [allStudentIds, setAllStudentIds] = useState<string[]>([])
+  const [checkedStudents, setCheckedStudents] = useState<Set<string>>(new Set())
   const [orderNumber, setOrderNumber] = useState('')
   const [orderDate, setOrderDate] = useState('')
   const [deadline, setDeadline] = useState('')
@@ -63,14 +61,12 @@ export default function AdminCorrectionsPage() {
   // Load cases + name map + all student ids
   useEffect(() => {
     ;(async () => {
-      const [{ data }, nm, sList] = await Promise.all([
+      const [{ data }, nm] = await Promise.all([
         supabase.from('practice_cases').select('id, case_number, case_name').order('created_at', { ascending: false }),
         buildNameMap(),
-        fetchStudents(),
       ])
       if (data) setCases(data)
       setNameMap(nm)
-      setAllStudentIds(sList.map(s => s.login_id))
     })()
   }, [])
 
@@ -95,14 +91,12 @@ export default function AdminCorrectionsPage() {
   useEffect(() => { fetchOrders() }, [fetchOrders])
 
   const handleSubmit = async () => {
-    if (!caseId || (!studentId && !isAllStudents) || !orderNumber || !orderDate || !deadline || !orderContent) {
+    if (!caseId || checkedStudents.size === 0 || !orderNumber || !orderDate || !deadline || !orderContent) {
       alert('모든 필드를 입력해주세요.')
       return
     }
     setSubmitting(true)
-    const targets = isAllStudents
-      ? assignments.length > 0 ? assignments.map(a => a.student_id) : allStudentIds
-      : [studentId]
+    const targets = [...checkedStudents]
 
     const rows = targets.map(sid => ({
       case_id: caseId,
@@ -167,15 +161,33 @@ export default function AdminCorrectionsPage() {
             </div>
             <div>
               <label style={lbl}>학생 선택</label>
-              <select value={isAllStudents ? '__ALL__' : studentId} onChange={e => {
-                if (e.target.value === '__ALL__') { setIsAllStudents(true); setStudentId('') }
-                else { setIsAllStudents(false); setStudentId(e.target.value) }
-              }} style={{ ...inp, cursor: 'pointer' }}>
-                <option value="">-- 학생 선택 --</option>
-                <option value="__ALL__">📋 전체 학생 (배정된 학생 일괄)</option>
-                {assignments.map(a => <option key={a.student_id} value={a.student_id}>{nameMap[a.student_id] || a.student_id} ({a.student_id})</option>)}
-              </select>
-              {isAllStudents && <span style={{ fontSize:11, color:'#e53e3e', fontWeight:700, marginTop:4, display:'block' }}>배정된 전체 학생에게 일괄 등록됩니다</span>}
+              <div>
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6 }}>
+                  {assignments.length > 0 && (
+                    <label style={{ fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:4, fontWeight:700, color:NAVY }}>
+                      <input type="checkbox" checked={checkedStudents.size === assignments.length && assignments.length > 0}
+                        onChange={e => setCheckedStudents(e.target.checked ? new Set(assignments.map(a=>a.student_id)) : new Set())}
+                        style={{ accentColor:NAVY }} />
+                      전체 선택
+                    </label>
+                  )}
+                  {checkedStudents.size > 0 && <span style={{ fontSize:11, color:'#e53e3e', fontWeight:700 }}>{checkedStudents.size}명 선택됨</span>}
+                </div>
+                {assignments.length === 0 ? (
+                  <p style={{ fontSize:12, color:'#999' }}>사건을 먼저 선택하세요</p>
+                ) : (
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:'4px 14px', padding:'6px 10px', background:'#fff', border:'1px solid #dde0e8', borderRadius:4 }}>
+                    {assignments.map(a => (
+                      <label key={a.student_id} style={{ fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
+                        <input type="checkbox" checked={checkedStudents.has(a.student_id)}
+                          onChange={e => { const n = new Set(checkedStudents); e.target.checked ? n.add(a.student_id) : n.delete(a.student_id); setCheckedStudents(n) }}
+                          style={{ accentColor:NAVY }} />
+                        {nameMap[a.student_id] || a.student_id}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             <div>
               <label style={lbl}>보정명령번호</label>

@@ -1782,8 +1782,7 @@ export default function AdminPage() {
 
   function DeliveriesPanel() {
     const [cases, setCases] = useState<{id:string; case_number:string; case_name:string; court:string; division:string}[]>([])
-    const [selectedStudentId, setSelectedStudentId] = useState('')
-    const [isAllStudents, setIsAllStudents] = useState(false)
+    const [checkedStudents, setCheckedStudents] = useState<Set<string>>(new Set())
     const [selectedCaseId, setSelectedCaseId] = useState('')
     const [docName, setDocName] = useState('')
     const [sentDaysAgo, setSentDaysAgo] = useState(5)
@@ -1794,21 +1793,22 @@ export default function AdminPage() {
     const [submitting, setSubmitting] = useState(false)
 
     useEffect(() => {
-      if (!selectedStudentId && !isAllStudents) { setCases([]); return }
+      if (checkedStudents.size === 0) { setCases([]); return }
       ;(async () => {
-        if (isAllStudents) {
-          // 전체 학생 → 모든 사건 표시
+        // 선택된 학생들의 배정 사건 합산 (또는 전체 선택 시 모든 사건)
+        if (checkedStudents.size === studentAccounts.length) {
           const { data } = await supabase.from('practice_cases').select('id, case_number, case_name, court, division').order('created_at', { ascending: false })
           if (data) setCases(data as {id:string; case_number:string; case_name:string; court:string; division:string}[])
         } else {
-          const { data: assigns } = await supabase.from('case_assignments').select('case_id').eq('student_id', selectedStudentId)
+          const ids = [...checkedStudents]
+          const { data: assigns } = await supabase.from('case_assignments').select('case_id').in('student_id', ids)
           if (!assigns?.length) { setCases([]); return }
-          const caseIds = assigns.map((a: Record<string, unknown>) => a.case_id)
+          const caseIds = [...new Set(assigns.map((a: Record<string, unknown>) => a.case_id as string))]
           const { data } = await supabase.from('practice_cases').select('id, case_number, case_name, court, division').in('id', caseIds)
           if (data) setCases(data as {id:string; case_number:string; case_name:string; court:string; division:string}[])
         }
       })()
-    }, [selectedStudentId, isAllStudents])
+    }, [checkedStudents, studentAccounts.length])
 
     const selectedCase = cases.find(c => c.id === selectedCaseId)
 
@@ -1819,12 +1819,12 @@ export default function AdminPage() {
     useEffect(() => { fetchDeliveries() }, [fetchDeliveries])
 
     async function handleSubmit() {
-      if ((!selectedStudentId && !isAllStudents) || !selectedCaseId || !docName) { alert('모든 필드를 입력하세요.'); return }
+      if (checkedStudents.size === 0 || !selectedCaseId || !docName) { alert('학생, 사건, 문서명을 모두 입력하세요.'); return }
       setSubmitting(true)
       const sentAt = sentMode === 'custom' ? sentCustomDate :
         new Date(Date.now() - sentDaysAgo * 86400000).toISOString().slice(0, 10)
 
-      const targetStudents = isAllStudents ? studentAccounts.map(s => s.login_id) : [selectedStudentId]
+      const targetStudents = [...checkedStudents]
 
       const rows = targetStudents.map(sid => ({
         student_id: sid,
@@ -1849,7 +1849,6 @@ export default function AdminPage() {
       fetchDeliveries(); showToast('삭제되었습니다.')
     }
 
-    const students = studentAccounts
     const thS: React.CSSProperties = { padding:'8px 10px', fontSize:11, fontWeight:700, color:'#333', textAlign:'center', whiteSpace:'nowrap', background:'#f0f3f8', borderBottom:'2px solid #b8c8e0' }
     const tdS: React.CSSProperties = { padding:'8px 10px', fontSize:12, borderBottom:'1px solid #eee', verticalAlign:'middle', textAlign:'center' }
     const quickDocs = ['변론기일통지서', '준비서면부본', '보정권고', '결정정본', '조정회부결정등본']
@@ -1861,18 +1860,28 @@ export default function AdminPage() {
         {/* Form card */}
         <div style={{ background:'#f8f9fc', border:'1px solid #dde0e8', borderRadius:8, padding:20, marginBottom:24 }}>
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            {/* 학생 선택 */}
-            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <span style={{ fontSize:13, fontWeight:600, color:'#333', minWidth:90 }}>학생 선택</span>
-              <select value={isAllStudents ? '__ALL__' : selectedStudentId} onChange={e => {
-                if (e.target.value === '__ALL__') { setIsAllStudents(true); setSelectedStudentId(''); setSelectedCaseId('') }
-                else { setIsAllStudents(false); setSelectedStudentId(e.target.value); setSelectedCaseId('') }
-              }} style={{ height:32, border:'1px solid #c8cdd6', borderRadius:4, fontSize:13, padding:'0 8px', fontFamily:'inherit', minWidth:180 }}>
-                <option value="">-- 선택 --</option>
-                <option value="__ALL__">📋 전체 학생 ({students.length}명)</option>
-                {students.map(s => <option key={s.login_id} value={s.login_id}>{s.name} ({s.login_id})</option>)}
-              </select>
-              {isAllStudents && <span style={{ fontSize:11, color:'#e53e3e', fontWeight:700 }}>전체 {students.length}명에게 일괄 등록됩니다</span>}
+            {/* 학생 선택 (체크박스) */}
+            <div>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                <span style={{ fontSize:13, fontWeight:600, color:'#333', minWidth:90 }}>학생 선택</span>
+                <label style={{ fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:4, fontWeight:700, color:'#003366' }}>
+                  <input type="checkbox" checked={checkedStudents.size === studentAccounts.length && studentAccounts.length > 0}
+                    onChange={e => setCheckedStudents(e.target.checked ? new Set(studentAccounts.map(s=>s.login_id)) : new Set())}
+                    style={{ accentColor:'#003366' }} />
+                  전체 선택
+                </label>
+                {checkedStudents.size > 0 && <span style={{ fontSize:11, color:'#e53e3e', fontWeight:700 }}>{checkedStudents.size}명 선택됨</span>}
+              </div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:'6px 14px', padding:'8px 12px', background:'#fff', border:'1px solid #dde0e8', borderRadius:6, maxHeight:120, overflowY:'auto' }}>
+                {studentAccounts.map(s => (
+                  <label key={s.login_id} style={{ fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:4, whiteSpace:'nowrap' }}>
+                    <input type="checkbox" checked={checkedStudents.has(s.login_id)}
+                      onChange={e => { const n = new Set(checkedStudents); e.target.checked ? n.add(s.login_id) : n.delete(s.login_id); setCheckedStudents(n); setSelectedCaseId('') }}
+                      style={{ accentColor:'#003366' }} />
+                    {s.name}
+                  </label>
+                ))}
+              </div>
             </div>
 
             {/* 사건 선택 */}
