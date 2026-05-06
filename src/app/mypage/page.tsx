@@ -1620,7 +1620,14 @@ export default function MyPage() {
           </select>
           <div style={{ display:'flex', gap:6 }}>
             <button style={{ height:26, padding:'0 12px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>일괄확인 ›</button>
-            <button style={{ height:26, padding:'0 12px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>📗 엑셀로 저장</button>
+            <button onClick={async () => {
+              const xlsx = await import('xlsx')
+              const rows = MOCK_DELIVERY_DOCS.map(d => ({ 법원:d.court, 재판부:d.dept, 사건번호:d.caseNo, 송달문서:d.docName, 발송일자:d.sentAt, 수신일자:d.recvAt }))
+              const ws = xlsx.utils.json_to_sheet(rows)
+              const wb = xlsx.utils.book_new()
+              xlsx.utils.book_append_sheet(wb, ws, '전체송달문서')
+              xlsx.writeFile(wb, `전체송달문서_${new Date().toISOString().slice(0,10)}.xlsx`)
+            }} style={{ height:26, padding:'0 12px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>📗 엑셀로 저장</button>
           </div>
         </div>
         {/* 테이블 */}
@@ -1817,7 +1824,14 @@ export default function MyPage() {
         {/* 테이블 상단 도구 */}
         <div style={{ background:'#fff', borderBottom:'1px solid #dde0e8', padding:'6px 16px', display:'flex', justifyContent:'flex-end', gap:8 }}>
           <button onClick={confirmAll} style={{ height:28, padding:'0 14px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>일괄확인 ›</button>
-          <button style={{ height:28, padding:'0 14px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>📗 엑셀로 저장</button>
+          <button onClick={async () => {
+            const xlsx = await import('xlsx')
+            const rows = docs.map(d => ({ 법원:d.court, 재판부:d.division, 사건번호:d.caseNum, 송달문서:d.docName, 발송일자:d.sentDate, 확인여부:d.confirmed?'확인':'미확인' }))
+            const ws = xlsx.utils.json_to_sheet(rows)
+            const wb = xlsx.utils.book_new()
+            xlsx.utils.book_append_sheet(wb, ws, '미확인송달문서')
+            xlsx.writeFile(wb, `미확인송달문서_${new Date().toISOString().slice(0,10)}.xlsx`)
+          }} style={{ height:28, padding:'0 14px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>📗 엑셀로 저장</button>
         </div>
 
         {/* ── 테이블 (실제 대법원 동일 컬럼) ── */}
@@ -2348,7 +2362,14 @@ export default function MyPage() {
 
         {/* 상단 버튼 */}
         <div style={{ background:'#fff', borderBottom:'1px solid #dde0e8', padding:'6px 14px', display:'flex', justifyContent:'flex-end', gap:6 }}>
-          <button style={{ height:28, padding:'0 10px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', gap:4, fontFamily:'inherit' }}>
+          <button onClick={async () => {
+            const xlsx = await import('xlsx')
+            const rows = filtered.map(c => ({ 법원:c.court, 사건번호:c.caseNo, 재판부:c.dept, 사건지위:c.stance, 접수일자:c.recvDate, 확정일자:c.confirmDate, 원고:c.plaintiff, 피고:c.defendant }))
+            const ws = xlsx.utils.json_to_sheet(rows)
+            const wb = xlsx.utils.book_new()
+            xlsx.utils.book_append_sheet(wb, ws, '완료된사건')
+            xlsx.writeFile(wb, `완료된사건_${new Date().toISOString().slice(0,10)}.xlsx`)
+          }} style={{ height:28, padding:'0 10px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', gap:4, fontFamily:'inherit' }}>
             <span style={{ fontSize:13 }}>📗</span> 엑셀로 저장
           </button>
           <ActBtn label="완료사건 지정취소" />
@@ -3252,7 +3273,14 @@ export default function MyPage() {
         {/* 도구 버튼 */}
         <div style={{ background:'#fff', borderBottom:'1px solid #dde0e8', padding:'6px 16px', display:'flex', justifyContent:'flex-end', gap:8 }}>
           <button style={{ height:28, padding:'0 14px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>일괄확인 ›</button>
-          <button style={{ height:28, padding:'0 14px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>📗 엑셀로 저장</button>
+          <button onClick={async () => {
+            const xlsx = await import('xlsx')
+            const rows = docs.map(d => ({ 법원:d.court, 재판부:d.division, 사건번호:d.case_number, 송달문서:d.document_name, 발송일자:d.sent_at, 수신일자:d.received_at||'미확인', 자동확인:d.is_auto_confirmed?'자동':'수동' }))
+            const ws = xlsx.utils.json_to_sheet(rows)
+            const wb = xlsx.utils.book_new()
+            xlsx.utils.book_append_sheet(wb, ws, '송달문서')
+            xlsx.writeFile(wb, `송달문서_${new Date().toISOString().slice(0,10)}.xlsx`)
+          }} style={{ height:28, padding:'0 14px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>📗 엑셀로 저장</button>
         </div>
 
         {/* 테이블 */}
@@ -3384,7 +3412,14 @@ export default function MyPage() {
         {/* 도구 버튼 */}
         <div style={{ background:'#fff', borderBottom:'1px solid #dde0e8', padding:'6px 16px', display:'flex', justifyContent:'flex-end', gap:8 }}>
           <button style={{ height:28, padding:'0 14px', background:'#fff', border:'1px solid #c8cdd6', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit' }}>일괄확인 ›</button>
-          <button style={{ height:28, padding:'0 14px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>📗 엑셀로 저장</button>
+          <button onClick={async () => {
+            const xlsx = await import('xlsx')
+            const rows = docs.map(d => ({ 법원:d.court, 재판부:d.division, 사건번호:d.case_number, 송달문서:d.document_name, 발송일자:d.sent_at, 수신일자:d.received_at||'미확인', 자동확인:d.is_auto_confirmed?'자동':'수동' }))
+            const ws = xlsx.utils.json_to_sheet(rows)
+            const wb = xlsx.utils.book_new()
+            xlsx.utils.book_append_sheet(wb, ws, '송달문서')
+            xlsx.writeFile(wb, `송달문서_${new Date().toISOString().slice(0,10)}.xlsx`)
+          }} style={{ height:28, padding:'0 14px', background:'#1a7a3a', color:'#fff', border:'none', borderRadius:3, fontSize:11, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>📗 엑셀로 저장</button>
         </div>
 
         {/* 테이블 */}
