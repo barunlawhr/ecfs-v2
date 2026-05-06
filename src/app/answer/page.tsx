@@ -93,6 +93,8 @@ export default function AnswerPage() {
 
   // 첨부서류
   const [attachFiles, setAttachFiles] = useState<{ id: string; name: string; file?: File }[]>([]);
+  // 입증방법 파일
+  const [evFiles, setEvFiles] = useState<{ id: string; name: string; size: number; file?: File }[]>([]);
 
   // 제출
   const [submitting, setSubmitting] = useState(false);
@@ -100,8 +102,10 @@ export default function AnswerPage() {
   const [submitError, setSubmitError] = useState('');
   const [draftToast, setDraftToast] = useState(false);
 
-  // contentEditable ref
+  // refs
   const causeRef = useRef<HTMLDivElement>(null);
+  const evFileRef = useRef<HTMLInputElement>(null);
+  const attachFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!loading && !user) router.push('/');
@@ -731,37 +735,39 @@ export default function AnswerPage() {
           <div id="sec-s4" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
             <SecHd label="④ 서류명의인" open={open.s4} toggle={() => toggle('s4')} />
             {open.s4 && (
-              <div style={{ padding: '12px' }}>
+              <div style={{ padding: '12px 14px 14px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#333', marginBottom: 12 }}>• 서류명의인</div>
                 <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4', fontSize: 12 }}>
                   <thead>
                     <tr style={{ background: '#f5f7fb' }}>
-                      <th style={{ padding: '8px 12px', fontWeight: 700, borderBottom: '1px solid #d0d8e4', borderRight: '1px solid #e0e6ee', textAlign: 'center', width: 80 }}>구분</th>
-                      <th style={{ padding: '8px 12px', fontWeight: 700, borderBottom: '1px solid #d0d8e4', borderRight: '1px solid #e0e6ee', textAlign: 'center' }}>이름(사용자아이디)</th>
-                      <th style={{ padding: '8px 12px', fontWeight: 700, borderBottom: '1px solid #d0d8e4', textAlign: 'center', width: 60 }}>삭제</th>
+                      <th style={{ padding: '8px 12px', fontWeight: 700, borderBottom: '2px solid #1a3a6b', textAlign: 'center', width: '40%' }}>구분</th>
+                      <th style={{ padding: '8px 12px', fontWeight: 700, borderBottom: '2px solid #1a3a6b', textAlign: 'center' }}>이름 (사용자아이디)</th>
+                      <th style={{ padding: '8px 12px', fontWeight: 700, borderBottom: '2px solid #1a3a6b', textAlign: 'center', width: 60 }}>삭제</th>
                     </tr>
                   </thead>
                   <tbody>
                     {docOwners.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} style={{ padding: '16px', textAlign: 'center', color: '#999' }}>서류명의인이 없습니다.</td>
-                      </tr>
+                      <tr><td colSpan={3} style={{ padding: '16px', textAlign: 'center', color: '#999' }}>서류명의인이 없습니다.</td></tr>
                     ) : (
                       docOwners.map(owner => (
                         <tr key={owner.id} style={{ borderBottom: '1px solid #eaecf4' }}>
-                          <td style={{ padding: '8px 12px', textAlign: 'center', borderRight: '1px solid #eaecf4' }}>{owner.type}</td>
-                          <td style={{ padding: '8px 12px', borderRight: '1px solid #eaecf4' }}>
-                            {owner.name} ({owner.userId})
+                          <td style={{ padding: '9px 12px', borderRight: '1px solid #eaecf4' }}>
+                            <input type="text" defaultValue={owner.type} style={{ width: '100%', border: '1px solid #d0d8e4', borderRadius: 2, padding: '4px 8px', fontSize: 12, boxSizing: 'border-box' }} />
                           </td>
-                          <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                            <button onClick={() => handleDeleteDocOwner(owner.id)} style={{ padding: '2px 8px', fontSize: 11, border: '1px solid #ef4444', borderRadius: 2, background: '#fff', color: '#ef4444', cursor: 'pointer' }}>
-                              삭제
-                            </button>
+                          <td style={{ padding: '9px 12px', borderRight: '1px solid #eaecf4' }}>{owner.name} ({owner.userId})</td>
+                          <td style={{ padding: '9px 12px', textAlign: 'center' }}>
+                            <button onClick={() => handleDeleteDocOwner(owner.id)} style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', color: '#999' }}>⊗</button>
                           </td>
                         </tr>
                       ))
                     )}
                   </tbody>
                 </table>
+                <div style={{ fontSize: 12, color: '#555', marginTop: 8 }}>총 {docOwners.length} 명</div>
+                <div style={{ borderTop: '2px dashed #d0d8e4', marginTop: 12 }} />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+                  <button style={{ height: 36, padding: '0 24px', border: 'none', borderRadius: 3, background: '#1a3a6b', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>✎ 등록</button>
+                </div>
               </div>
             )}
           </div>
@@ -770,56 +776,125 @@ export default function AnswerPage() {
           <div id="sec-s5" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
             <SecHd label="⑤ 입증방법" open={open.s5} toggle={() => toggle('s5')} />
             {open.s5 && (
-              <div style={{ padding: '12px' }}>
+              <div style={{ padding: '12px 14px 14px' }}>
                 <div style={{ fontSize: 11, color: '#555', marginBottom: 10, lineHeight: 1.7 }}>
                   <div>• 입증서류(증거)는 단순한 첨부서류와 구분하여 제출하여야 하며, 첨부서류는 별도의 파일로 다음 단계에서 제출하시기 바랍니다.</div>
+                  <div style={{ color: '#e53e3e' }}>• 1개의 파일에 여러 개의 입증서류가 있는 경우에는 아래 입증서류목록 {'>'} [입증서류분리] 버튼을 클릭한 후 서증명별로 서증부호를 부여하여 입증서류를 제출하시기 바랍니다.</div>
                 </div>
-
-                {/* 서증 추가 폼 */}
-                <div style={{ display: 'flex', gap: 8, alignItems: 'end', marginBottom: 12 }}>
-                  <div>
-                    <label style={{ fontSize: 11, color: '#6b7280', display: 'block', marginBottom: 3 }}>서증번호</label>
-                    <input type="text" value={nextEvNumber} readOnly style={{ ...INP, width: 120, backgroundColor: '#e5e7eb', color: '#6b7280', cursor: 'not-allowed' }} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: 11, color: '#6b7280', display: 'block', marginBottom: 3 }}>서류명 <span style={{ color: '#e53e3e' }}>*</span></label>
-                    <input type="text" value={evForm.name} onChange={e => setEvForm(p => ({ ...p, name: e.target.value }))} onKeyDown={e => e.key === 'Enter' && handleAddEvidence()} placeholder="예: 차용증, 계약서 사본" style={{ ...INP, width: '100%' }} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: 11, color: '#6b7280', display: 'block', marginBottom: 3 }}>입증취지</label>
-                    <input type="text" value={evForm.purpose} onChange={e => setEvForm(p => ({ ...p, purpose: e.target.value }))} onKeyDown={e => e.key === 'Enter' && handleAddEvidence()} placeholder="예: 금전 차용 사실" style={{ ...INP, width: '100%' }} />
-                  </div>
-                  <button onClick={handleAddEvidence} style={{ height: 28, padding: '0 14px', background: TEAL, color: '#fff', border: 'none', borderRadius: 2, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>추가</button>
-                </div>
-
-                {/* 입증서류 목록 */}
+                {/* 파일첨부 영역 */}
                 <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4', fontSize: 12 }}>
-                  <thead>
-                    <tr style={{ background: '#f5f7fb' }}>
-                      {['서증부호','서류명','입증취지','삭제'].map(h => (
-                        <th key={h} style={{ padding: '7px 10px', fontWeight: 700, borderBottom: '1px solid #d0d8e4', borderRight: '1px solid #e0e6ee', textAlign: 'center', fontSize: 11 }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
                   <tbody>
-                    {formData.evidences.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} style={{ padding: '16px', textAlign: 'center', color: '#999', fontSize: 11 }}>등록된 입증서류가 없습니다.</td>
-                      </tr>
-                    ) : (
-                      formData.evidences.map(ev => (
-                        <tr key={ev.id} style={{ borderBottom: '1px solid #eaecf4' }}>
-                          <td style={{ padding: '6px 10px', textAlign: 'center', fontWeight: 600, borderRight: '1px solid #eaecf4', width: 100 }}>{ev.number}</td>
-                          <td style={{ padding: '6px 10px', borderRight: '1px solid #eaecf4' }}>{ev.name}</td>
-                          <td style={{ padding: '6px 10px', borderRight: '1px solid #eaecf4', color: '#555' }}>{ev.purpose || '-'}</td>
-                          <td style={{ padding: '6px 10px', textAlign: 'center', width: 50 }}>
-                            <button onClick={() => handleDeleteEvidence(ev.id)} style={{ padding: '2px 8px', fontSize: 11, border: '1px solid #ef4444', borderRadius: 2, background: '#fff', color: '#ef4444', cursor: 'pointer' }}>삭제</button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
+                    <tr>
+                      <th style={{ ...TH, verticalAlign: 'top', paddingTop: 14, width: 120, lineHeight: 1.6 }}>파일첨부 <span style={{ color: '#e53e3e' }}>*</span> <span style={{ fontSize: 10, color: '#888' }}>ⓘ</span></th>
+                      <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginBottom: 6 }}>
+                          <button onClick={() => evFileRef.current?.click()} style={{ height: 28, padding: '0 12px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>📎 파일찾기</button>
+                          <button style={{ height: 28, padding: '0 12px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>🗑 삭제</button>
+                          <input ref={evFileRef} type="file" style={{ display: 'none' }} accept=".hwp,.hwpx,.doc,.docx,.pdf,.txt,.bmp,.jpg,.jpeg,.gif,.tif,.tiff,.png" onChange={e => { const f = e.target.files?.[0]; if (f) setEvFiles(prev => [...prev, { id: crypto.randomUUID(), name: f.name, size: f.size, file: f }]); e.target.value = ''; }} />
+                        </div>
+                        {/* 파일 목록 테이블 */}
+                        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4', fontSize: 11, marginBottom: 8 }}>
+                          <thead><tr style={{ background: '#f5f7fb' }}>
+                            <th style={{ padding: '6px 8px', borderBottom: '1px solid #d0d8e4', width: 30 }}>☐</th>
+                            <th style={{ padding: '6px 8px', borderBottom: '1px solid #d0d8e4', textAlign: 'center' }}>파일명</th>
+                            <th style={{ padding: '6px 8px', borderBottom: '1px solid #d0d8e4', textAlign: 'center', width: 80 }}>파일크기</th>
+                            <th style={{ padding: '6px 8px', borderBottom: '1px solid #d0d8e4', textAlign: 'center', width: 60 }}>순서변경</th>
+                            <th style={{ padding: '6px 8px', borderBottom: '1px solid #d0d8e4', textAlign: 'center', width: 40 }}>삭제</th>
+                          </tr></thead>
+                          <tbody>
+                            {(evFiles || []).length === 0 ? (
+                              <tr><td colSpan={5} style={{ padding: 12, textAlign: 'center', color: '#999' }}></td></tr>
+                            ) : (evFiles || []).map((f: {id:string;name:string;size:number}) => (
+                              <tr key={f.id} style={{ borderBottom: '1px solid #eee' }}>
+                                <td style={{ padding: '6px 8px', textAlign: 'center' }}>☐</td>
+                                <td style={{ padding: '6px 8px' }}>{f.name}</td>
+                                <td style={{ padding: '6px 8px', textAlign: 'right' }}>{(f.size / 1024).toFixed(2)} KB</td>
+                                <td style={{ padding: '6px 8px', textAlign: 'center' }}>▲ ▼</td>
+                                <td style={{ padding: '6px 8px', textAlign: 'center' }}><button onClick={() => setEvFiles(prev => prev.filter(x => x.id !== f.id))} style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', color: '#999' }}>⊗</button></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {/* 드래그앤드롭 영역 */}
+                        <div style={{ border: '2px dashed #d0d8e4', borderRadius: 4, padding: '24px 20px', textAlign: 'center', background: '#fafbfe' }}>
+                          <div style={{ fontSize: 28, opacity: 0.4, marginBottom: 4 }}>🎵 🖼 📄 ▶ ⚙</div>
+                          <div style={{ fontSize: 14, color: '#00a99d', fontWeight: 700, letterSpacing: 2 }}>DRAG & DROP</div>
+                        </div>
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
+                <div style={{ fontSize: 11, color: '#e53e3e', marginTop: 6, lineHeight: 1.7 }}>※ 파일첨부가 완료되면 [목록에 추가]버튼을 눌러 첨부파일을 입증서류목록에 추가할 수 있습니다.</div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                  <button style={{ height: 30, padding: '0 16px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>목록에 추가</button>
+                </div>
+
+                {/* 입증서류목록 */}
+                <div style={{ marginTop: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#333' }}>• 입증서류목록</span>
+                      <span style={{ fontSize: 10, color: '#888' }}>ⓘ</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button style={{ height: 26, padding: '0 10px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer' }}>📎 전자발급 서류 첨부하기</button>
+                      <button style={{ height: 26, padding: '0 10px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer' }}>서증등목록삭제</button>
+                      <button style={{ height: 26, padding: '0 10px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer' }}>서증등목록조회</button>
+                      <button style={{ height: 26, padding: '0 10px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer' }}>📎 서증입력파일 등록</button>
+                    </div>
+                  </div>
+                  {/* 표시기준 안내 */}
+                  <div style={{ background: '#fef9ef', border: '1px solid #f5e6c8', borderRadius: 4, padding: '10px 14px', marginBottom: 12, display: 'flex', gap: 10, fontSize: 11, lineHeight: 1.7 }}>
+                    <span style={{ fontSize: 28, opacity: 0.5 }}>📋</span>
+                    <div>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>표시기준</div>
+                      <div>• 제출자가 사건의 원고일 경우 &apos;갑호증&apos;, 피고일 경우 &apos;을호증&apos;으로 제출하시기 바랍니다.</div>
+                      <div>• 본소가 소취하되어 병합 분리된 반소사건의 경우 반소원고는 &apos;을호증&apos;, 반소피고는 &apos;갑호증&apos;으로 제출하시기 바랍니다.</div>
+                      <div>• 독립당사자 참가인은 &apos;병호증&apos;으로 제출하시기 바랍니다.</div>
+                    </div>
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4', fontSize: 11 }}>
+                    <thead><tr style={{ background: '#f5f7fb' }}>
+                      {['☐','서증부호 *','가지부호','서증번호 *','가지번호','서류명 *','파일명','페이지번호','입증취지 등','삭제'].map(h => (
+                        <th key={h} style={{ padding: '7px 6px', fontWeight: 700, borderBottom: '2px solid #1a3a6b', textAlign: 'center', whiteSpace: 'nowrap', fontSize: 10 }}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {formData.evidences.length === 0 ? (
+                        <tr><td colSpan={10} style={{ padding: 16, textAlign: 'center', color: '#999' }}>등록된 입증서류가 없습니다.</td></tr>
+                      ) : formData.evidences.map(ev => (
+                        <tr key={ev.id} style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={{ padding: '5px 4px', textAlign: 'center' }}>☐</td>
+                          <td style={{ padding: '5px 4px', textAlign: 'center' }}>{ev.number?.replace(/[0-9]/g,'')}</td>
+                          <td style={{ padding: '5px 4px', textAlign: 'center' }}>-</td>
+                          <td style={{ padding: '5px 4px', textAlign: 'center' }}>{ev.number?.replace(/[^0-9]/g,'')}</td>
+                          <td style={{ padding: '5px 4px', textAlign: 'center' }}>-</td>
+                          <td style={{ padding: '5px 4px' }}>{ev.name}</td>
+                          <td style={{ padding: '5px 4px', color: '#888' }}>-</td>
+                          <td style={{ padding: '5px 4px', textAlign: 'center' }}>-</td>
+                          <td style={{ padding: '5px 4px', color: '#555' }}>{ev.purpose || '-'}</td>
+                          <td style={{ padding: '5px 4px', textAlign: 'center' }}><button onClick={() => handleDeleteEvidence(ev.id)} style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', color: '#999' }}>⊗</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 12 }}>
+                    <span>총 {formData.evidences.length}건</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}><input type="checkbox" defaultChecked style={{ accentColor: '#1a3a6b' }} /> 가지번호로 분리</label>
+                      <span style={{ fontSize: 11 }}>분리방법</span>
+                      <select style={{ height: 24, fontSize: 11, border: '1px solid #c8cdd6', borderRadius: 2 }}><option>서류개수</option></select>
+                      <input type="text" style={{ height: 24, width: 40, border: '1px solid #c8cdd6', borderRadius: 2, padding: '0 4px', fontSize: 11 }} />
+                      <button style={{ height: 26, padding: '0 12px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 2, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>입증서류분리</button>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, color: '#e53e3e', marginTop: 8, lineHeight: 1.7 }}>
+                  ※ 입증서류목록에 서증파일들을 추가한 후 서증분리, 서류명 수정등 수정할 사항이 많은 경우 입력편의를 위하여 <strong>[서증입력파일 등록]</strong>기능을 활용하여 서증목록을 수정할 수 있습니다.
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+                  <button style={{ height: 36, padding: '0 24px', border: 'none', borderRadius: 3, background: '#1a3a6b', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>✎ 등록</button>
+                </div>
               </div>
             )}
           </div>
@@ -828,56 +903,101 @@ export default function AnswerPage() {
           <div id="sec-s6" style={{ background: '#fff', border: '1px solid #d0d8e4', marginBottom: 5, borderRadius: 2 }}>
             <SecHd label="⑥ 첨부서류" open={open.s6} toggle={() => toggle('s6')} />
             {open.s6 && (
-              <div style={{ padding: '12px' }}>
+              <div style={{ padding: '12px 14px 14px' }}>
                 <div style={{ fontSize: 11, color: '#555', marginBottom: 10, lineHeight: 1.7 }}>
-                  <div>• ��부서류로 제출한 문서는 증거로 사용될 수 없으며, 판결(결정) 등에 효력이 없습니다.</div>
-                  <div>• 소송대리허가신청서 및 기타 신청서는 답변서와 별도의 서류로 제출하여야 합니다.</div>
+                  • 첨부서류로 제출한 문서는 증거로 사용될 수 없으며, 판결(결정) 등에 효력이 없습니다.
                 </div>
-
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                    <span style={{ fontSize: 11, color: '#333', fontWeight: 600 }}>파일첨부</span>
-                    <input
-                      type="file"
-                      accept=".hwp,.hwpx,.doc,.docx,.pdf,.txt,.bmp,.jpg,.jpeg,.gif,.tif,.tiff,.png"
-                      style={{ fontSize: 11 }}
-                      onChange={e => {
-                        const f = e.target.files?.[0];
-                        if (f) setAttachFiles(prev => [...prev, { id: crypto.randomUUID(), name: f.name, file: f }]);
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
-                </div>
-
                 <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4', fontSize: 12 }}>
-                  <thead>
-                    <tr style={{ background: '#f5f7fb' }}>
-                      {['No.','파일명','삭제'].map(h => (
-                        <th key={h} style={{ padding: '7px 10px', fontWeight: 700, borderBottom: '1px solid #d0d8e4', borderRight: '1px solid #e0e6ee', textAlign: 'center', fontSize: 11 }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
                   <tbody>
-                    {attachFiles.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} style={{ padding: '16px', textAlign: 'center', color: '#999', fontSize: 11 }}>첨부��� 파일이 없습니다.</td>
-                      </tr>
-                    ) : (
-                      attachFiles.map((f, i) => (
-                        <tr key={f.id} style={{ borderBottom: '1px solid #eaecf4' }}>
-                          <td style={{ padding: '6px 10px', textAlign: 'center', borderRight: '1px solid #eaecf4', width: 50 }}>{i + 1}</td>
-                          <td style={{ padding: '6px 10px', borderRight: '1px solid #eaecf4' }}>{f.name}</td>
-                          <td style={{ padding: '6px 10px', textAlign: 'center', width: 50 }}>
-                            <button onClick={() => setAttachFiles(prev => prev.filter(x => x.id !== f.id))} style={{ padding: '2px 8px', fontSize: 11, border: '1px solid #ef4444', borderRadius: 2, background: '#fff', color: '#ef4444', cursor: 'pointer' }}>삭제</button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
+                    <tr>
+                      <th style={{ ...TH, verticalAlign: 'top', paddingTop: 14, width: 120, lineHeight: 1.6 }}>서류명 <span style={{ color: '#e53e3e' }}>*</span> <span style={{ fontSize: 10, color: '#888' }}>ⓘ</span></th>
+                      <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                          <select style={{ height: 30, border: '1px solid #c8cdd6', borderRadius: 2, fontSize: 12, padding: '0 8px', minWidth: 160 }}>
+                            <option>직접입력</option>
+                            <option>법인등기사항증명서</option>
+                            <option>주민등록등본</option>
+                            <option>소송위임장</option>
+                            <option>담당변호사지정서</option>
+                            <option>소가계산서</option>
+                          </select>
+                          <input type="text" placeholder="" style={{ height: 30, border: '1px solid #c8cdd6', borderRadius: 2, fontSize: 12, padding: '0 8px', flex: 1 }} />
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, whiteSpace: 'nowrap' }}>☐ 파일명과 동일</label>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <th style={{ ...TH, verticalAlign: 'top', paddingTop: 14, width: 120, lineHeight: 1.6 }}>파일첨부 <span style={{ color: '#e53e3e' }}>*</span> <span style={{ fontSize: 10, color: '#888' }}>ⓘ</span></th>
+                      <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginBottom: 6 }}>
+                          <button onClick={() => attachFileRef.current?.click()} style={{ height: 28, padding: '0 12px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>📎 파일찾기</button>
+                          <button style={{ height: 28, padding: '0 12px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>🗑 삭제</button>
+                          <input ref={attachFileRef} type="file" style={{ display: 'none' }} accept=".hwp,.hwpx,.doc,.docx,.pdf,.txt,.bmp,.jpg,.jpeg,.gif,.tif,.tiff,.png" onChange={e => { const f = e.target.files?.[0]; if (f) setAttachFiles(prev => [...prev, { id: crypto.randomUUID(), name: f.name, file: f }]); e.target.value = ''; }} />
+                        </div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4', fontSize: 11, marginBottom: 8 }}>
+                          <thead><tr style={{ background: '#f5f7fb' }}>
+                            <th style={{ padding: '6px', borderBottom: '1px solid #d0d8e4', textAlign: 'center' }}>파일명</th>
+                            <th style={{ padding: '6px', borderBottom: '1px solid #d0d8e4', textAlign: 'center', width: 80 }}>파일크기</th>
+                            <th style={{ padding: '6px', borderBottom: '1px solid #d0d8e4', textAlign: 'center', width: 60 }}>순서변경</th>
+                            <th style={{ padding: '6px', borderBottom: '1px solid #d0d8e4', textAlign: 'center', width: 40 }}>삭제</th>
+                          </tr></thead>
+                          <tbody>
+                            {attachFiles.length === 0 ? (
+                              <tr><td colSpan={4} style={{ padding: 12, textAlign: 'center', color: '#999' }}>조회된 결과가 없습니다.</td></tr>
+                            ) : attachFiles.map(f => (
+                              <tr key={f.id} style={{ borderBottom: '1px solid #eee' }}>
+                                <td style={{ padding: '6px 8px' }}>{f.name}</td>
+                                <td style={{ padding: '6px 8px', textAlign: 'right' }}>-</td>
+                                <td style={{ padding: '6px 8px', textAlign: 'center' }}>▲ ▼</td>
+                                <td style={{ padding: '6px 8px', textAlign: 'center' }}><button onClick={() => setAttachFiles(prev => prev.filter(x => x.id !== f.id))} style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', color: '#999' }}>⊗</button></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <div style={{ border: '2px dashed #d0d8e4', borderRadius: 4, padding: '24px 20px', textAlign: 'center', background: '#fafbfe' }}>
+                          <div style={{ fontSize: 28, opacity: 0.4, marginBottom: 4 }}>🎵 🖼 📄 ▶ ⚙</div>
+                          <div style={{ fontSize: 14, color: '#00a99d', fontWeight: 700, letterSpacing: 2 }}>DRAG & DROP</div>
+                        </div>
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
-                <div style={{ marginTop: 6, fontSize: 11, color: '#888' }}>
-                  ※ 첨부가���한 파일 형식 : HWP, HWPX, DOC, DOCX, PDF, TXT, BMP, JPG, JPEG, GIF, TIF, TIFF, PNG (20MB까지)
+                <div style={{ fontSize: 11, color: '#e53e3e', marginTop: 6, lineHeight: 1.7 }}>※ 첨부할 파일을 등록 후 반드시 [목록에 추가]버튼을 눌러 첨부서류 목록에 추가하시기 바랍니다.</div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                  <button style={{ height: 30, padding: '0 16px', background: '#1a3a6b', color: '#fff', border: 'none', borderRadius: 2, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>목록에 추가</button>
+                </div>
+
+                {/* 첨부서류목록 */}
+                <div style={{ marginTop: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#333' }}>• 첨부서류목록</span>
+                    <button style={{ height: 26, padding: '0 12px', border: '1px solid #aaa', borderRadius: 2, background: '#f5f5f5', fontSize: 11, cursor: 'pointer' }}>📎 전자발급 서류 첨부하기</button>
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4', fontSize: 11 }}>
+                    <thead><tr style={{ background: '#f5f7fb' }}>
+                      {['번호','서류명 *','파일명','등록일','순서변경','삭제'].map(h => (
+                        <th key={h} style={{ padding: '7px 8px', fontWeight: 700, borderBottom: '2px solid #1a3a6b', textAlign: 'center', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {attachFiles.length === 0 ? (
+                        <tr><td colSpan={6} style={{ padding: 16, textAlign: 'center', color: '#999' }}>조회된 결과가 없습니다.</td></tr>
+                      ) : attachFiles.map((f, i) => (
+                        <tr key={f.id} style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={{ padding: '6px 8px', textAlign: 'center' }}>{i + 1}</td>
+                          <td style={{ padding: '6px 8px' }}><input type="text" defaultValue={f.name.replace(/\.[^.]+$/, '')} style={{ border: '1px solid #d0d8e4', borderRadius: 2, padding: '3px 6px', fontSize: 11, width: '100%', boxSizing: 'border-box' }} /></td>
+                          <td style={{ padding: '6px 8px', color: '#0067c2' }}>{f.name}</td>
+                          <td style={{ padding: '6px 8px', textAlign: 'center' }}>{new Date().toLocaleDateString('ko-KR')}</td>
+                          <td style={{ padding: '6px 8px', textAlign: 'center' }}>▲ ▼</td>
+                          <td style={{ padding: '6px 8px', textAlign: 'center' }}><button onClick={() => setAttachFiles(prev => prev.filter(x => x.id !== f.id))} style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', color: '#999' }}>⊗</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div style={{ fontSize: 12, color: '#555', marginTop: 6 }}>총 {attachFiles.length} 건</div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+                  <button style={{ height: 36, padding: '0 24px', border: 'none', borderRadius: 3, background: '#1a3a6b', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>✎ 등록</button>
                 </div>
               </div>
             )}
