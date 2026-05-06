@@ -153,7 +153,7 @@ export default function MyPage() {
     if (!loading && user?.role === 'admin') router.push('/admin')
   }, [user, loading, router])
 
-  // Fetch unconfirmed delivery count
+  // Fetch unconfirmed delivery count (페이지 전환마다 갱신)
   useEffect(() => {
     if (!user) return
     ;(async () => {
@@ -163,7 +163,7 @@ export default function MyPage() {
         .is('received_at', null)
       setDeliveryUnconfirmedCount(count || 0)
     })()
-  }, [user])
+  }, [user, activePage])
 
   const fetchControllerRef = useRef<AbortController | null>(null)
 
