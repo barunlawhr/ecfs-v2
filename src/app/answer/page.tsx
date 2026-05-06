@@ -11,7 +11,7 @@ import type { ComplaintFormData, Evidence, SampleCase, Assignment } from '@/type
 
 const EMPTY_FORM: ComplaintFormData = {
   doc_type: 'answer',
-  caseCategory: '', caseName: '', court: '', claimType: '', sogaType: '', soga: '',
+  caseCategory: '', caseName: '', court: '', claimType: '', sogaType: '', soga: '', caseNumber: '',
   parties: [], claimPurpose: '', claimCause: '',
   hasAgent: false, agentType: undefined, agentName: undefined, evidences: [],
 };
@@ -193,7 +193,7 @@ export default function AnswerPage() {
       applyAndConfirm(match.sample_cases);
     } else if (caseSearch.court) {
       const caseNum = `${caseSearch.year}${caseSearch.caseCode}${caseSearch.caseNum}`;
-      setFormData(prev => ({ ...prev, court: caseSearch.court, sogaType: caseNum }));
+      setFormData(prev => ({ ...prev, court: caseSearch.court, caseNumber: caseNum }));
       setCaseConfirmed(true);
     } else {
       alert('법원을 선택해주세요.');
@@ -247,6 +247,15 @@ export default function AnswerPage() {
     setSubmitError('');
 
     try {
+      // 디버그: 필드 매핑 확인
+      console.log('[답변서 제출] 필드 매핑 확인:', {
+        caseNumber: formData.caseNumber,
+        sogaType: formData.sogaType,
+        court: formData.court,
+        claimPurpose: formData.claimPurpose?.slice(0, 30) + '...',
+        claimCause: formData.claimCause?.slice(0, 30) + '...',
+      });
+
       const record = {
         student_id: user.id,
         user_name: user.name,
@@ -545,7 +554,7 @@ export default function AnswerPage() {
       <div style={{ background: '#e8f4fb', borderBottom: '1px solid #b0d0eb' }}>
         <div style={{ maxWidth: 1160, margin: '0 auto', padding: '8px 20px', fontSize: 12, color: '#1a4a6b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span>
-            ✔ 사건확인 완료 — {formData.court} {formData.sogaType || ''} {assignedCase ? `(${assignedCase.title || assignedCase.case_type})` : ''}
+            ✔ 사건확인 완료 — {formData.court} {formData.caseNumber || ''} {assignedCase ? `(${assignedCase.title || assignedCase.case_type})` : ''}
           </span>
           <button onClick={() => setCaseConfirmed(false)} style={{ background: 'none', border: '1px solid #8ab8d8', borderRadius: 3, padding: '2px 10px', fontSize: 11, color: '#1a4a6b', cursor: 'pointer', fontFamily: 'inherit' }}>
             사건 재검색
@@ -623,7 +632,7 @@ export default function AnswerPage() {
                     <tr style={{ borderBottom: '1px solid #eaecf4' }}>
                       <th style={TH}>사건번호</th>
                       <td style={TD}>
-                        <input type="text" value={formData.sogaType} onChange={e => upd({ sogaType: e.target.value })} placeholder="예: 2024가단12345" style={{ ...INP, width: 300 }} />
+                        <input type="text" value={formData.caseNumber} onChange={e => upd({ caseNumber: e.target.value })} placeholder="예: 2024가단12345" style={{ ...INP, width: 300 }} />
                       </td>
                     </tr>
                   </tbody>

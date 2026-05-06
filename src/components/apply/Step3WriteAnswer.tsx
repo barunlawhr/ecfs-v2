@@ -128,8 +128,8 @@ export default function Step3WriteAnswer({ data, onChange, onNext, onBack, assig
                   <td>
                     <input
                       type="text"
-                      value={data.sogaType}
-                      onChange={e => onChange({ ...data, sogaType: e.target.value })}
+                      value={data.caseNumber}
+                      onChange={e => { console.log('[답변서] 사건번호 입력:', e.target.value, '| sogaType 유지:', data.sogaType); onChange({ ...data, caseNumber: e.target.value }); }}
                       placeholder="예: 2024가단12345 (소장에 표시된 사건번호)"
                       style={{ ...inp, maxWidth: 300 }}
                     />

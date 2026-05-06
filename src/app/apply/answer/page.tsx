@@ -259,6 +259,7 @@ function AnswerPage() {
               claimType: '',
               sogaType: '',
               soga: '',
+              caseNumber: '',
             },
             sampleCase: { id: '0', title: caseName, case_type: caseName, court, plaintiff, defendant, created_at: new Date().toISOString() },
             doc_type: 'answer',

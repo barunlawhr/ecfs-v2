@@ -65,7 +65,7 @@ const EMAIL_DOMAINS = ['naver.com','gmail.com','daum.net','hanmail.net','nate.co
 
 const EMPTY: ComplaintFormData = {
   doc_type: 'complaint',
-  caseCategory: '', caseName: '', court: '', claimType: '재산권', sogaType: '금액', soga: '',
+  caseCategory: '', caseName: '', court: '', claimType: '재산권', sogaType: '금액', soga: '', caseNumber: '',
   parties: [], claimPurpose: '', claimCause: '', hasAgent: false, agentType: undefined,
   agentName: undefined, evidences: [],
 };

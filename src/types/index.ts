@@ -94,6 +94,7 @@ export interface ComplaintFormData {
   claimType: string
   sogaType: string
   soga: string
+  caseNumber: string    // 답변서: 사건번호
   // 당사자
   parties: Party[]
   // 소장/답변서 본문
