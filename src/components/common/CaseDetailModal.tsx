@@ -17,7 +17,7 @@ export interface CaseInfo {
   merger_type?: string
   stamp_amount?: number
   appeal_history?: { court: string; case_number: string; result: string }[]
-  progress_history?: { date: string; event: string }[]
+  progress_history?: { date: string; content: string; result?: string; color?: string }[]
 }
 
 const TEAL = '#00897b'
@@ -180,23 +180,49 @@ export default function CaseDetailModal({ caseInfo, onClose }: { caseInfo: CaseI
           ) : (
             /* 진행내용 탭 */
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#333', marginBottom: 8 }}>&#9675; 진행내용 ({c.court || '-'})</div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #d0d8e4' }}>
+              {/* 진행내용 헤더 */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#333' }}>&#9675; 진행내용</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                  <span style={{ color: '#555' }}>진행구분 :</span>
+                  <select style={{ height: 26, border: '1px solid #c8cdd6', borderRadius: 3, fontSize: 11, padding: '0 6px' }}><option>전체</option></select>
+                </div>
+              </div>
+
+              {/* 안내 박스 */}
+              <div style={{ background: '#fffdf0', border: '1px solid #e8e0b0', borderRadius: 4, padding: '10px 14px', marginBottom: 12, fontSize: 11, color: '#555', lineHeight: 1.8 }}>
+                <div>&#8226; 송달결과는 법적인 효력이 없는 참고사항에 불과하고, 추후 송달이 착오에 말미암은 것이거나 부적법한 경우 변경될 수 있습니다.</div>
+                <div>&#8226; 송달결과는 &apos;0시 도달&apos;로 나타나는 경우에는 기간 계산 시 초일이 산입된다는 점에 유의하시기 바랍니다.</div>
+                <div style={{ marginTop: 6, color: '#b8860b' }}>
+                  ※ 송달결과(2007.03.12전에는 재판부에서 등록한 내용에, 그 이후에는 우정사업본부로부터 전송받은 내용에 한함) 를 조회하고자 할 경우에는 &apos;확인&apos; 항목에 체크하시기 바랍니다.
+                  <label style={{ marginLeft: 8, cursor: 'pointer' }}><input type="checkbox" style={{ marginRight: 4 }} />확인</label>
+                </div>
+              </div>
+
+              {/* 테이블 */}
+              <table style={{ width: '100%', borderCollapse: 'collapse', borderTop: '2px solid #333' }}>
                 <thead>
-                  <tr style={{ background: '#f5f7fb' }}>
-                    <th style={{ ...thC, textAlign: 'center', width: '20%' }}>일자</th>
-                    <th style={{ ...thC, textAlign: 'center', borderRight: 'none' }}>진행내용</th>
+                  <tr style={{ borderBottom: '1px solid #d0d8e4' }}>
+                    <th style={{ padding: '10px 12px', fontSize: 12, fontWeight: 600, color: '#333', textAlign: 'center', width: '15%' }}>일자</th>
+                    <th style={{ padding: '10px 12px', fontSize: 12, fontWeight: 600, color: '#333', textAlign: 'center', width: '50%' }}>내용</th>
+                    <th style={{ padding: '10px 12px', fontSize: 12, fontWeight: 600, color: '#333', textAlign: 'center', width: '20%' }}>결과</th>
+                    <th style={{ padding: '10px 12px', fontSize: 12, fontWeight: 600, color: '#333', textAlign: 'center', width: '15%' }}>공시문</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(!c.progress_history || c.progress_history.length === 0) ? (
-                    <tr><td colSpan={2} style={{ ...tdC, textAlign: 'center', color: '#999', padding: 16, borderRight: 'none' }}>진행내용이 없습니다</td></tr>
-                  ) : c.progress_history.map((p, i) => (
-                    <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#fafbfe' }}>
-                      <td style={{ ...tdC, textAlign: 'center' }}>{p.date}</td>
-                      <td style={{ ...tdC, borderRight: 'none' }}>{p.event}</td>
-                    </tr>
-                  ))}
+                    <tr><td colSpan={4} style={{ padding: 20, textAlign: 'center', color: '#999', borderBottom: '1px solid #e8edf0' }}>진행내용이 없습니다</td></tr>
+                  ) : c.progress_history.map((p, i) => {
+                    const rowColor = p.color === 'red' ? '#c0392b' : p.color === 'blue' ? '#0067c2' : '#222'
+                    return (
+                      <tr key={i} style={{ borderBottom: '1px solid #e8edf0' }}>
+                        <td style={{ padding: '10px 12px', fontSize: 12, textAlign: 'center', color: rowColor }}>{p.date}</td>
+                        <td style={{ padding: '10px 12px', fontSize: 12, color: rowColor, textDecoration: p.color ? 'underline' : 'none', cursor: p.color ? 'pointer' : 'default' }}>{p.content}</td>
+                        <td style={{ padding: '10px 12px', fontSize: 12, textAlign: 'center', color: p.result ? '#c0392b' : '#999' }}>{p.result || ''}</td>
+                        <td style={{ padding: '10px 12px', fontSize: 12, textAlign: 'center' }}></td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

@@ -57,7 +57,30 @@ export function UnconfirmedDeliveryContent({
   async function openCaseDetail(doc: DeliveryDoc) {
     // 사건번호 클릭 → 사건 정보 팝업 (송달 확인 X)
     const { data } = await supabase.from('practice_cases').select('*').eq('case_number', doc.case_number).maybeSingle()
-    setCaseModal((data as CaseInfo) || { case_number: doc.case_number, court: doc.court, division: doc.division, plaintiff: '-', defendant: '-' } as CaseInfo)
+    setCaseModal((data as CaseInfo) || {
+      case_number: doc.case_number, court: doc.court, division: doc.division,
+      case_name: doc.document_category === 'decision' ? '채권가압류' : '손해배상(기)',
+      plaintiff: '김태영', defendant: '주식회사 태정이앤씨',
+      court_phone: '052-216-8682',
+      reception_date: '2026.04.14',
+      stamp_amount: 230000,
+      progress_history: [
+        { date: '2026.04.14', content: '신청서접수' },
+        { date: '2026.04.16', content: '기타', color: 'blue' },
+        { date: '2026.04.16', content: '채권자대리인 법무법인 해강에게 보정명령등본 송달', color: 'red', result: "위의 '확인' 항목 체크" },
+        { date: '2026.04.20', content: '채권자 소송대리인 법무법인 해강 박상영 사실조회 촉탁신청서(울산 남구청) 제출' },
+        { date: '2026.04.21', content: '채권자 소송대리인 법무법인 해강 박상영 보정기간연장 신청서 제출' },
+        { date: '2026.04.24', content: '기타 울산 남구청에게 사실조회서 송달', color: 'red', result: "위의 '확인' 항목 체크" },
+        { date: '2026.04.27', content: '채권자 소송대리인 법무법인 해강 박상영 신청취지 및 신청이유 변경신청서 제출' },
+        { date: '2026.04.28', content: '참여관용 기타' },
+        { date: '2026.04.28', content: '채권자대리인 법무법인 해강에게 보정명령등본 송달', color: 'red', result: "위의 '확인' 항목 체크" },
+        { date: '2026.04.29', content: '채권자 소송대리인 법무법인 해강 박상영 신청일부취하서 제출' },
+        { date: '2026.04.30', content: '채권자 소송대리인 법무법인 해강 박상영 증거설명서 제출' },
+        { date: '2026.04.30', content: '채권자 소송대리인 법무법인 해강 박상영 서증 제출' },
+        { date: '2026.04.30', content: '담보제공명령' },
+        { date: '2026.04.30', content: '채권자대리인 법무법인 해강에게 담보제공명령등본 송달', color: 'red', result: "위의 '확인' 항목 체크" },
+      ],
+    } as CaseInfo)
   }
 
   const loadDocs = useCallback(async () => {
@@ -276,7 +299,30 @@ export function AllDeliveryContent({
 
   async function openCaseDetail(doc: DeliveryDoc) {
     const { data } = await supabase.from('practice_cases').select('*').eq('case_number', doc.case_number).maybeSingle()
-    setCaseModal((data as CaseInfo) || { case_number: doc.case_number, court: doc.court, division: doc.division, plaintiff: '-', defendant: '-' } as CaseInfo)
+    setCaseModal((data as CaseInfo) || {
+      case_number: doc.case_number, court: doc.court, division: doc.division,
+      case_name: doc.document_category === 'decision' ? '채권가압류' : '손해배상(기)',
+      plaintiff: '김태영', defendant: '주식회사 태정이앤씨',
+      court_phone: '052-216-8682',
+      reception_date: '2026.04.14',
+      stamp_amount: 230000,
+      progress_history: [
+        { date: '2026.04.14', content: '신청서접수' },
+        { date: '2026.04.16', content: '기타', color: 'blue' },
+        { date: '2026.04.16', content: '채권자대리인 법무법인 해강에게 보정명령등본 송달', color: 'red', result: "위의 '확인' 항목 체크" },
+        { date: '2026.04.20', content: '채권자 소송대리인 법무법인 해강 박상영 사실조회 촉탁신청서(울산 남구청) 제출' },
+        { date: '2026.04.21', content: '채권자 소송대리인 법무법인 해강 박상영 보정기간연장 신청서 제출' },
+        { date: '2026.04.24', content: '기타 울산 남구청에게 사실조회서 송달', color: 'red', result: "위의 '확인' 항목 체크" },
+        { date: '2026.04.27', content: '채권자 소송대리인 법무법인 해강 박상영 신청취지 및 신청이유 변경신청서 제출' },
+        { date: '2026.04.28', content: '참여관용 기타' },
+        { date: '2026.04.28', content: '채권자대리인 법무법인 해강에게 보정명령등본 송달', color: 'red', result: "위의 '확인' 항목 체크" },
+        { date: '2026.04.29', content: '채권자 소송대리인 법무법인 해강 박상영 신청일부취하서 제출' },
+        { date: '2026.04.30', content: '채권자 소송대리인 법무법인 해강 박상영 증거설명서 제출' },
+        { date: '2026.04.30', content: '채권자 소송대리인 법무법인 해강 박상영 서증 제출' },
+        { date: '2026.04.30', content: '담보제공명령' },
+        { date: '2026.04.30', content: '채권자대리인 법무법인 해강에게 담보제공명령등본 송달', color: 'red', result: "위의 '확인' 항목 체크" },
+      ],
+    } as CaseInfo)
   }
 
   const loadDocs = useCallback(async () => {
