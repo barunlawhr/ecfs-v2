@@ -1264,7 +1264,7 @@ export default function AdminPage() {
     const [scoreReveal, setScoreReveal] = useState('immediate')
     const [submitLimit, setSubmitLimit] = useState('unlimited')
     // ── 3. 채점 기준
-    const [weights, setWeights] = useState({ plaintiff: 10, defendant: 10, purpose: 25, reason: 35, evidence: 20 })
+    const [weights, setWeights] = useState({ plaintiff: 15, defendant: 15, purpose: 20, reason: 20, evidence: 30 })
     // ── 4. 공지사항
     const [notices, setNotices] = useState<{ id: string; text: string; date: string }[]>([])
     const [newNotice, setNewNotice] = useState('')

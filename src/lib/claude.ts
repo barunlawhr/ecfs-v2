@@ -36,9 +36,10 @@ export async function gradeWithAI(
 학생 제출 청구원인: ${data.claimReason || '(미입력)'}
 학생 증거목록: ${(data.evidence || []).map((e, i) => `갑${i + 1}: ${e.name} (${e.purpose})`).join(', ') || '없음'}
 
+배점: 원고정보 15점, 피고정보 15점, 청구취지 20점, 청구원인 20점, 입증서류 30점 (합계 100점)
 1차 규칙 점수: ${ruleResult.totalScore}점 (±15점 범위 내 조정)
 
-평가: 1) 청구취지 법률 형식 2) 청구원인 논리성 3) 모범답안 핵심 포함 여부 4) 법률 용어 적절성
+평가: 1) 청구취지 법률 형식 2) 청구원인 논리성 3) 모범답안 핵심 포함 여부 4) 법률 용어 적절성 5) 입증서류 적절성
 ` : isAnswer ? `
 사건: ${caseData.case_name || ''} | 원고(청구인): ${caseData.plaintiff} | 피고(학생측): ${caseData.defendant}
 사건개요: ${caseData.case_facts || ''}
@@ -105,6 +106,7 @@ function buildPrompt(data: ComplaintFormData, sc: SampleCase, ruleScore: number)
   const evList = data.evidences.map(e => `${e.number} ${e.name}`).join(', ') || '없음'
 
   return `[1차 규칙점수: ${ruleScore}점] ${isAnswer ? '답변서' : '소장'} 평가 (±15점 조정)
+배점: ${isAnswer ? '답변취지 20점, 답변이유 60점, 증거 20점' : '원고 15점, 피고 15점, 청구취지 20점, 청구원인 20점, 입증서류 30점'}
 
 출제: ${sc.title}|${sc.court}|원고:${sc.plaintiff}|피고:${sc.defendant}
 ${sc.claim_purpose ? `모범취지: ${sc.claim_purpose}` : ''}

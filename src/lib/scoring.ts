@@ -216,7 +216,7 @@ export function ruleGrade(data: ComplaintFormData, answer?: SampleCase | null): 
   const bd: ScoreBreakdown = { parties: 0, claim: 0, cause: 0, evidence: 0 }
   const issues: string[] = []
   const isAnswer = data.doc_type === 'answer'
-  const maxP = isAnswer ? 20 : 25, maxCl = isAnswer ? 30 : 25, maxCa = isAnswer ? 30 : 30, maxEv = 20
+  const maxP = isAnswer ? 20 : 30, maxCl = isAnswer ? 30 : 20, maxCa = isAnswer ? 30 : 20, maxEv = 30
 
   const ps = data.parties || []
   const hasW = ps.some(p => p.role === '원고' && p.name?.trim())
