@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import CaseDetailModal, { type CaseInfo } from '@/components/common/CaseDetailModal'
 import DocumentViewerModal, { type DocViewerData } from '@/components/common/DocumentViewerModal'
+import DeliveryHistoryModal, { type DeliveryHistoryDoc } from '@/components/common/DeliveryHistoryModal'
 
 interface DeliveryDoc {
   id: string; court: string; division: string; case_number: string
@@ -40,9 +41,10 @@ const tdS: React.CSSProperties = { padding: '8px 8px', fontSize: 12, borderBotto
 // 미확인송달문서
 // ════════════════════════════════════════════
 export function UnconfirmedDeliveryContent({
-  userId, onCountChange, PageHd, ActBtn
+  userId, userName, onCountChange, PageHd, ActBtn
 }: {
   userId: string
+  userName?: string
   onCountChange: (n: number) => void
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   PageHd: any
@@ -55,6 +57,7 @@ export function UnconfirmedDeliveryContent({
   const [page, setPage] = useState(1)
   const [caseModal, setCaseModal] = useState<CaseInfo | null>(null)
   const [docViewer, setDocViewer] = useState<DocViewerData | null>(null)
+  const [historyModal, setHistoryModal] = useState<DeliveryHistoryDoc | null>(null)
   const perPage = 10
 
   async function openDocViewer(doc: DeliveryDoc) {
@@ -249,8 +252,8 @@ export function UnconfirmedDeliveryContent({
                   <td style={tdS}><CaseNoLink caseNo={doc.case_number} onClick={() => openCaseDetail(doc)} /></td>
                   <td style={{ ...tdS, textAlign: 'left' }}><DocNameCell doc={doc} onClick={() => openDocViewer(doc)} /></td>
                   <td style={tdS}>{doc.sent_at.replace(/-/g, '.')}</td>
-                  <td style={tdS}>{doc.has_publish && <button onClick={() => openDocViewer(doc)} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>발급/조회</button>}</td>
-                  <td style={tdS}><button onClick={() => openDocViewer(doc)} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>조회</button></td>
+                  <td style={tdS}>{doc.has_publish && <button onClick={() => { window.location.href = `/mypage/document-issue?docId=${doc.id}` }} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>발급/조회</button>}</td>
+                  <td style={tdS}><button onClick={() => setHistoryModal(doc as DeliveryHistoryDoc)} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>조회</button></td>
                   <td style={tdS}>{doc.has_submit_button && <button style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>제출</button>}</td>
                 </tr>
               ))}
@@ -290,6 +293,7 @@ export function UnconfirmedDeliveryContent({
 
       {caseModal && <CaseDetailModal caseInfo={caseModal} onClose={() => setCaseModal(null)} />}
       {docViewer && <DocumentViewerModal doc={docViewer} onClose={() => setDocViewer(null)} />}
+      {historyModal && <DeliveryHistoryModal doc={historyModal} userName={userName || '학생'} onClose={() => setHistoryModal(null)} />}
     </div>
   )
 }
@@ -298,9 +302,10 @@ export function UnconfirmedDeliveryContent({
 // 전체송달문서
 // ════════════════════════════════════════════
 export function AllDeliveryContent({
-  userId, onCountChange, PageHd, ActBtn
+  userId, userName, onCountChange, PageHd, ActBtn
 }: {
   userId: string
+  userName?: string
   onCountChange: (n: number) => void
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   PageHd: any
@@ -313,6 +318,7 @@ export function AllDeliveryContent({
   const [statusFilter, setStatusFilter] = useState('전체')
   const [caseModal, setCaseModal] = useState<CaseInfo | null>(null)
   const [docViewer, setDocViewer] = useState<DocViewerData | null>(null)
+  const [historyModal, setHistoryModal] = useState<DeliveryHistoryDoc | null>(null)
   const perPage = 10
 
   async function openDocViewer(doc: DeliveryDoc) {
@@ -481,8 +487,8 @@ export function AllDeliveryContent({
                   <td style={{ ...tdS, textAlign: 'left' }}><DocNameCell doc={doc} onClick={() => openDocViewer(doc)} /></td>
                   <td style={tdS}>{doc.sent_at.replace(/-/g, '.')}</td>
                   <td style={tdS}>{recvDisplay(doc)}</td>
-                  <td style={tdS}>{doc.has_publish && <button onClick={() => openDocViewer(doc)} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>발급/조회</button>}</td>
-                  <td style={tdS}><button onClick={() => openDocViewer(doc)} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>조회</button></td>
+                  <td style={tdS}>{doc.has_publish && <button onClick={() => { window.location.href = `/mypage/document-issue?docId=${doc.id}` }} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>발급/조회</button>}</td>
+                  <td style={tdS}><button onClick={() => setHistoryModal(doc as DeliveryHistoryDoc)} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>조회</button></td>
                   <td style={tdS}>{doc.has_submit_button && <button style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>제출</button>}</td>
                 </tr>
               ))}
@@ -518,6 +524,7 @@ export function AllDeliveryContent({
 
       {caseModal && <CaseDetailModal caseInfo={caseModal} onClose={() => setCaseModal(null)} />}
       {docViewer && <DocumentViewerModal doc={docViewer} onClose={() => setDocViewer(null)} />}
+      {historyModal && <DeliveryHistoryModal doc={historyModal} userName={userName || '학생'} onClose={() => setHistoryModal(null)} />}
     </div>
   )
 }

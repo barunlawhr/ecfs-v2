@@ -3355,8 +3355,8 @@ export default function MyPage() {
       case 'submitted-docs': return <SubmittedDocsContent />
       case 'schedule': return <ScheduleContent />
       case 'pay': return <PayContent />
-      case 'all-delivery': return <AllDeliveryPage userId={user?.id||''} onCountChange={setDeliveryUnconfirmedCount} PageHd={PageHd} ActBtn={ActBtn} />
-      case 'unread-delivery': return <UnconfirmedDeliveryPage userId={user?.id||''} onCountChange={setDeliveryUnconfirmedCount} PageHd={PageHd} ActBtn={ActBtn} />
+      case 'all-delivery': return <AllDeliveryPage userId={user?.id||''} userName={user?.name} onCountChange={setDeliveryUnconfirmedCount} PageHd={PageHd} ActBtn={ActBtn} />
+      case 'unread-delivery': return <UnconfirmedDeliveryPage userId={user?.id||''} userName={user?.name} onCountChange={setDeliveryUnconfirmedCount} PageHd={PageHd} ActBtn={ActBtn} />
       case 'alert-service': return <AlertServiceContent />
       case 'doc-history': return <DocHistoryContent />
       case 'delivery-detail': return <DeliveryDetailContent />
@@ -3366,8 +3366,8 @@ export default function MyPage() {
       case 'correction-list': return <CorrectionListContent />
       case 'completed-cases': return <CompletedCasesContent />
       case 'ecfs-reg': return <EcfsRegContent />
-      case 'unconfirmed-delivery-new': return <UnconfirmedDeliveryPage userId={user?.id||''} onCountChange={setDeliveryUnconfirmedCount} PageHd={PageHd} ActBtn={ActBtn} />
-      case 'all-delivery-new': return <AllDeliveryPage userId={user?.id||''} onCountChange={setDeliveryUnconfirmedCount} PageHd={PageHd} ActBtn={ActBtn} />
+      case 'unconfirmed-delivery-new': return <UnconfirmedDeliveryPage userId={user?.id||''} userName={user?.name} onCountChange={setDeliveryUnconfirmedCount} PageHd={PageHd} ActBtn={ActBtn} />
+      case 'all-delivery-new': return <AllDeliveryPage userId={user?.id||''} userName={user?.name} onCountChange={setDeliveryUnconfirmedCount} PageHd={PageHd} ActBtn={ActBtn} />
       case 'practice-complaint': return <PracticeContent docType="complaint" />
       case 'practice-answer': return <PracticeContent docType="answer" />
       case 'practice-brief': return <PracticeContent docType="brief" />
