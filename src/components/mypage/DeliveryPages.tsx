@@ -252,7 +252,7 @@ export function UnconfirmedDeliveryContent({
                   <td style={tdS}><CaseNoLink caseNo={doc.case_number} onClick={() => openCaseDetail(doc)} /></td>
                   <td style={{ ...tdS, textAlign: 'left' }}><DocNameCell doc={doc} onClick={() => openDocViewer(doc)} /></td>
                   <td style={tdS}>{doc.sent_at.replace(/-/g, '.')}</td>
-                  <td style={tdS}>{doc.has_publish && <button onClick={() => { window.location.href = `/mypage/document-issue?docId=${doc.id}` }} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>발급/조회</button>}</td>
+                  <td style={tdS}>{doc.has_publish && <button onClick={() => { window.open(`/mypage/document-issue?docId=${doc.id}`, '_blank') }} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>발급/조회</button>}</td>
                   <td style={tdS}><button onClick={() => setHistoryModal(doc as DeliveryHistoryDoc)} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>조회</button></td>
                   <td style={tdS}>{doc.has_submit_button && <button style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>제출</button>}</td>
                 </tr>
@@ -487,7 +487,7 @@ export function AllDeliveryContent({
                   <td style={{ ...tdS, textAlign: 'left' }}><DocNameCell doc={doc} onClick={() => openDocViewer(doc)} /></td>
                   <td style={tdS}>{doc.sent_at.replace(/-/g, '.')}</td>
                   <td style={tdS}>{recvDisplay(doc)}</td>
-                  <td style={tdS}>{doc.has_publish && <button onClick={() => { window.location.href = `/mypage/document-issue?docId=${doc.id}` }} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>발급/조회</button>}</td>
+                  <td style={tdS}>{doc.has_publish && <button onClick={() => { window.open(`/mypage/document-issue?docId=${doc.id}`, '_blank') }} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>발급/조회</button>}</td>
                   <td style={tdS}><button onClick={() => setHistoryModal(doc as DeliveryHistoryDoc)} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>조회</button></td>
                   <td style={tdS}>{doc.has_submit_button && <button style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>제출</button>}</td>
                 </tr>
