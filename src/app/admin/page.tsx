@@ -869,14 +869,8 @@ export default function AdminPage() {
     const [selectedStudent, setSelectedStudent] = useState<string | null>(null)
     const [regrading, setRegrading] = useState<Set<string>>(new Set())
 
-    // ── Submissions ──
-    interface SubRow { id: string; assignment_id: string; doc_type: string; submitted_at: string; rule_score: number | null; ai_score: number | null; final_score: number | null; feedback: string | null }
-    interface SubAMap { [id: string]: { student_id: string; case_id: string } }
-    interface SubCMap { [id: string]: { case_number: string; case_name: string } }
-
-    const [submissions, setSubmissions] = useState<SubRow[]>([])
-    const [subAMap, setSubAMap] = useState<SubAMap>({})
-    const [subCMap, setSubCMap] = useState<SubCMap>({})
+    // ── Submissions (= practice_records) ──
+    const [submissions, setSubmissions] = useState<PracticeRecord[]>([])
     const [subLoading, setSubLoading] = useState(true)
     const [subFilter, setSubFilter] = useState('')
 
@@ -908,21 +902,10 @@ export default function AdminPage() {
 
     const loadSubmissions = useCallback(async () => {
       setSubLoading(true)
-      const { data: subs, error: subErr } = await supabase.from('submissions').select('*').order('submitted_at', { ascending: false })
-      if (subErr) { setSubLoading(false); return }
-      const assignmentIds = [...new Set((subs || []).map((s: SubRow) => s.assignment_id).filter(Boolean))]
-      let aMap: SubAMap = {}
-      if (assignmentIds.length > 0) {
-        const { data: assignments } = await supabase.from('case_assignments').select('id, student_id, case_id').in('id', assignmentIds)
-        if (assignments) for (const a of assignments) aMap[a.id] = { student_id: a.student_id, case_id: a.case_id }
-      }
-      const caseIds = [...new Set(Object.values(aMap).map(a => a.case_id).filter(Boolean))]
-      let cMap: SubCMap = {}
-      if (caseIds.length > 0) {
-        const { data: cases } = await supabase.from('practice_cases').select('id, case_number, case_name').in('id', caseIds)
-        if (cases) for (const c of cases) cMap[c.id] = { case_number: c.case_number, case_name: c.case_name }
-      }
-      setSubmissions(subs || []); setSubAMap(aMap); setSubCMap(cMap); setSubLoading(false)
+      const { data, error: err } = await supabase.from('practice_records').select('*').order('created_at', { ascending: false })
+      if (err) { setSubLoading(false); return }
+      setSubmissions((data || []) as PracticeRecord[])
+      setSubLoading(false)
     }, [])
 
     useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -965,11 +948,8 @@ export default function AdminPage() {
     const selectedRecs = selectedStudent ? byStudent[selectedStudent] || [] : []
     const selectedAcc = selectedStudent ? allAccounts.find(a => a.login_id === selectedStudent) : null
 
-    // Submissions helpers
-    function getSubStudentId(sub: SubRow): string { const a = subAMap[sub.assignment_id]; return a ? a.student_id : '-' }
-    function getSubStudentName(sid: string): string { return nameOf(sid) }
-    function getSubCaseNumber(sub: SubRow): string { const a = subAMap[sub.assignment_id]; if (!a) return '-'; const c = subCMap[a.case_id]; return c ? c.case_number : '-' }
-    const filteredSubs = subFilter ? submissions.filter(s => getSubStudentId(s) === subFilter) : submissions
+    // Submissions helpers (practice_records 기반)
+    const filteredSubs = subFilter ? submissions.filter(s => s.student_id === subFilter) : submissions
 
     const tabStyle = (active: boolean): React.CSSProperties => ({
       padding: '10px 24px', fontSize: 14, fontWeight: 700, cursor: 'pointer', border: 'none',
@@ -1071,24 +1051,19 @@ export default function AdminPage() {
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, border: '1px solid #d0d8e4' }}>
                   <thead><tr style={{ background: '#1a3a6b', color: '#fff' }}>
-                    {['학생','사건번호','서류유형','제출일','규칙점수','AI점수','최종점수','피드백'].map(h => <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>)}
+                    {['학생','사건유형','서류유형','제출일','점수','피드백'].map(h => <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>)}
                   </tr></thead>
                   <tbody>
-                    {filteredSubs.map((s, i) => {
-                      const studentId = getSubStudentId(s)
-                      return (
+                    {filteredSubs.map((s, i) => (
                         <tr key={s.id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: '1px solid #e0e6ee' }}>
-                          <td style={{ padding: '9px 12px' }}>{getSubStudentName(studentId)}</td>
-                          <td style={{ padding: '9px 12px' }}>{getSubCaseNumber(s)}</td>
-                          <td style={{ padding: '9px 12px' }}>{s.doc_type === 'complaint' ? '소장' : s.doc_type === 'answer' ? '답변서' : (s.doc_type || '-')}</td>
-                          <td style={{ padding: '9px 12px' }}>{s.submitted_at ? new Date(s.submitted_at).toLocaleDateString('ko-KR') : '-'}</td>
-                          <td style={{ padding: '9px 12px', color: subScoreColor(s.rule_score), fontWeight: 700 }}>{s.rule_score !== null && s.rule_score !== undefined ? s.rule_score : '-'}</td>
-                          <td style={{ padding: '9px 12px', color: subScoreColor(s.ai_score), fontWeight: 700 }}>{s.ai_score !== null && s.ai_score !== undefined ? s.ai_score : '-'}</td>
-                          <td style={{ padding: '9px 12px', color: subScoreColor(s.final_score), fontWeight: 700 }}>{s.final_score !== null && s.final_score !== undefined ? s.final_score : '-'}</td>
-                          <td style={{ padding: '9px 12px', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.feedback || '-'}</td>
+                          <td style={{ padding: '9px 12px' }}>{nameOf(s.student_id)}</td>
+                          <td style={{ padding: '9px 12px' }}>{s.case_type || '-'}</td>
+                          <td style={{ padding: '9px 12px' }}>{s.doc_type === 'answer' ? '답변서' : s.doc_type === 'complaint' ? '소장' : (s.doc_type || '소장')}</td>
+                          <td style={{ padding: '9px 12px' }}>{s.created_at ? new Date(s.created_at).toLocaleDateString('ko-KR') : '-'}</td>
+                          <td style={{ padding: '9px 12px', color: subScoreColor(s.score), fontWeight: 700 }}>{s.score ?? '-'}</td>
+                          <td style={{ padding: '9px 12px', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.feedback || '-'}</td>
                         </tr>
-                      )
-                    })}
+                    ))}
                   </tbody>
                 </table>
               </div>
