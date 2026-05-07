@@ -391,6 +391,24 @@ export function AllDeliveryContent({
           <span style={{ fontSize: 12, fontWeight: 600, color: '#555', marginLeft: 16 }}>법원</span>
           <select style={{ height: 30, border: '1px solid #c8cdd6', borderRadius: 3, fontSize: 12, padding: '0 8px' }}><option>전체</option></select>
         </div>
+        {/* 발송일자 / 사건번호 라디오 */}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}><input type="radio" name="allSearchMode" defaultChecked style={{ accentColor: TEAL }} /> 발송일자</label>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {['오늘', '3일', '1주일', '1개월'].map(l => (
+              <button key={l} style={{ height: 26, padding: '0 10px', border: '1px solid #c8cdd6', borderRadius: 3, fontSize: 11, background: '#fff', cursor: 'pointer' }}>{l}</button>
+            ))}
+          </div>
+          <input type="date" style={{ height: 28, border: '1px solid #c8cdd6', borderRadius: 3, fontSize: 11, padding: '0 6px' }} />
+          <span style={{ fontSize: 11, color: '#999' }}>~</span>
+          <input type="date" style={{ height: 28, border: '1px solid #c8cdd6', borderRadius: 3, fontSize: 11, padding: '0 6px' }} />
+        </div>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}><input type="radio" name="allSearchMode" style={{ accentColor: TEAL }} /> 사건번호</label>
+          <select style={{ height: 28, border: '1px solid #c8cdd6', borderRadius: 3, fontSize: 12, padding: '0 6px' }}><option>2026</option><option>2025</option></select>
+          <select style={{ height: 28, border: '1px solid #c8cdd6', borderRadius: 3, fontSize: 12, padding: '0 6px' }}><option>가단</option><option>가합</option><option>가소</option></select>
+          <input style={{ height: 28, width: 100, border: '1px solid #c8cdd6', borderRadius: 3, fontSize: 12, padding: '0 8px' }} />
+        </div>
         <div style={{ textAlign: 'center', paddingTop: 4 }}>
           <button style={{ height: 34, padding: '0 48px', background: TEAL, color: '#fff', border: 'none', borderRadius: 3, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>조 회</button>
         </div>
