@@ -151,11 +151,13 @@ export function UnconfirmedDeliveryContent({
 
   async function excelDownload() {
     const xlsx = await import('xlsx')
-    const rows = docs.map(d => ({ 법원: d.court, 재판부: d.division, 사건번호: d.case_number, 송달문서: d.document_name, 발송일자: d.sent_at }))
+    const fmtD = (s: string) => s ? s.replace(/-/g, '.') : ''
+    const rows = docs.map((d, i) => ({ 번호: i + 1, 법원: d.court, 재판부: d.division, 사건번호: d.case_number, 송달문서: d.document_name, 발송일자: fmtD(d.sent_at) }))
     const ws = xlsx.utils.json_to_sheet(rows)
+    ws['!cols'] = [{ wch: 6 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 36 }, { wch: 14 }]
     const wb = xlsx.utils.book_new()
     xlsx.utils.book_append_sheet(wb, ws, '미확인송달문서')
-    xlsx.writeFile(wb, `미확인송달문서_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    xlsx.writeFile(wb, `미확인송달문서_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`)
   }
 
   const total = docs.length
@@ -347,11 +349,16 @@ export function AllDeliveryContent({
 
   async function excelDownload() {
     const xlsx = await import('xlsx')
-    const rows = docs.map(d => ({ 법원: d.court, 재판부: d.division, 사건번호: d.case_number, 송달문서: d.document_name, 발송일자: d.sent_at, 수신일자: d.received_at || '미확인' }))
+    const fmtD = (s: string) => s ? s.replace(/-/g, '.') : ''
+    const rows = filtered.map((d, i) => ({
+      번호: i + 1, 법원: d.court, 재판부: d.division, 사건번호: d.case_number, 송달문서: d.document_name, 발송일자: fmtD(d.sent_at),
+      수신일자: !d.received_at ? '미확인' : d.is_auto_confirmed ? `${fmtD(d.received_at)}(자동확인)` : fmtD(d.received_at),
+    }))
     const ws = xlsx.utils.json_to_sheet(rows)
+    ws['!cols'] = [{ wch: 6 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 36 }, { wch: 14 }, { wch: 20 }]
     const wb = xlsx.utils.book_new()
     xlsx.utils.book_append_sheet(wb, ws, '전체송달문서')
-    xlsx.writeFile(wb, `전체송달문서_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    xlsx.writeFile(wb, `전체송달문서_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`)
   }
 
   const filtered = docs.filter(d => {
