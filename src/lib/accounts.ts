@@ -9,6 +9,7 @@ export interface AccountRow {
   bar_num: string
   password?: string
   cohort?: string
+  last_login_at?: string | null
 }
 
 /**
@@ -17,7 +18,7 @@ export interface AccountRow {
 export async function fetchAccounts(): Promise<AccountRow[]> {
   const { data, error } = await supabase
     .from('accounts')
-    .select('login_id, name, org, role, email, bar_num, cohort')
+    .select('login_id, name, org, role, email, bar_num, cohort, last_login_at')
     .order('login_id')
   if (error) { console.error('accounts fetch error:', error.message); return [] }
   return data || []
@@ -29,7 +30,7 @@ export async function fetchAccounts(): Promise<AccountRow[]> {
 export async function fetchStudents(): Promise<AccountRow[]> {
   const { data, error } = await supabase
     .from('accounts')
-    .select('login_id, name, org, role, email, bar_num, cohort')
+    .select('login_id, name, org, role, email, bar_num, cohort, last_login_at')
     .eq('role', 'student')
     .order('login_id')
   if (error) { console.error('students fetch error:', error.message); return [] }

@@ -24,6 +24,7 @@ interface AccountRow {
   cohort: string
   bar_num: string
   email: string
+  last_login_at?: string | null
   isHardcoded?: boolean
 }
 
@@ -391,14 +392,14 @@ export default function AdminPage() {
                   }}
                 />
               </th>
-              {['아이디', '이름', '소속', '역할', '이메일', '수정', '삭제'].map(h => (
+              {['아이디', '이름', '소속', '역할', '이메일', '최근 접속', '수정', '삭제'].map(h => (
                 <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={7} style={{ padding: 32, textAlign: 'center', color: '#999' }}>검색 결과가 없습니다.</td></tr>
+              <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center', color: '#999' }}>검색 결과가 없습니다.</td></tr>
             ) : filtered.map(acc => (
               <tr key={acc.login_id} style={{ background: acc.isHardcoded ? '#f5f7fc' : '#fff', borderBottom: '1px solid #e8edf5' }}>
                 <td style={{ padding: '7px 12px', textAlign: 'center' }}>
@@ -416,6 +417,9 @@ export default function AdminPage() {
                   {acc.isHardcoded && <span style={{ fontSize: 10, color: '#9ca3af', marginLeft: 6, border: '1px solid #d1d5db', borderRadius: 3, padding: '1px 5px' }}>기본</span>}
                 </td>
                 <td style={{ padding: '7px 12px', color: '#666' }}>{acc.email || '-'}</td>
+                <td style={{ padding: '7px 12px', fontSize: 11, color: acc.last_login_at ? '#333' : '#bbb', whiteSpace: 'nowrap' }}>
+                  {acc.last_login_at ? new Date(acc.last_login_at).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '없음'}
+                </td>
                 <td style={{ padding: '7px 12px' }}>
                   {/* 수정: 새로 추가한 관리자(role=admin, !isHardcoded)는 불가 */}
                   {!(acc.role === 'admin' && !acc.isHardcoded)

@@ -1,5 +1,5 @@
 import type { User } from '@/types'
-import { SB_URL, SB_KEY } from '@/lib/supabase'
+import { SB_URL, SB_KEY, supabase } from '@/lib/supabase'
 
 export interface AccountRecord {
   pw: string
@@ -44,6 +44,8 @@ export async function validateWithSupabase(id: string, pw: string): Promise<User
       if (Array.isArray(rows) && rows.length > 0) {
         const acc = rows[0]
         if (acc.password !== pw) return null
+        // Update last_login_at
+        supabase.from('accounts').update({ last_login_at: new Date().toISOString() }).eq('login_id', id).then(() => {})
         return {
           id: acc.login_id,
           name: acc.name,
