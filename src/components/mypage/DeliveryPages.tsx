@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import CaseDetailModal, { type CaseInfo } from '@/components/common/CaseDetailModal'
 
 interface DeliveryDoc {
   id: string; court: string; division: string; case_number: string
@@ -25,9 +26,10 @@ function DocNameCell({ doc }: { doc: DeliveryDoc }) {
   )
 }
 
-function CaseNoLink({ caseNo }: { caseNo: string }) {
-  return <span style={{ color: '#0067c2', textDecoration: 'underline', cursor: 'pointer' }}>{caseNo}</span>
+function CaseNoLink({ caseNo, onClick }: { caseNo: string; onClick: () => void }) {
+  return <span onClick={onClick} style={{ color: '#0067c2', textDecoration: 'underline', cursor: 'pointer' }}>{caseNo}</span>
 }
+
 
 const thS: React.CSSProperties = { padding: '8px 8px', fontWeight: 600, fontSize: 11, color: '#333', textAlign: 'center', whiteSpace: 'nowrap', background: '#f0f3f8', borderBottom: '2px solid #b8c8e0' }
 const tdS: React.CSSProperties = { padding: '8px 8px', fontSize: 12, borderBottom: '1px solid #eee', verticalAlign: 'middle', textAlign: 'center' }
@@ -49,7 +51,14 @@ export function UnconfirmedDeliveryContent({
   const [loading, setLoading] = useState(true)
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [page, setPage] = useState(1)
+  const [caseModal, setCaseModal] = useState<CaseInfo | null>(null)
   const perPage = 10
+
+  async function openCaseDetail(doc: DeliveryDoc) {
+    // 사건번호 클릭 → 사건 정보 팝업 (송달 확인 X)
+    const { data } = await supabase.from('practice_cases').select('*').eq('case_number', doc.case_number).maybeSingle()
+    setCaseModal((data as CaseInfo) || { case_number: doc.case_number, court: doc.court, division: doc.division, plaintiff: '-', defendant: '-' } as CaseInfo)
+  }
 
   const loadDocs = useCallback(async () => {
     setLoading(true)
@@ -198,7 +207,7 @@ export function UnconfirmedDeliveryContent({
                   <td style={tdS}><input type="checkbox" checked={checked.has(doc.id)} onChange={() => toggleCheck(doc.id)} /></td>
                   <td style={tdS}>{doc.court.replace('지방법원', '지법').replace('고등법원', '고법')}</td>
                   <td style={tdS}>{doc.division}</td>
-                  <td style={tdS}><CaseNoLink caseNo={doc.case_number} /></td>
+                  <td style={tdS}><CaseNoLink caseNo={doc.case_number} onClick={() => openCaseDetail(doc)} /></td>
                   <td style={{ ...tdS, textAlign: 'left' }}><DocNameCell doc={doc} /></td>
                   <td style={tdS}>{doc.sent_at.replace(/-/g, '.')}</td>
                   <td style={tdS}>{doc.has_publish && <button onClick={() => confirmDoc(doc.id)} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>발급/조회</button>}</td>
@@ -239,6 +248,8 @@ export function UnconfirmedDeliveryContent({
           </ul>
         </div>
       </div>
+
+      {caseModal && <CaseDetailModal caseInfo={caseModal} onClose={() => setCaseModal(null)} />}
     </div>
   )
 }
@@ -260,7 +271,13 @@ export function AllDeliveryContent({
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState('전체')
+  const [caseModal, setCaseModal] = useState<CaseInfo | null>(null)
   const perPage = 10
+
+  async function openCaseDetail(doc: DeliveryDoc) {
+    const { data } = await supabase.from('practice_cases').select('*').eq('case_number', doc.case_number).maybeSingle()
+    setCaseModal((data as CaseInfo) || { case_number: doc.case_number, court: doc.court, division: doc.division, plaintiff: '-', defendant: '-' } as CaseInfo)
+  }
 
   const loadDocs = useCallback(async () => {
     setLoading(true)
@@ -363,7 +380,7 @@ export function AllDeliveryContent({
                   <td style={tdS}><input type="checkbox" /></td>
                   <td style={tdS}>{doc.court.replace('지방법원', '지법').replace('고등법원', '고법')}</td>
                   <td style={tdS}>{doc.division}</td>
-                  <td style={tdS}><CaseNoLink caseNo={doc.case_number} /></td>
+                  <td style={tdS}><CaseNoLink caseNo={doc.case_number} onClick={() => openCaseDetail(doc)} /></td>
                   <td style={{ ...tdS, textAlign: 'left' }}><DocNameCell doc={doc} /></td>
                   <td style={tdS}>{doc.sent_at.replace(/-/g, '.')}</td>
                   <td style={tdS}>{recvDisplay(doc)}</td>
@@ -401,6 +418,8 @@ export function AllDeliveryContent({
           </ul>
         </div>
       </div>
+
+      {caseModal && <CaseDetailModal caseInfo={caseModal} onClose={() => setCaseModal(null)} />}
     </div>
   )
 }
