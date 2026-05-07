@@ -417,8 +417,14 @@ export default function AdminPage() {
                   {acc.isHardcoded && <span style={{ fontSize: 10, color: '#9ca3af', marginLeft: 6, border: '1px solid #d1d5db', borderRadius: 3, padding: '1px 5px' }}>기본</span>}
                 </td>
                 <td style={{ padding: '7px 12px', color: '#666' }}>{acc.email || '-'}</td>
-                <td style={{ padding: '7px 12px', fontSize: 11, color: acc.last_login_at ? '#333' : '#bbb', whiteSpace: 'nowrap' }}>
-                  {acc.last_login_at ? new Date(acc.last_login_at).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '없음'}
+                <td style={{ padding: '7px 12px', fontSize: 11, whiteSpace: 'nowrap' }}>
+                  {(() => {
+                    if (!acc.last_login_at) return <span style={{ color: '#bbb' }}>없음</span>
+                    const isOnline = Date.now() - new Date(acc.last_login_at).getTime() < 30 * 60 * 1000
+                    const dot = <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: isOnline ? '#3b82f6' : '#d1d5db', marginRight: 6, verticalAlign: 'middle' }} />
+                    const timeStr = new Date(acc.last_login_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+                    return <span style={{ color: isOnline ? '#1d4ed8' : '#888' }}>{dot}{timeStr}</span>
+                  })()}
                 </td>
                 <td style={{ padding: '7px 12px' }}>
                   {/* 수정: 새로 추가한 관리자(role=admin, !isHardcoded)는 불가 */}

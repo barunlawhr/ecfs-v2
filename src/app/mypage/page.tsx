@@ -155,6 +155,15 @@ export default function MyPage() {
     if (!loading && user?.role === 'admin') router.push('/admin')
   }, [user, loading, router])
 
+  // 활동 heartbeat: last_login_at 갱신 (접속 시 + 10분 간격)
+  useEffect(() => {
+    if (!user?.id) return
+    const ping = () => supabase.from('accounts').update({ last_login_at: new Date().toISOString() }).eq('login_id', user.id).then(() => {})
+    ping()
+    const iv = setInterval(ping, 10 * 60 * 1000)
+    return () => clearInterval(iv)
+  }, [user?.id])
+
   // URL 쿼리 파라미터로 초기 페이지 설정 (클라이언트 사이드)
   useEffect(() => {
     if (initialReady) return
