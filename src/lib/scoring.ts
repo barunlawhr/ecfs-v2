@@ -68,33 +68,33 @@ export function practiceGrade(data: PracticeSubmission, caseData: PracticeCaseDa
   }
 
   if (data.docType === 'complaint') {
-    // ① 원고 정보 (10점)
+    // ① 원고 정보 (15점)
     let pScore = 0
     if (!data.plaintiffName?.trim()) {
       issues.push('원고 이름을 입력해주세요.')
     } else {
       const nameMatch = norm(data.plaintiffName).includes(norm(caseData.plaintiff).split(' ')[0] || norm(caseData.plaintiff))
       const addrOk = (data.plaintiffAddr?.length || 0) > 5
-      if (nameMatch && addrOk) pScore = 10
-      else if (nameMatch || addrOk) { pScore = 5; issues.push('원고 정보를 정확히 확인해주세요.') }
+      if (nameMatch && addrOk) pScore = 15
+      else if (nameMatch || addrOk) { pScore = 8; issues.push('원고 정보를 정확히 확인해주세요.') }
       else { issues.push(`원고명이 사건의 원고(${caseData.plaintiff})와 다릅니다.`) }
     }
-    addItem('원고 정보', pScore, 10, pScore === 10 ? '정확합니다.' : '확인 필요')
+    addItem('원고 정보', pScore, 15, pScore === 15 ? '정확합니다.' : '확인 필요')
 
-    // ② 피고 정보 (10점)
+    // ② 피고 정보 (15점)
     let dScore = 0
     if (!data.defendantName?.trim()) {
       issues.push('피고 이름을 입력해주세요.')
     } else {
       const nameMatch = norm(data.defendantName).includes(norm(caseData.defendant).split(' ')[0] || norm(caseData.defendant))
       const addrOk = (data.defendantAddr?.length || 0) > 5
-      if (nameMatch && addrOk) dScore = 10
-      else if (nameMatch || addrOk) { dScore = 5; issues.push('피고 정보를 정확히 확인해주세요.') }
+      if (nameMatch && addrOk) dScore = 15
+      else if (nameMatch || addrOk) { dScore = 8; issues.push('피고 정보를 정확히 확인해주세요.') }
       else { issues.push(`피고명이 사건의 피고(${caseData.defendant})와 다릅니다.`) }
     }
-    addItem('피고 정보', dScore, 10, dScore === 10 ? '정확합니다.' : '확인 필요')
+    addItem('피고 정보', dScore, 15, dScore === 15 ? '정확합니다.' : '확인 필요')
 
-    // ③ 청구취지 (25점)
+    // ③ 청구취지 (20점)
     let cpScore = 0
     if (!data.claimPurpose || data.claimPurpose.length < 20) {
       issues.push('청구취지를 작성해주세요.')
@@ -102,20 +102,20 @@ export function practiceGrade(data: PracticeSubmission, caseData: PracticeCaseDa
       const sub = norm(data.claimPurpose)
       const reqKw = ['지급하라', '소송비용', '가집행']
       const kwMatches = reqKw.filter(k => sub.includes(k))
-      cpScore += Math.round((kwMatches.length / reqKw.length) * 15)
+      cpScore += Math.round((kwMatches.length / reqKw.length) * 12)
       // 금액 체크
       const sample = norm(caseData.sample_claim_purpose || '')
       const amtMatch = sample.match(/\d{1,3}(,\d{3})*/)
-      if (amtMatch && sub.includes(amtMatch[0])) cpScore += 10
+      if (amtMatch && sub.includes(amtMatch[0])) cpScore += 8
       else issues.push('청구취지에 정확한 청구금액을 기재해주세요.')
       if (kwMatches.length < reqKw.length) {
         const miss = reqKw.filter(k => !sub.includes(k))
         issues.push(`청구취지에 "${miss.join('", "')}" 표현이 누락되었습니다.`)
       }
     }
-    addItem('청구취지', cpScore, 25, cpScore >= 20 ? '잘 작성되었습니다.' : '수정이 필요합니다.')
+    addItem('청구취지', cpScore, 20, cpScore >= 16 ? '잘 작성되었습니다.' : '수정이 필요합니다.')
 
-    // ④ 청구원인 (35점)
+    // ④ 청구원인 (20점)
     let crScore = 0
     if (!data.claimReason || data.claimReason.length < 100) {
       issues.push('청구원인을 더 구체적으로 작성해주세요. (최소 100자)')
@@ -123,29 +123,29 @@ export function practiceGrade(data: PracticeSubmission, caseData: PracticeCaseDa
       const sub = norm(data.claimReason)
       const secs = ['당사자', '계약', '청구']
       const secMatches = secs.filter(s => sub.includes(s))
-      crScore += Math.round((secMatches.length / secs.length) * 20)
-      crScore += sub.length >= 300 ? 15 : sub.length >= 200 ? 10 : 5
+      crScore += Math.round((secMatches.length / secs.length) * 12)
+      crScore += sub.length >= 300 ? 8 : sub.length >= 200 ? 5 : 3
       if (secMatches.length < secs.length) {
         const miss = secs.filter(s => !sub.includes(s))
         issues.push(`청구원인에 "${miss.join('", "')}" 관련 내용을 추가해주세요.`)
       }
     }
-    addItem('청구원인', crScore, 35, crScore >= 28 ? '잘 작성되었습니다.' : '보완이 필요합니다.')
+    addItem('청구원인', crScore, 20, crScore >= 16 ? '잘 작성되었습니다.' : '보완이 필요합니다.')
 
-    // ⑤ 증거목록 (20점)
+    // ⑤ 증거목록 (30점)
     let evScore = 0
     if (!data.evidence || data.evidence.length === 0) {
       issues.push('증거 목록을 1개 이상 입력해주세요.')
     } else {
-      data.evidence.forEach((ev, i) => {
-        if (ev.name?.length > 0) evScore += 5
-        if (ev.purpose?.length > 0) evScore += 5
+      data.evidence.forEach((ev) => {
+        if (ev.name?.length > 0) evScore += 8
+        if (ev.purpose?.length > 0) evScore += 7
       })
-      evScore = Math.min(evScore, 20)
+      evScore = Math.min(evScore, 30)
       if (data.evidence.some(e => !e.name?.trim())) issues.push('증거명이 비어있는 항목이 있습니다.')
       if (data.evidence.some(e => !e.purpose?.trim())) issues.push('입증취지를 작성해주세요.')
     }
-    addItem('증거 목록', evScore, 20, evScore >= 16 ? '정확합니다.' : '증거 정보를 보완해주세요.')
+    addItem('증거 목록', evScore, 30, evScore >= 24 ? '정확합니다.' : '증거 정보를 보완해주세요.')
 
   } else if (data.docType === 'answer') {
     // ① 답변취지 (20점)
