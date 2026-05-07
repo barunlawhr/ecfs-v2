@@ -270,6 +270,41 @@ export default function DocumentIssuePage() {
         </tbody>
       </table>
 
+      {/* 참고하세요 */}
+      <div style={{ background: '#f8f9fb', border: '1px solid #d8dce8', borderRadius: 4, padding: '20px 24px', marginTop: 24, display: 'flex', gap: 20 }}>
+        <div style={{ fontSize: 48, color: '#8fa0b8', flexShrink: 0, lineHeight: 1 }}>&#128433;</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#222', marginBottom: 12 }}>참고하세요</div>
+
+          <div style={{ fontSize: 13, fontWeight: 700, color: NAVY, marginTop: 12, marginBottom: 4 }}>• 발급</div>
+          <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8, marginLeft: 12 }}>
+            &apos;발급&apos; 버튼을 이용하여 발급하여야 &apos;열람용&apos;이라는 문구가 기재되지 않은 등본을 출력할 수 있고, 그렇지 않은 경우는 &apos;열람용&apos;이라는 문구가 포함되어 출력되는 점에 유의하시기 바랍니다.<br />
+            <span style={{ color: '#e53e3e', fontWeight: 600 }}>판결(판결에 갈음하는 결정, 조서 포함) 정(등)본은 발급횟수를 1회로 제한하고 그 외의 정(등)본 문서는 제한 없이 발급 가능합니다.</span><br />
+            발급문서는 문서위조변조방지 기술이 적용된 것으로 원본과 동일하므로 그 발급 문서를 법원이나 필요로 하는 관청에 제출할 수 있습니다.
+          </div>
+
+          <div style={{ fontSize: 13, fontWeight: 700, color: NAVY, marginTop: 12, marginBottom: 4 }}>• 발급테스트</div>
+          <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8, marginLeft: 12 }}>
+            발급하시기 전에 먼저 발급테스트를 눌러 문서위조변조방지 기술이 적용된 QR 코드가 표시된 테스트페이지가 출력되는지를 확인하시기 바랍니다.
+          </div>
+
+          <div style={{ fontSize: 13, fontWeight: 700, color: NAVY, marginTop: 12, marginBottom: 4 }}>• 발급가능 프린트</div>
+          <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8, marginLeft: 12 }}>
+            프린터 발급가능 프린터 확인하기를 선택하여 발급 가능한 프린터가 연결되어 있는지 확인하시기 바랍니다.<br />
+            프린터는 기본값이 <span style={{ color: '#e53e3e', fontWeight: 600 }}>600dpi급 이상</span>으로 설정되어야 정상적인 발급서비스를 받으실 수 있습니다.
+          </div>
+
+          <div style={{ fontSize: 13, fontWeight: 700, color: NAVY, marginTop: 12, marginBottom: 4 }}>• 재발급요청</div>
+          <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8, marginLeft: 12 }}>
+            전자소송시스템의 장애 등 사용자에게 책임이 없는 사유로 인하여 발급이 정상적으로 완료되지 아니한 경우에는 그 사유를 소명하여 재발급을 신청할 수 있습니다.
+          </div>
+
+          <div style={{ fontSize: 12, color: '#e53e3e', fontWeight: 600, lineHeight: 1.8, marginTop: 12, marginLeft: 12 }}>
+            - 보존일로부터 1년이 경과된 사건의 경우 (재)발급이 불가합니다.
+          </div>
+        </div>
+      </div>
+
       {/* 뒤로가기 */}
       <div style={{ textAlign: 'center', marginTop: 16 }}>
         <button onClick={() => window.history.back()} style={{ height: 34, padding: '0 32px', background: '#e0e4ec', border: 'none', borderRadius: 3, fontSize: 13, cursor: 'pointer' }}>뒤로가기</button>
