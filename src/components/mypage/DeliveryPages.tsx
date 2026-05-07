@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import CaseDetailModal, { type CaseInfo } from '@/components/common/CaseDetailModal'
+import DocumentViewerModal, { type DocViewerData } from '@/components/common/DocumentViewerModal'
 
 interface DeliveryDoc {
   id: string; court: string; division: string; case_number: string
@@ -10,16 +11,17 @@ interface DeliveryDoc {
   is_auto_confirmed: boolean; has_publish: boolean
   icon_color: string; document_category: string; has_submit_button: boolean
   student_id: string | null
+  template_data?: Record<string, unknown> | null
 }
 
 const TEAL = '#00897b'
 const NAVY = '#003366'
 const COLOR_MAP: Record<string, string> = { red: '#e53e3e', blue: '#0067c2', none: '#222' }
 
-function DocNameCell({ doc }: { doc: DeliveryDoc }) {
+function DocNameCell({ doc, onClick }: { doc: DeliveryDoc; onClick?: () => void }) {
   const color = COLOR_MAP[doc.icon_color] || '#222'
   return (
-    <span style={{ color, cursor: 'pointer', textDecoration: 'underline', fontWeight: doc.icon_color !== 'none' ? 600 : 400 }}>
+    <span onClick={onClick} style={{ color, cursor: 'pointer', textDecoration: 'underline', fontWeight: doc.icon_color !== 'none' ? 600 : 400 }}>
       {doc.icon_color !== 'none' && <span style={{ marginRight: 4, fontWeight: 700, color }}>(!)</span>}
       {doc.document_name}
     </span>
@@ -52,7 +54,19 @@ export function UnconfirmedDeliveryContent({
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [page, setPage] = useState(1)
   const [caseModal, setCaseModal] = useState<CaseInfo | null>(null)
+  const [docViewer, setDocViewer] = useState<DocViewerData | null>(null)
   const perPage = 10
+
+  async function openDocViewer(doc: DeliveryDoc) {
+    // 열람 처리: received_at이 NULL이면 오늘 날짜로 업데이트
+    if (!doc.received_at) {
+      const today = new Date().toISOString().slice(0, 10)
+      await supabase.from('delivery_documents').update({ received_at: today }).eq('id', doc.id)
+      setDocs(prev => prev.filter(d => d.id !== doc.id))
+      onCountChange(docs.length - 1)
+    }
+    setDocViewer(doc as DocViewerData)
+  }
 
   async function openCaseDetail(doc: DeliveryDoc) {
     // 사건번호 클릭 → 사건 정보 팝업 (송달 확인 X)
@@ -233,10 +247,10 @@ export function UnconfirmedDeliveryContent({
                   <td style={tdS}>{doc.court.replace('지방법원', '지법').replace('고등법원', '고법')}</td>
                   <td style={tdS}>{doc.division}</td>
                   <td style={tdS}><CaseNoLink caseNo={doc.case_number} onClick={() => openCaseDetail(doc)} /></td>
-                  <td style={{ ...tdS, textAlign: 'left' }}><DocNameCell doc={doc} /></td>
+                  <td style={{ ...tdS, textAlign: 'left' }}><DocNameCell doc={doc} onClick={() => openDocViewer(doc)} /></td>
                   <td style={tdS}>{doc.sent_at.replace(/-/g, '.')}</td>
-                  <td style={tdS}>{doc.has_publish && <button onClick={() => confirmDoc(doc.id)} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>발급/조회</button>}</td>
-                  <td style={tdS}><button onClick={() => confirmDoc(doc.id)} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>조회</button></td>
+                  <td style={tdS}>{doc.has_publish && <button onClick={() => openDocViewer(doc)} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>발급/조회</button>}</td>
+                  <td style={tdS}><button onClick={() => openDocViewer(doc)} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>조회</button></td>
                   <td style={tdS}>{doc.has_submit_button && <button style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>제출</button>}</td>
                 </tr>
               ))}
@@ -275,6 +289,7 @@ export function UnconfirmedDeliveryContent({
       </div>
 
       {caseModal && <CaseDetailModal caseInfo={caseModal} onClose={() => setCaseModal(null)} />}
+      {docViewer && <DocumentViewerModal doc={docViewer} onClose={() => setDocViewer(null)} />}
     </div>
   )
 }
@@ -297,7 +312,18 @@ export function AllDeliveryContent({
   const [page, setPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState('전체')
   const [caseModal, setCaseModal] = useState<CaseInfo | null>(null)
+  const [docViewer, setDocViewer] = useState<DocViewerData | null>(null)
   const perPage = 10
+
+  async function openDocViewer(doc: DeliveryDoc) {
+    if (!doc.received_at) {
+      const today = new Date().toISOString().slice(0, 10)
+      await supabase.from('delivery_documents').update({ received_at: today }).eq('id', doc.id)
+      setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, received_at: today } : d))
+      onCountChange(docs.filter(d => !d.received_at).length - 1)
+    }
+    setDocViewer(doc as DocViewerData)
+  }
 
   async function openCaseDetail(doc: DeliveryDoc) {
     const { data } = await supabase.from('practice_cases').select('*').eq('case_number', doc.case_number).maybeSingle()
@@ -452,11 +478,11 @@ export function AllDeliveryContent({
                   <td style={tdS}>{doc.court.replace('지방법원', '지법').replace('고등법원', '고법')}</td>
                   <td style={tdS}>{doc.division}</td>
                   <td style={tdS}><CaseNoLink caseNo={doc.case_number} onClick={() => openCaseDetail(doc)} /></td>
-                  <td style={{ ...tdS, textAlign: 'left' }}><DocNameCell doc={doc} /></td>
+                  <td style={{ ...tdS, textAlign: 'left' }}><DocNameCell doc={doc} onClick={() => openDocViewer(doc)} /></td>
                   <td style={tdS}>{doc.sent_at.replace(/-/g, '.')}</td>
                   <td style={tdS}>{recvDisplay(doc)}</td>
-                  <td style={tdS}>{doc.has_publish && <button style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>발급/조회</button>}</td>
-                  <td style={tdS}><button style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>조회</button></td>
+                  <td style={tdS}>{doc.has_publish && <button onClick={() => openDocViewer(doc)} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>발급/조회</button>}</td>
+                  <td style={tdS}><button onClick={() => openDocViewer(doc)} style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>조회</button></td>
                   <td style={tdS}>{doc.has_submit_button && <button style={{ height: 22, padding: '0 8px', background: '#fff', border: '1px solid #8899bb', borderRadius: 3, fontSize: 11, cursor: 'pointer', color: NAVY }}>제출</button>}</td>
                 </tr>
               ))}
@@ -491,6 +517,7 @@ export function AllDeliveryContent({
       </div>
 
       {caseModal && <CaseDetailModal caseInfo={caseModal} onClose={() => setCaseModal(null)} />}
+      {docViewer && <DocumentViewerModal doc={docViewer} onClose={() => setDocViewer(null)} />}
     </div>
   )
 }
