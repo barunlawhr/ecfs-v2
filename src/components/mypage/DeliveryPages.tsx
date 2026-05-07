@@ -244,7 +244,7 @@ export function UnconfirmedDeliveryContent({
           <div style={{ fontSize: 13, fontWeight: 700, color: '#333', marginBottom: 8 }}>참고하세요</div>
           <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: '#555', lineHeight: 1.9 }}>
             <li><span style={{ color: '#e53e3e', fontWeight: 700 }}>(!)</span> 송달문서를 반드시 확인해 주세요. 송달문서에 대한 불복문서를 제출하고자 하는 경우 제출기간 도과에 따른 불이익이 발생하지 않도록 주의하시기 바랍니다.</li>
-            <li><span style={{ color: '#e53e3e', fontWeight: 700 }}>(!)</span> 송달문서를 확인해 주세요. 제출기한이 있는 송달문서의 경우 기한 내에 해당 서류가 법원에 접수될 수 있도록 유의하시기 바랍니다.</li>
+            <li><span style={{ color: '#0067c2', fontWeight: 700 }}>(!)</span> 송달문서를 확인해 주세요. 제출기한이 있는 송달문서의 경우 기한 내에 해당 서류가 법원에 접수될 수 있도록 유의하시기 바랍니다.</li>
           </ul>
         </div>
       </div>
@@ -414,7 +414,7 @@ export function AllDeliveryContent({
           <div style={{ fontSize: 13, fontWeight: 700, color: '#333', marginBottom: 8 }}>참고하세요</div>
           <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: '#555', lineHeight: 1.9 }}>
             <li><span style={{ color: '#e53e3e', fontWeight: 700 }}>(!)</span> 송달문서를 반드시 확인해 주세요. 송달문서에 대한 불복문서를 제출하고자 하는 경우 제출기간 도과에 따른 불이익이 발생하지 않도록 주의하시기 바랍니다.</li>
-            <li><span style={{ color: '#e53e3e', fontWeight: 700 }}>(!)</span> 송달문서를 확인해 주세요. 제출기한이 있는 송달문서의 경우 기한 내에 해당 서류가 법원에 접수될 수 있도록 유의하시기 바랍니다.</li>
+            <li><span style={{ color: '#0067c2', fontWeight: 700 }}>(!)</span> 송달문서를 확인해 주세요. 제출기한이 있는 송달문서의 경우 기한 내에 해당 서류가 법원에 접수될 수 있도록 유의하시기 바랍니다.</li>
           </ul>
         </div>
       </div>
