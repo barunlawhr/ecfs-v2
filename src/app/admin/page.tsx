@@ -1291,18 +1291,19 @@ export default function AdminPage() {
     const [csvLoading, setCsvLoading] = useState(false)
 
     useEffect(() => {
-      // siteName/mockBarText 제거됨
-      setAiFeedback(localStorage.getItem('ai_feedback_enabled') !== 'false')
-      setScoreReveal(localStorage.getItem('score_reveal') || 'immediate')
-      setSubmitLimit(localStorage.getItem('submit_limit') || 'unlimited')
-      try {
-        const w = JSON.parse(localStorage.getItem('scoring_weights') || 'null')
-        if (w && typeof w === 'object') setWeights(w)
-      } catch { /* ignore */ }
-      try {
-        const n = JSON.parse(localStorage.getItem('notices') || 'null')
-        if (Array.isArray(n)) setNotices(n)
-      } catch { /* ignore */ }
+      // Supabase에서 설정 로드
+      ;(async () => {
+        const { data } = await supabase.from('system_settings').select('key, value')
+        if (data) {
+          const m: Record<string, string> = {}
+          data.forEach(r => { m[r.key] = r.value })
+          if (m.ai_feedback_enabled) setAiFeedback(m.ai_feedback_enabled !== 'false')
+          if (m.score_reveal) setScoreReveal(m.score_reveal)
+          if (m.submit_limit) setSubmitLimit(m.submit_limit)
+          if (m.scoring_weights) try { setWeights(JSON.parse(m.scoring_weights)) } catch { /* */ }
+          if (m.notices) try { setNotices(JSON.parse(m.notices)) } catch { /* */ }
+        }
+      })()
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     const weightsTotal = Math.round((weights.plaintiff + weights.defendant + weights.purpose + weights.reason + weights.evidence) * 10) / 10
@@ -1313,21 +1314,27 @@ export default function AdminPage() {
 
     // saveSection1 제거됨 — 사이트명/배너 하드코딩
 
-    function saveSection2() {
-      localStorage.setItem('ai_feedback_enabled', String(aiFeedback))
-      localStorage.setItem('score_reveal', scoreReveal)
-      localStorage.setItem('submit_limit', submitLimit)
+    async function saveSection2() {
+      await supabase.from('system_settings').upsert([
+        { key: 'ai_feedback_enabled', value: String(aiFeedback) },
+        { key: 'score_reveal', value: scoreReveal },
+        { key: 'submit_limit', value: submitLimit },
+      ], { onConflict: 'key' })
       showToast('실습 설정이 저장되었습니다.')
     }
 
-    function saveSection3() {
+    async function saveSection3() {
       if (weightsTotal !== 100) { alert(`합계가 ${weightsTotal}점입니다. 합산이 100점이 되도록 조정해주세요.`); return }
-      localStorage.setItem('scoring_weights', JSON.stringify(weights))
+      await supabase.from('system_settings').upsert([
+        { key: 'scoring_weights', value: JSON.stringify(weights) },
+      ], { onConflict: 'key' })
       showToast('채점 기준이 저장되었습니다.')
     }
 
     function persistNotices(updated: typeof notices) {
-      localStorage.setItem('notices', JSON.stringify(updated))
+      supabase.from('system_settings').upsert([
+        { key: 'notices', value: JSON.stringify(updated) },
+      ], { onConflict: 'key' })
       setNotices(updated)
     }
 
