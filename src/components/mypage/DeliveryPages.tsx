@@ -19,7 +19,7 @@ function DocNameCell({ doc }: { doc: DeliveryDoc }) {
   const color = COLOR_MAP[doc.icon_color] || '#222'
   return (
     <span style={{ color, cursor: 'pointer', textDecoration: 'underline', fontWeight: doc.icon_color !== 'none' ? 600 : 400 }}>
-      {doc.icon_color !== 'none' && <span style={{ marginRight: 4, fontWeight: 700 }}>❗</span>}
+      {doc.icon_color !== 'none' && <span style={{ marginRight: 4, fontWeight: 700, color }}>(!)</span>}
       {doc.document_name}
     </span>
   )
@@ -230,12 +230,12 @@ export function UnconfirmedDeliveryContent({
 
       {/* 참고 박스 */}
       <div style={{ background: '#f8f9fb', border: '1px solid #d8dce8', borderRadius: 4, padding: 16, marginTop: 20, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <div style={{ fontSize: 32, marginTop: 2, opacity: 0.6 }}>🖱️</div>
+        <div style={{ width: 48, height: 48, background: '#e8edf4', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div>
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#333', marginBottom: 8 }}>참고하세요</div>
           <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: '#555', lineHeight: 1.9 }}>
-            <li>❗ 송달문서를 반드시 확인해 주세요. 송달문서에 대한 불복문서를 제출하고자 하는 경우 제출기간 도과에 따른 불이익이 발생하지 않도록 주의하시기 바랍니다.</li>
-            <li>❗ 송달문서를 확인해 주세요. 제출기한이 있는 송달문서의 경우 기한 내에 해당 서류가 법원에 접수될 수 있도록 유의하시기 바랍니다.</li>
+            <li><span style={{ color: '#e53e3e', fontWeight: 700 }}>(!)</span> 송달문서를 반드시 확인해 주세요. 송달문서에 대한 불복문서를 제출하고자 하는 경우 제출기간 도과에 따른 불이익이 발생하지 않도록 주의하시기 바랍니다.</li>
+            <li><span style={{ color: '#e53e3e', fontWeight: 700 }}>(!)</span> 송달문서를 확인해 주세요. 제출기한이 있는 송달문서의 경우 기한 내에 해당 서류가 법원에 접수될 수 있도록 유의하시기 바랍니다.</li>
           </ul>
         </div>
       </div>
@@ -392,12 +392,12 @@ export function AllDeliveryContent({
 
       {/* 참고 박스 */}
       <div style={{ background: '#f8f9fb', border: '1px solid #d8dce8', borderRadius: 4, padding: 16, marginTop: 20, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <div style={{ fontSize: 32, marginTop: 2, opacity: 0.6 }}>🖱️</div>
+        <div style={{ width: 48, height: 48, background: '#e8edf4', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div>
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#333', marginBottom: 8 }}>참고하세요</div>
           <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: '#555', lineHeight: 1.9 }}>
-            <li>❗ 송달문서를 반드시 확인해 주세요. 송달문서에 대한 불복문서를 제출하고자 하는 경우 제출기간 도과에 따른 불이익이 발생하지 않도록 주의하시기 바랍니다.</li>
-            <li>❗ 송달문서를 확인해 주세요. 제출기한이 있는 송달문서의 경우 기한 내에 해당 서류가 법원에 접수될 수 있도록 유의하시기 바랍니다.</li>
+            <li><span style={{ color: '#e53e3e', fontWeight: 700 }}>(!)</span> 송달문서를 반드시 확인해 주세요. 송달문서에 대한 불복문서를 제출하고자 하는 경우 제출기간 도과에 따른 불이익이 발생하지 않도록 주의하시기 바랍니다.</li>
+            <li><span style={{ color: '#e53e3e', fontWeight: 700 }}>(!)</span> 송달문서를 확인해 주세요. 제출기한이 있는 송달문서의 경우 기한 내에 해당 서류가 법원에 접수될 수 있도록 유의하시기 바랍니다.</li>
           </ul>
         </div>
       </div>
